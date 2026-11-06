@@ -198,6 +198,7 @@ dependencies = [
  "criterion",
  "fixed",
  "fulcrum",
+ "serde_json",
 ]
 
 [[package]]

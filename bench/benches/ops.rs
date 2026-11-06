@@ -7,6 +7,8 @@
 //! compiler may vectorize. `latency`: a dependent chain, one result feeds the
 //! next operation. `fixed` is measured with its default operators (wrapping in
 //! release, truncating) and with `saturating_*` (closest to fulcrum).
+//!
+//! The latency chains keep `|x|` in `[0.25, 4)`, see [`bounded_chain`].
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
@@ -30,6 +32,8 @@ macro_rules! bench_ops {
         let add = $add;
         let mul = $mul;
         let div = $div;
+        let (mul_start, mul_chain) = bounded_chain($make, mul, 3);
+        let (div_start, div_chain) = bounded_chain($make, div, 4);
 
         let mut g = $c.benchmark_group("throughput");
         g.throughput(Throughput::Elements(N as u64));
@@ -66,9 +70,9 @@ macro_rules! bench_ops {
         g.throughput(Throughput::Elements(CHAIN as u64));
         g.bench_function(BenchmarkId::new("mul", $name), |bn| {
             bn.iter(|| {
-                let b = black_box(&b);
-                let mut x = black_box(a[0]);
-                for y in &b[..CHAIN] {
+                let ys = black_box(&mul_chain);
+                let mut x = black_box(mul_start);
+                for y in ys {
                     x = mul(x, *y);
                 }
                 black_box(x)
@@ -76,9 +80,9 @@ macro_rules! bench_ops {
         });
         g.bench_function(BenchmarkId::new("div", $name), |bn| {
             bn.iter(|| {
-                let b = black_box(&b);
-                let mut x = black_box(a[0]);
-                for y in &b[..CHAIN] {
+                let ys = black_box(&div_chain);
+                let mut x = black_box(div_start);
+                for y in ys {
                     x = div(x, *y);
                 }
                 black_box(x)
@@ -99,6 +103,39 @@ fn divisor(x: u64) -> i64 {
     } else {
         -m
     }
+}
+
+/// Operands for a dependent chain `x = op(x, y)` that keeps `|x|` in
+/// `[0.25, 4)`.
+///
+/// Random factors from `±[0.5, 2)` drift: a product of 1024 of them overflows
+/// and a quotient underflows, so floats would hit subnormals or infinity and
+/// fixed-point would saturate or reach zero, which measures special cases
+/// instead of ordinary arithmetic. Each step takes the factor `y` or its
+/// reciprocal, whichever keeps `x` in range, simulated in the type's own
+/// arithmetic.
+fn bounded_chain<T: Copy + PartialOrd>(
+    make: impl Fn(i64) -> T,
+    op: impl Fn(T, T) -> T,
+    seed: u64,
+) -> (T, Vec<T>) {
+    let (lo, hi) = (make(1 << 14), make(1 << 18));
+    let (nlo, nhi) = (make(-(1 << 14)), make(-(1 << 18)));
+    let ok = |t: T| (t >= lo && t < hi) || (t <= nlo && t > nhi);
+    let start = make(1 << 16);
+    let mut x = start;
+    let ys = inputs(CHAIN, seed)
+        .into_iter()
+        .map(|r| {
+            let q = divisor(r);
+            let y = make(q);
+            let y = if ok(op(x, y)) { y } else { make((1 << 32) / q) };
+            x = op(x, y);
+            assert!(ok(x), "chain left the range");
+            y
+        })
+        .collect();
+    (start, ys)
 }
 
 fn to_f64(q16: i64) -> f64 {
