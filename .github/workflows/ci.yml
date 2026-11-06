@@ -26,7 +26,7 @@ jobs:
             toolchain: nightly
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal && rustup default ${{ matrix.toolchain }}
       - run: cargo test --features std,float-convert
       - run: cargo test --features std,float-convert --release
@@ -40,14 +40,14 @@ jobs:
       run:
         working-directory: oracle
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo test --release
 
   stress:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: cargo test --release --test stress -- --ignored --nocapture
         env:
           FULCRUM_STRESS_SECS: "1200"
@@ -63,12 +63,12 @@ jobs:
       run:
         working-directory: fuzz
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install nightly --profile minimal
       - run: cargo install --locked cargo-fuzz
       - run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=600
       - if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts
@@ -76,7 +76,7 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup toolchain install 1.60 --profile minimal
       - run: cargo +1.60 build
       - run: cargo +1.60 build --all-features
@@ -85,7 +85,7 @@ jobs:
     name: 32-bit (i686)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
       - run: rustup target add i686-unknown-linux-gnu
       - run: cargo test --target i686-unknown-linux-gnu
@@ -93,14 +93,14 @@ jobs:
   no-std:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup target add thumbv7em-none-eabihf
       - run: cargo build --target thumbv7em-none-eabihf
 
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: rustup component add clippy rustfmt
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
@@ -117,7 +117,7 @@ jobs:
   kani:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: model-checking/kani-github-action@v1
 
   lean:
@@ -126,6 +126,6 @@ jobs:
       run:
         working-directory: verify/lean
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
       - run: ~/.elan/bin/lake build
