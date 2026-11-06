@@ -27,7 +27,7 @@ jobs:
       matrix:
         manifest: [Cargo.toml, oracle/Cargo.toml, bench/Cargo.toml, tools/gen-tables/Cargo.toml, fuzz/Cargo.toml]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: EmbarkStudios/cargo-deny-action@v2
         with:
           manifest-path: ${{ matrix.manifest }}
