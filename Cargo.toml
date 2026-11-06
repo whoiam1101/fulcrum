@@ -1,0 +1,34 @@
+[package]
+name = "fulcrum"
+version = "0.0.0"
+edition = "2021"
+authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
+rust-version = "1.60"
+license = "Apache-2.0"
+description = "Deterministic fixed-point math: bit-identical results on every platform, no floats inside."
+repository = "https://github.com/whoiam1101/fulcrum"
+readme = "README.md"
+keywords = ["fixed-point", "deterministic", "no_std", "math", "lockstep"]
+categories = ["mathematics", "no-std", "game-development"]
+include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
+
+[features]
+default = []
+alloc = []
+std = ["alloc"]
+float-convert = []
+strict-overflow = []
+
+[lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
+unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
+
+[lints.clippy]
+float_arithmetic = "deny"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+
+[workspace]

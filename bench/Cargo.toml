@@ -1,0 +1,25 @@
+[package]
+name = "fulcrum-bench"
+version = "0.0.0"
+edition = "2021"
+authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
+license = "Apache-2.0"
+publish = false
+description = "Speed and accuracy comparison of fulcrum with competitors (docs/ARCHITECTURE.md §7)."
+
+[workspace]
+
+[dependencies]
+fulcrum = { path = ".." }
+
+[dev-dependencies]
+criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
+fixed = "1"
+
+[[bench]]
+name = "ops"
+harness = false
+
+[profile.bench]
+codegen-units = 1
+lto = "fat"

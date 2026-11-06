@@ -1,0 +1,131 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 0"
+  workflow_dispatch:
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test:
+    name: test ${{ matrix.os }} ${{ matrix.toolchain }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
+        toolchain: [stable]
+        include:
+          - os: ubuntu-latest
+            toolchain: beta
+          - os: ubuntu-latest
+            toolchain: nightly
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal && rustup default ${{ matrix.toolchain }}
+      - run: cargo test --features std,float-convert
+      - run: cargo test --features std,float-convert --release
+      - run: cargo test --features strict-overflow --test strict
+      - if: github.event_name == 'schedule'
+        run: cargo test --release -- --ignored
+
+  oracle:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: oracle
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --release
+
+  stress:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: cargo test --release --test stress -- --ignored --nocapture
+        env:
+          FULCRUM_STRESS_SECS: "1200"
+
+  fuzz:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [parse, ops, format]
+    defaults:
+      run:
+        working-directory: fuzz
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install nightly --profile minimal
+      - run: cargo install --locked cargo-fuzz
+      - run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=600
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: fuzz/artifacts
+
+  msrv:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup toolchain install 1.60 --profile minimal
+      - run: cargo +1.60 build
+      - run: cargo +1.60 build --all-features
+
+  bit32:
+    name: 32-bit (i686)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
+      - run: rustup target add i686-unknown-linux-gnu
+      - run: cargo test --target i686-unknown-linux-gnu
+
+  no-std:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup target add thumbv7em-none-eabihf
+      - run: cargo build --target thumbv7em-none-eabihf
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: rustup component add clippy rustfmt
+      - run: cargo fmt --check
+      - run: cargo clippy --all-targets -- -D warnings
+      - name: generated tables are up to date
+        run: cargo run --manifest-path tools/gen-tables/Cargo.toml -- --check
+      - name: no regular comments
+        run: |
+          if grep -rnE '^\s*//([^/!]|$)|\s//([^/!]|$)|/\*' --include='*.rs' --exclude-dir=target .; then exit 1; fi
+          if grep -rnE '(^|\s)#' --include='*.toml' --include='*.yml' --include='*.yaml' --include='.gitignore' --exclude-dir=target --exclude-dir=.lake .; then exit 1; fi
+          if grep -rnE '(^|\s)--|/-[^-!]' --include='*.lean' --exclude-dir=.lake verify/lean; then exit 1; fi
+      - name: no platform-specific code in src
+        run: "! grep -rnE 'asm!|target_arch|target_pointer_width|target_endian|\\bf32\\b|\\bf64\\b' src --include=*.rs --exclude=float.rs"
+
+  kani:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: model-checking/kani-github-action@v1
+
+  lean:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: verify/lean
+    steps:
+      - uses: actions/checkout@v4
+      - run: curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+      - run: ~/.elan/bin/lake build

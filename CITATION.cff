@@ -1,0 +1,18 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it as below."
+type: software
+title: "fulcrum: deterministic fixed-point math for Rust"
+abstract: "Deterministic fixed-point math library for Rust: bit-identical results on every platform, no floating point inside, explicit overflow, no_std."
+authors:
+  - family-names: Safaryan
+    given-names: Samvel
+    email: samvelsafaryan1313@gmail.com
+repository-code: "https://github.com/whoiam1101/fulcrum"
+license: Apache-2.0
+version: 0.0.0
+keywords:
+  - fixed-point
+  - deterministic
+  - rust
+  - no_std
+  - lockstep

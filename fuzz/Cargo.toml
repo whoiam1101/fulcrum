@@ -1,0 +1,39 @@
+[package]
+name = "fulcrum-fuzz"
+version = "0.0.0"
+edition = "2021"
+authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
+license = "Apache-2.0"
+publish = false
+description = "cargo-fuzz targets for fulcrum (docs/ARCHITECTURE.md §6)."
+
+[package.metadata]
+cargo-fuzz = true
+
+[workspace]
+
+[dependencies]
+fulcrum = { path = ".." }
+fulcrum-oracle = { path = "../oracle" }
+libfuzzer-sys = "0.4"
+
+[[bin]]
+name = "parse"
+path = "fuzz_targets/parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ops"
+path = "fuzz_targets/ops.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "format"
+path = "fuzz_targets/format.rs"
+test = false
+doc = false
+bench = false

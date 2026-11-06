@@ -1,0 +1,20 @@
+[package]
+name = "fulcrum-oracle"
+version = "0.0.0"
+edition = "2021"
+authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
+license = "Apache-2.0"
+publish = false
+description = "Checks fulcrum against an exact rational oracle (docs/ARCHITECTURE.md §6)."
+
+[workspace]
+
+[dependencies]
+fulcrum = { path = ".." }
+num-bigint = "0.4"
+num-rational = "0.4"
+num-traits = "0.2"
+num-integer = "0.1"
+
+[dev-dependencies]
+proptest = "1"

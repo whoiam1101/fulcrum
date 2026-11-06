@@ -1,0 +1,15 @@
+[package]
+name = "fulcrum-gen-tables"
+version = "0.0.0"
+edition = "2021"
+authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
+license = "Apache-2.0"
+publish = false
+description = "Generates src/tables/*.rs and verify/gappa/*.g from one description (docs/ARCHITECTURE.md §4.4)."
+
+[workspace]
+
+[dependencies]
+num-bigint = "0.4"
+num-integer = "0.1"
+num-traits = "0.2"
