@@ -20,24 +20,16 @@ use common::*;
 use fulcrum::{FixedFloat32, FixedFloat64};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::Arc;
-use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant};
 
 const BATCH: u64 = 4096;
 const UNARY_EVERY: u64 = 64;
-
-fn env_u64(name: &str) -> Option<u64> {
-    std::env::var(name).ok().and_then(|v| v.parse().ok())
-}
 
 #[test]
 #[ignore = "long running: set FULCRUM_STRESS_SECS and run with --ignored --release"]
 fn stress_fixed32_fixed64() {
     let secs = env_u64("FULCRUM_STRESS_SECS").unwrap_or(60);
-    let seed = env_u64("FULCRUM_STRESS_SEED").unwrap_or_else(|| {
-        SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_or(1, |d| d.as_nanos() as u64)
-    });
+    let seed = seed_from_env("FULCRUM_STRESS_SEED");
     let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
     eprintln!(
         "stress: seed {} ({} s, {} threads); replay with FULCRUM_STRESS_SEED={}",

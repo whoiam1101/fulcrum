@@ -453,3 +453,18 @@ macro_rules! check_unary {
         }
     }};
 }
+
+/// Unsigned integer from the environment variable `name`, if set and valid.
+pub fn env_u64(name: &str) -> Option<u64> {
+    std::env::var(name).ok().and_then(|v| v.parse().ok())
+}
+
+/// Seed from the environment variable `name`, or from the clock when it is
+/// not set, so that a run can always be replayed from the printed value.
+pub fn seed_from_env(name: &str) -> u64 {
+    env_u64(name).unwrap_or_else(|| {
+        std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_or(1, |d| d.as_nanos() as u64)
+    })
+}
