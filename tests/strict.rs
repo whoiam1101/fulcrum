@@ -69,3 +69,16 @@ fn in_range_operations_and_explicit_methods_do_not_panic() {
         .sum();
     assert_eq!(s, FixedFloat8::MAX);
 }
+
+#[test]
+#[should_panic(expected = "strict-overflow")]
+fn shl_overflow_panics() {
+    let _ = FixedFloat8::ONE << 3;
+}
+
+#[test]
+fn shl_in_range_and_shr_do_not_panic() {
+    assert_eq!(FixedFloat8::ONE << 2, FixedFloat8::from_bits(64));
+    assert_eq!(FixedFloat8::MIN >> 200, FixedFloat8::ZERO);
+    assert_eq!(FixedFloat8::ONE.saturating_shl(3), FixedFloat8::MAX);
+}

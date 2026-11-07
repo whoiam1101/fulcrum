@@ -12,7 +12,7 @@
 
 macro_rules! impl_accumulator {
     (
-        $Acc:ident, $Name:ident, $Bits:ty, $F:literal, scale: $S:literal,
+        $Acc:ident, $Name:ident, $F:literal, scale: $S:literal,
         product: [$($product:tt)*]
     ) => {
         #[doc = concat!(
@@ -56,38 +56,16 @@ macro_rules! impl_accumulator {
                 Self { sum: self.sum.wrapping_add(other.sum) }
             }
 
-            #[inline]
-            const fn rounded(self) -> i128 {
-                if $S == $F {
-                    self.sum
-                } else {
-                    let s: u32 = $S - $F;
-                    (self.sum >> s) + ((self.sum >> s.saturating_sub(1)) & 1)
-                }
-            }
-
             /// The total, rounded once to nearest (ties toward `+∞`) and saturated.
             #[inline]
             pub const fn finish(self) -> $Name {
-                let w = self.rounded();
-                if w > <$Bits>::MAX as i128 {
-                    $Name::MAX
-                } else if w < <$Bits>::MIN as i128 {
-                    $Name::MIN
-                } else {
-                    $Name::from_bits(w as $Bits)
-                }
+                $Name::saturating_from_scaled_bits(self.sum, $S)
             }
 
             /// The total, rounded once, or `None` when it is out of range.
             #[inline]
             pub const fn checked_finish(self) -> Option<$Name> {
-                let w = self.rounded();
-                if w > <$Bits>::MAX as i128 || w < <$Bits>::MIN as i128 {
-                    None
-                } else {
-                    Some($Name::from_bits(w as $Bits))
-                }
+                $Name::checked_from_scaled_bits(self.sum, $S)
             }
         }
 

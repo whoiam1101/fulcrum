@@ -9,7 +9,7 @@ authors:
     email: samvelsafaryan1313@gmail.com
 repository-code: "https://github.com/whoiam1101/fulcrum"
 license: Apache-2.0
-version: 0.0.0
+version: 0.1.0
 keywords:
   - fixed-point
   - deterministic

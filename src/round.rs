@@ -1,34 +1,8 @@
 //! `floor`, `ceil`, `trunc`, `fract`, `round`, `round_ties_even`, `to_int_*`.
 
 macro_rules! impl_round {
-    ($Name:ident, $Bits:ty, $Wide:ty, $F:literal) => {
+    ($Name:ident, $Bits:ty, $F:literal, $k:ident) => {
         impl $Name {
-            const W_MASK: $Wide = (1 << $F) - 1;
-            const W_HALF: $Wide = 1 << ($F - 1);
-
-            #[inline]
-            const fn wide_round_half_away(self) -> $Wide {
-                let w = self.raw as $Wide;
-                if w >= 0 {
-                    (w + Self::W_HALF) & !Self::W_MASK
-                } else {
-                    -((Self::W_HALF - w) & !Self::W_MASK)
-                }
-            }
-
-            #[inline]
-            const fn wide_round_ties_even(self) -> $Wide {
-                let w = self.raw as $Wide;
-                let floor = w & !Self::W_MASK;
-                let frac = w & Self::W_MASK;
-                let odd = (w >> $F) & 1 == 1;
-                if frac > Self::W_HALF || (frac == Self::W_HALF && odd) {
-                    floor + (1 << $F)
-                } else {
-                    floor
-                }
-            }
-
             /// Largest integer `≤ self`. Never overflows.
             #[inline]
             pub const fn floor(self) -> Self {
@@ -40,13 +14,13 @@ macro_rules! impl_round {
             /// Smallest integer `≥ self`, saturating to `MAX` when it is out of range.
             #[inline]
             pub const fn ceil(self) -> Self {
-                Self::saturate(((self.raw as $Wide) + Self::W_MASK) & !Self::W_MASK)
+                Self::saturate(crate::kernel::$k::ceil(self.raw))
             }
 
             /// Smallest integer `≥ self`, or `None` when it is out of range.
             #[inline]
             pub const fn checked_ceil(self) -> Option<Self> {
-                Self::checked(((self.raw as $Wide) + Self::W_MASK) & !Self::W_MASK)
+                Self::checked(crate::kernel::$k::ceil(self.raw))
             }
 
             /// Integer part rounded toward zero. Never overflows.
@@ -72,25 +46,25 @@ macro_rules! impl_round {
             /// Nearest integer, ties away from zero, saturating to `MAX` when out of range.
             #[inline]
             pub const fn round(self) -> Self {
-                Self::saturate(self.wide_round_half_away())
+                Self::saturate(crate::kernel::$k::round_half_away(self.raw))
             }
 
             /// Nearest integer, ties away from zero, or `None` when out of range.
             #[inline]
             pub const fn checked_round(self) -> Option<Self> {
-                Self::checked(self.wide_round_half_away())
+                Self::checked(crate::kernel::$k::round_half_away(self.raw))
             }
 
             /// Nearest integer, ties to even, saturating to `MAX` when out of range.
             #[inline]
             pub const fn round_ties_even(self) -> Self {
-                Self::saturate(self.wide_round_ties_even())
+                Self::saturate(crate::kernel::$k::round_ties_even(self.raw))
             }
 
             /// Nearest integer, ties to even, or `None` when out of range.
             #[inline]
             pub const fn checked_round_ties_even(self) -> Option<Self> {
-                Self::checked(self.wide_round_ties_even())
+                Self::checked(crate::kernel::$k::round_ties_even(self.raw))
             }
 
             /// `floor(self)` as an integer. Never overflows.
@@ -118,13 +92,13 @@ macro_rules! impl_round {
             /// `round(self)` (ties away from zero) as an integer. Never overflows.
             #[inline]
             pub const fn to_int_round(self) -> $Bits {
-                (self.wide_round_half_away() >> $F) as $Bits
+                crate::kernel::$k::to_int(crate::kernel::$k::round_half_away(self.raw))
             }
 
             /// `round_ties_even(self)` as an integer. Never overflows.
             #[inline]
             pub const fn to_int_round_ties_even(self) -> $Bits {
-                (self.wide_round_ties_even() >> $F) as $Bits
+                crate::kernel::$k::to_int(crate::kernel::$k::round_ties_even(self.raw))
             }
         }
     };

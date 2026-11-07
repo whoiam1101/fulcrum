@@ -150,6 +150,8 @@ pub trait FixedFloat:
     fn from_bits(bits: Self::Bits) -> Self;
     /// The raw representation.
     fn to_bits(self) -> Self::Bits;
+    #[doc(hidden)]
+    fn __raw_i128(self) -> i128;
     /// Converts an integer, saturating.
     fn saturating_from_int(n: i128) -> Self;
     /// Converts an integer, or `None` when out of range.

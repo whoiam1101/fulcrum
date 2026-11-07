@@ -14,6 +14,54 @@ use crate::error::ParseErrorKind;
 const MAX_FRAC_BITS: usize = 64;
 const INT_CAP: u128 = 1 << 63;
 
+/// Decimal digits of a fraction, most significant first.
+pub(crate) type Digits = [u8; MAX_FRAC_BITS + 1];
+
+/// Doubles the decimal fraction `0.d₀d₁…d₍ₖ₋₁₎` and returns the carry out of
+/// its first digit. Digits at most 9 stay at most 9.
+pub(crate) const fn double(mut digits: Digits, k: usize) -> (Digits, bool) {
+    let mut carry = 0u8;
+    let mut j = k;
+    while j > 0 {
+        j -= 1;
+        let v = digits[j] * 2 + carry;
+        if v >= 10 {
+            digits[j] = v - 10;
+            carry = 1;
+        } else {
+            digits[j] = v;
+            carry = 0;
+        }
+    }
+    (digits, carry == 1)
+}
+
+/// The first `keep` binary digits of the decimal fraction `0.d₀d₁…d₍ₖ₋₁₎`, as an
+/// integer below `2^keep`, and whether anything is left after them.
+///
+/// Every digit must be at most 9, and `k ≤ keep ≤ MAX_FRAC_BITS + 1`. The
+/// fraction is doubled `keep` times; each carry out of the first digit is the
+/// next binary digit.
+pub(crate) const fn fraction_bits(mut digits: Digits, k: usize, keep: usize) -> (u128, bool) {
+    let mut bits: u128 = 0;
+    let mut b = 0usize;
+    while b < keep {
+        let (doubled, carry) = double(digits, k);
+        digits = doubled;
+        bits = (bits << 1) | carry as u128;
+        b += 1;
+    }
+    let mut rest = false;
+    let mut j = 0usize;
+    while j < k {
+        if digits[j] != 0 {
+            rest = true;
+        }
+        j += 1;
+    }
+    (bits, rest)
+}
+
 pub(crate) const fn parse_magnitude(
     s: &[u8],
     frac_bits: u32,
@@ -52,7 +100,7 @@ pub(crate) const fn parse_magnitude(
     }
 
     let keep = frac_bits as usize + 1;
-    let mut digits = [0u8; MAX_FRAC_BITS + 1];
+    let mut digits: Digits = [0; MAX_FRAC_BITS + 1];
     let mut k = 0usize;
     let mut sticky = false;
     if i < len && s[i] == b'.' {
@@ -89,43 +137,18 @@ pub(crate) const fn parse_magnitude(
         return Err(ParseErrorKind::Overflow);
     }
 
-    let mut bits: u128 = 0;
-    let mut b = 0usize;
-    while b < keep {
-        let mut carry = 0u8;
-        let mut j = k;
-        while j > 0 {
-            j -= 1;
-            let v = digits[j] * 2 + carry;
-            if v >= 10 {
-                digits[j] = v - 10;
-                carry = 1;
-            } else {
-                digits[j] = v;
-                carry = 0;
-            }
-        }
-        bits = (bits << 1) | carry as u128;
-        b += 1;
-    }
-    let mut j = 0usize;
-    while j < k {
-        if digits[j] != 0 {
-            sticky = true;
-        }
-        j += 1;
-    }
+    let (bits, rest) = fraction_bits(digits, k, keep);
+    let sticky = sticky || rest;
 
-    let half = bits & 1 == 1;
-    let up = if negative { half && sticky } else { half };
+    let up = crate::kernel::magnitude_rounds_up(negative, bits & 1 == 1, sticky);
     let magnitude = (int << frac_bits) + (bits >> 1) + up as u128;
     Ok((negative, magnitude))
 }
 
 macro_rules! impl_parse {
-    ($Name:ident, $Bits:ty, $F:literal) => {
+    ($Name:ident, $F:literal) => {
         impl $Name {
-            const fn parse_bytes(
+            pub(crate) const fn parse_bytes(
                 s: &[u8],
                 underscores: bool,
                 negate: bool,
@@ -133,21 +156,9 @@ macro_rules! impl_parse {
                 match crate::parse::parse_magnitude(s, $F, underscores, negate) {
                     Err(kind) => Err(crate::ParseError::new(kind)),
                     Ok((negative, magnitude)) => {
-                        let max = <$Bits>::MAX as u128;
-                        if negative {
-                            if magnitude > max + 1 {
-                                Err(crate::ParseError::new(crate::ParseErrorKind::Overflow))
-                            } else {
-                                Ok(Self {
-                                    raw: (magnitude as $Bits).wrapping_neg(),
-                                })
-                            }
-                        } else if magnitude > max {
-                            Err(crate::ParseError::new(crate::ParseErrorKind::Overflow))
-                        } else {
-                            Ok(Self {
-                                raw: magnitude as $Bits,
-                            })
+                        match Self::checked_from_sign_magnitude(negative, magnitude) {
+                            Some(v) => Ok(v),
+                            None => Err(crate::ParseError::new(crate::ParseErrorKind::Overflow)),
                         }
                     }
                 }

@@ -5,9 +5,54 @@
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![msrv](https://img.shields.io/badge/MSRV-1.60-orange.svg)](Cargo.toml)
 
-fulcrum is a deterministic fixed-point math library for Rust. Every operation, including sqrt, sin, cos and atan2, gives bit-identical results on x86-64 and ARM64, with no floating point used internally. Overflow is explicit and never panics. It includes 2D/3D vectors and stable serialization for snapshots, replays and checksums. It is no_std and suited to lockstep networking, replays and any simulation that must agree across machines.
+fulcrum is a deterministic fixed-point math library for Rust. Every operation gives bit-identical results on every platform, with no floating point used internally. Overflow is explicit: operators saturate and never panic. It is `no_std`, has no dependencies, and is meant for lockstep networking, replays and any simulation that must agree across machines.
 
-> **Status:** early development. The architecture is in [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md); the API is not implemented yet.
+> **Status:** stage 1 of the [roadmap](#roadmap) is done: the integer core of four types. The API may still change before 1.0. Not published on crates.io; use it as a git dependency pinned to a tag.
+
+```toml
+[dependencies]
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.1.0" }
+```
+
+## Example
+
+```rust
+use fulcrum::{ff64, FixedFloat64};
+
+const SPEED: FixedFloat64 = ff64!(12.6);
+
+let dt: FixedFloat64 = "0.016".parse().unwrap();
+let step = SPEED * dt;
+assert_eq!(format!("{:.4}", step), "0.2016");
+
+assert_eq!(FixedFloat64::MAX + FixedFloat64::ONE, FixedFloat64::MAX);
+assert_eq!(FixedFloat64::MAX.checked_add(FixedFloat64::ONE), None);
+
+let xs = [ff64!(0.1), ff64!(0.2), ff64!(0.3)];
+let mut left = FixedFloat64::accumulator();
+left.extend(&xs[..1]);
+let mut right = FixedFloat64::accumulator();
+right.extend(&xs[1..]);
+assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
+```
+
+## What is in 0.1
+
+- **Types:** `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32), with the `FixedFloat` trait for generic code.
+- **Arithmetic:** `+ - * / %` and unary `-` saturate; `checked_*`, `wrapping_*`, `saturating_*` and `overflowing_*` for explicit semantics. `*` and `/` round to nearest, ties toward `+∞`. Division by zero does not panic. `<<` and `>>` by an integer scale by powers of two; `>>` rounds like `/`, so `x >> 1 == x / 2`.
+- **Exact accumulators:** `Sum` and `Accumulator8`..`Accumulator64` add exactly, so the result does not depend on the order of terms or how they are split between threads; dot products (up to 32 bits) are rounded once.
+- **Rounding:** `floor`, `ceil`, `trunc`, `fract`, `round`, `round_ties_even` and their `to_int_*` forms.
+- **Conversions:** lossless `From` between widths and from small integers; `TryFrom` for narrowing and from every integer type; `saturating_from` and `wrapping_from` from any width; from ratios.
+- **Text:** exact `parse` / `FromStr` and `Display` (every value prints exactly; `{:.N}` rounds ties to even), `Debug` with the raw bits, compile-time literals `ff8!` .. `ff64!`.
+- **Bytes:** `to_le_bytes` / `from_le_bytes` and big-endian, for snapshots, replays and checksums.
+- **Constants:** `PI`, `TAU`, `E`, `SQRT_2`, `LN_2` and more, correctly rounded for each type.
+- **Features:** `float-convert` (`f64` conversions for debugging and rendering, exact and bit-pattern based), `strict-overflow` (operators panic instead of saturating, for tests of the code that uses fulcrum), `alloc`, `std`.
+
+Correctness: every pair of operands is checked exhaustively for `FixedFloat8` and `FixedFloat16`, wider types against an exact rational oracle, with fuzzing, a golden hash and Kani proofs. CI runs on x86-64 and ARM64 (Linux, macOS, Windows), 32-bit x86, and builds for `thumbv7em` without `std`. MSRV is Rust 1.60.
+
+## Roadmap
+
+Stage 1 of 9 is done. Next: `FixedFloat128` on 256-bit integers, then `FixedFloat256`, `sqrt`, trigonometry, vectors, `exp`/`ln`, batch operations, and the remaining proofs before 1.0. Each stage, with what it delivers, when it counts as done and how it is verified, is in [ROADMAP.md](ROADMAP.md).
 
 ## Benchmarks
 

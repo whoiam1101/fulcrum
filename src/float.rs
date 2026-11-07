@@ -42,7 +42,7 @@ pub(crate) fn decompose(x: f64, frac_bits: u32) -> FromF64 {
     let q = m >> r;
     let rem = m & ((1u128 << r) - 1);
     let half = 1u128 << (r - 1);
-    let up = if negative { rem > half } else { rem >= half };
+    let up = crate::kernel::magnitude_rounds_up(negative, rem >= half, rem & (half - 1) != 0);
     FromF64::Value(negative, q + up as u128, false)
 }
 
@@ -55,7 +55,7 @@ pub(crate) fn compose(raw: i128, frac_bits: u32) -> f64 {
 }
 
 macro_rules! impl_float {
-    ($Name:ident, $Bits:ty, $F:literal) => {
+    ($Name:ident, $F:literal) => {
         impl $Name {
             /// Converts from `f64`, rounding to nearest (ties toward `+∞`).
             /// `None` for NaN and for values out of range.
@@ -64,22 +64,7 @@ macro_rules! impl_float {
                     crate::float::FromF64::Nan => None,
                     crate::float::FromF64::Value(_, _, true) => None,
                     crate::float::FromF64::Value(negative, magnitude, false) => {
-                        let max = <$Bits>::MAX as u128;
-                        if negative {
-                            if magnitude > max + 1 {
-                                None
-                            } else {
-                                Some(Self {
-                                    raw: (magnitude as $Bits).wrapping_neg(),
-                                })
-                            }
-                        } else if magnitude > max {
-                            None
-                        } else {
-                            Some(Self {
-                                raw: magnitude as $Bits,
-                            })
-                        }
+                        Self::checked_from_sign_magnitude(negative, magnitude)
                     }
                 }
             }

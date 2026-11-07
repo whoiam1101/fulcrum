@@ -1,23 +1,24 @@
-//! Algebraic properties of `+` and `*` (ARCHITECTURE §5.1).
+//! Algebraic properties of `+` and `*` (docs/ARCHITECTURE.md §5.1).
 //!
-//! Commutativity holds everywhere. Associativity holds only where §5.1
-//! promises it:
+//! Commutativity holds everywhere. Associativity holds only where it is
+//! promised:
 //!
 //! * `+`: whenever no partial sum saturates, and always when all terms have
 //!   the same sign; `wrapping_add` always.
 //! * `*`: bit for bit when the second and third factors are integers and
 //!   nothing saturates; otherwise, without saturation,
-//!   `|(a·b)·c − a·(b·c)| ≤ ½(|a| + |c|) + 1` ulp.
+//!   `|(a·b)·c − a·(b·c)| ≤ ⌊½(|a| + |c|)⌋ + 1` ulp (see [`mul_assoc_bound`]).
 //!
 //! `documented_counterexamples` runs with the normal test suite. The other
-//! tests are ignored by default; duration and seed come from the environment:
+//! tests are ignored by default; `algebra_stress` takes its settings from
+//! `FULCRUM_ALGEBRA_*` (see `common::run_streams`):
 //!
 //! ```text
-//! FULCRUM_ALGEBRA_SECS=60 FULCRUM_ALGEBRA_SEED=1 cargo test --release --test algebra -- --include-ignored --nocapture
+//! FULCRUM_ALGEBRA_SEED=1 FULCRUM_ALGEBRA_THREADS=4 FULCRUM_ALGEBRA_BATCHES=64 cargo test --release --test algebra -- --include-ignored --nocapture
 //! ```
 //!
 //! Without `FULCRUM_ALGEBRA_SEED` the seed is taken from the clock and
-//! printed, so any failure can be replayed exactly.
+//! printed; a failure prints the seed, stream and batch to replay it exactly.
 
 #![cfg(not(feature = "strict-overflow"))]
 
@@ -25,11 +26,6 @@ mod common;
 
 use common::*;
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
-use std::sync::atomic::{AtomicU64, Ordering};
-use std::sync::Arc;
-use std::time::{Duration, Instant};
-
-const BATCH: u64 = 4096;
 
 /// Raw value of a random integer that fits the integer part of a
 /// `bits`-bit format with `frac_bits` fractional bits.
@@ -85,6 +81,8 @@ macro_rules! check_commutative {
     }};
 }
 
+/// Associativity checks for one triple. Evaluates to `true` when neither
+/// association of `*` saturated, so the `*` checks actually ran.
 macro_rules! check_triple {
     ($T:ident, $bits:expr, $f:expr, $a:expr, $b:expr, $c:expr) => {{
         let (ra, rb, rc): (i128, i128, i128) = ($a as i128, $b as i128, $c as i128);
@@ -92,9 +90,6 @@ macro_rules! check_triple {
         let y = $T::from_bits($b);
         let z = $T::from_bits($c);
         let ctx = || format!("{} ({:?}, {:?}, {:?})", stringify!($T), x, y, z);
-
-        check_commutative!($T, x, y);
-        check_commutative!($T, y, z);
 
         let sum = ra + rb + rc;
         assert_eq!(
@@ -158,7 +153,31 @@ macro_rules! check_triple {
                 bound,
                 ctx()
             );
+            true
+        } else {
+            false
         }
+    }};
+}
+
+/// Random triple with edge-biased `a`, `b`, `c`, then the same `a` with
+/// integer `b`, `c`. Checks commutativity on all three pairs of the first
+/// triple; evaluates to how many of the two triples reached the `*` checks.
+macro_rules! check_width {
+    ($rng:expr, $T:ident, $I:ty, $bits:expr, $f:expr) => {{
+        let rng: &mut Pcg32 = $rng;
+        let a = rng.edge_bits($bits, $f) as $I;
+        let b = rng.edge_bits($bits, $f) as $I;
+        let c = rng.edge_bits($bits, $f) as $I;
+        let (x, y, z) = ($T::from_bits(a), $T::from_bits(b), $T::from_bits(c));
+        check_commutative!($T, x, y);
+        check_commutative!($T, y, z);
+        check_commutative!($T, x, z);
+        let mut mul = check_triple!($T, $bits, $f, a, b, c) as u64;
+        let b = int_bits(rng, $bits, $f) as $I;
+        let c = int_bits(rng, $bits, $f) as $I;
+        mul += check_triple!($T, $bits, $f, a, b, c) as u64;
+        mul
     }};
 }
 
@@ -175,74 +194,54 @@ fn documented_counterexamples() {
 }
 
 #[test]
-#[ignore = "2^24 triples: run with --release --include-ignored"]
-fn exhaustive_fixed8_triples() {
+#[ignore = "2^16 pairs and 2^24 triples: run with --release --include-ignored"]
+fn exhaustive_fixed8() {
+    for a in i8::MIN..=i8::MAX {
+        for b in i8::MIN..=i8::MAX {
+            check_commutative!(
+                FixedFloat8,
+                FixedFloat8::from_bits(a),
+                FixedFloat8::from_bits(b)
+            );
+        }
+    }
+    let mut mul = 0u64;
     for a in i8::MIN..=i8::MAX {
         for b in i8::MIN..=i8::MAX {
             for c in i8::MIN..=i8::MAX {
-                check_triple!(FixedFloat8, 8, 4, a, b, c);
+                mul += check_triple!(FixedFloat8, 8, 4, a, b, c) as u64;
             }
         }
     }
+    eprintln!("algebra: {} of 2^24 Q4.4 triples reached the * checks", mul);
+    assert!(mul > 0);
 }
 
+/// Fraction of generated triples, in percent, that must reach the `*` checks.
+/// Edge-biased factors saturate often; if a generator change made that the
+/// rule, the `*` association checks would silently stop running.
+const MIN_MUL_PERCENT: u64 = 20;
+
 #[test]
-#[ignore = "time bounded: set FULCRUM_ALGEBRA_SECS and run with --release --ignored"]
+#[ignore = "randomized: set FULCRUM_ALGEBRA_* and run with --release --ignored"]
 fn algebra_stress() {
-    let secs = env_u64("FULCRUM_ALGEBRA_SECS").unwrap_or(60);
-    let seed = seed_from_env("FULCRUM_ALGEBRA_SEED");
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let t = run_streams("algebra", "FULCRUM_ALGEBRA", 60, |rng| {
+        check_width!(rng, FixedFloat16, i16, 16, 8)
+            + check_width!(rng, FixedFloat32, i32, 32, 16)
+            + check_width!(rng, FixedFloat64, i64, 64, 32)
+    });
+    let triples = t.items * 2 * 3;
     eprintln!(
-        "algebra: seed {} ({} s, {} threads); replay with FULCRUM_ALGEBRA_SEED={}",
-        seed, secs, threads, seed
+        "algebra: {} triples per width checked (half with integer b, c); {} of {} in all reached the * checks; seed {}",
+        t.items * 2,
+        t.tally,
+        triples,
+        t.seed
     );
-
-    let deadline = Instant::now() + Duration::from_secs(secs);
-    let triples = Arc::new(AtomicU64::new(0));
-    let handles: Vec<_> = (0..threads as u64)
-        .map(|stream| {
-            let triples = Arc::clone(&triples);
-            std::thread::spawn(move || {
-                let mut rng = Pcg32::new(seed, stream);
-                let mut done = 0u64;
-                while Instant::now() < deadline {
-                    for _ in 0..BATCH {
-                        let a = rng.edge_bits(16, 8) as i16;
-                        let b = rng.edge_bits(16, 8) as i16;
-                        let c = rng.edge_bits(16, 8) as i16;
-                        check_triple!(FixedFloat16, 16, 8, a, b, c);
-                        let b = int_bits(&mut rng, 16, 8) as i16;
-                        let c = int_bits(&mut rng, 16, 8) as i16;
-                        check_triple!(FixedFloat16, 16, 8, a, b, c);
-
-                        let a = rng.edge_bits(32, 16) as i32;
-                        let b = rng.edge_bits(32, 16) as i32;
-                        let c = rng.edge_bits(32, 16) as i32;
-                        check_triple!(FixedFloat32, 32, 16, a, b, c);
-                        let b = int_bits(&mut rng, 32, 16) as i32;
-                        let c = int_bits(&mut rng, 32, 16) as i32;
-                        check_triple!(FixedFloat32, 32, 16, a, b, c);
-
-                        let a = rng.edge_bits(64, 32);
-                        let b = rng.edge_bits(64, 32);
-                        let c = rng.edge_bits(64, 32);
-                        check_triple!(FixedFloat64, 64, 32, a, b, c);
-                        let b = int_bits(&mut rng, 64, 32);
-                        let c = int_bits(&mut rng, 64, 32);
-                        check_triple!(FixedFloat64, 64, 32, a, b, c);
-                    }
-                    done += BATCH;
-                }
-                triples.fetch_add(done, Ordering::Relaxed);
-            })
-        })
-        .collect();
-    for h in handles {
-        h.join().expect("algebra thread failed, see the seed above");
-    }
-    eprintln!(
-        "algebra: {} triples per width checked (half with integer b, c), seed {}",
-        triples.load(Ordering::Relaxed) * 2,
-        seed
+    assert!(
+        t.tally * 100 >= triples * MIN_MUL_PERCENT,
+        "only {} of {} triples reached the * checks",
+        t.tally,
+        triples
     );
 }

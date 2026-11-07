@@ -35,6 +35,48 @@ macro_rules! impl_ops {
             }
         }
 
+        impl core::ops::Shl<u32> for $Name {
+            type Output = Self;
+            /// `self · 2^n`, saturating, see [`Self::saturating_shl`].
+            #[inline]
+            fn shl(self, n: u32) -> Self {
+                #[cfg(feature = "strict-overflow")]
+                {
+                    match self.checked_shl(n) {
+                        Some(v) => v,
+                        None => panic!("fulcrum strict-overflow: {} << {} overflows", self, n),
+                    }
+                }
+                #[cfg(not(feature = "strict-overflow"))]
+                {
+                    self.saturating_shl(n)
+                }
+            }
+        }
+
+        impl core::ops::Shr<u32> for $Name {
+            type Output = Self;
+            /// `self / 2^n`, rounded to nearest, see [`Self::shr_round`].
+            #[inline]
+            fn shr(self, n: u32) -> Self {
+                self.shr_round(n)
+            }
+        }
+
+        impl core::ops::ShlAssign<u32> for $Name {
+            #[inline]
+            fn shl_assign(&mut self, n: u32) {
+                *self = *self << n;
+            }
+        }
+
+        impl core::ops::ShrAssign<u32> for $Name {
+            #[inline]
+            fn shr_assign(&mut self, n: u32) {
+                *self = *self >> n;
+            }
+        }
+
         impl core::iter::Sum for $Name {
             /// Exact and order-independent: the terms are accumulated without
             /// saturation and the total is saturated once.

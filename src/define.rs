@@ -8,15 +8,13 @@ macro_rules! define_fixed {
         $Name:ident {
             bits: $Bits:ty,
             ubits: $UBits:ty,
-            wide: $Wide:ty,
             int: $Int:ty,
             frac: $Frac:ty,
             frac_bits: $F:literal,
             bytes: $NB:literal,
-            mul: $mul:ident,
-            div: $div:ident,
-            round_div: $round_div:ident,
+            kernel: $k:ident,
             from_ints: [$($FromInt:ty),*],
+            try_from_ints: [$($TryFromInt:ty),*],
         }
     ) => {
         $(#[$meta])*
@@ -49,26 +47,21 @@ macro_rules! define_fixed {
             const FRAC_MASK: $Bits = (1 << $F) - 1;
 
             #[inline]
-            const fn fits(w: $Wide) -> bool {
-                w >= <$Bits>::MIN as $Wide && w <= <$Bits>::MAX as $Wide
+            const fn saturate(w: crate::kernel::$k::Wide) -> Self {
+                Self { raw: crate::kernel::$k::saturate(w) }
             }
 
             #[inline]
-            const fn saturate(w: $Wide) -> Self {
-                let hi = <$Bits>::MAX as $Wide;
-                let lo = <$Bits>::MIN as $Wide;
-                let w = if w > hi { hi } else { w };
-                let w = if w < lo { lo } else { w };
-                Self { raw: w as $Bits }
-            }
-
-            #[inline]
-            const fn checked(w: $Wide) -> Option<Self> {
-                if Self::fits(w) {
-                    Some(Self { raw: w as $Bits })
-                } else {
-                    None
+            const fn checked(w: crate::kernel::$k::Wide) -> Option<Self> {
+                match crate::kernel::$k::narrow(w) {
+                    Some(raw) => Some(Self { raw }),
+                    None => None,
                 }
+            }
+
+            #[inline]
+            const fn wrapped(w: crate::kernel::$k::Wide) -> Self {
+                Self { raw: crate::kernel::$k::wrap(w) }
             }
 
             #[inline]
@@ -100,13 +93,13 @@ macro_rules! define_fixed {
             /// integer part rounds toward `-∞`, so `-1.25` is `(-2, 0.75)`.
             #[inline]
             pub const fn from_parts(int: $Int, frac: $Frac) -> Self {
-                Self::saturate(((int as $Wide) << $F) + frac as $Wide)
+                Self::saturate(crate::kernel::$k::from_parts(int, frac))
             }
 
             /// `int + frac / 2^FRAC_BITS`, or `None` when out of range.
             #[inline]
             pub const fn checked_from_parts(int: $Int, frac: $Frac) -> Option<Self> {
-                Self::checked(((int as $Wide) << $F) + frac as $Wide)
+                Self::checked(crate::kernel::$k::from_parts(int, frac))
             }
 
             /// Integer part, rounded toward `-∞`: `-1.25` gives `-2`.
@@ -125,27 +118,13 @@ macro_rules! define_fixed {
             /// Converts an integer, saturating when out of range.
             #[inline]
             pub const fn saturating_from_int(n: i128) -> Self {
-                let lo = (<$Bits>::MIN >> $F) as i128;
-                let hi = (<$Bits>::MAX >> $F) as i128;
-                if n > hi {
-                    Self::MAX
-                } else if n < lo {
-                    Self::MIN
-                } else {
-                    Self { raw: (n as $Bits) << $F }
-                }
+                Self::saturating_from_scaled_bits(n, 0)
             }
 
             /// Converts an integer, or `None` when out of range.
             #[inline]
             pub const fn checked_from_int(n: i128) -> Option<Self> {
-                let lo = (<$Bits>::MIN >> $F) as i128;
-                let hi = (<$Bits>::MAX >> $F) as i128;
-                if n > hi || n < lo {
-                    None
-                } else {
-                    Some(Self { raw: (n as $Bits) << $F })
-                }
+                Self::checked_from_scaled_bits(n, 0)
             }
 
             /// `num / den` rounded to nearest (ties toward `+∞`).
@@ -155,7 +134,7 @@ macro_rules! define_fixed {
                 if den == 0 {
                     return Self { raw: num }.div_by_zero();
                 }
-                Self::saturate(crate::kernel::$round_div((num as $Wide) << $F, den as $Wide))
+                Self::saturate(crate::kernel::$k::div(num, den))
             }
 
             /// `num / den` rounded to nearest (ties toward `+∞`), or `None` on
@@ -165,7 +144,7 @@ macro_rules! define_fixed {
                 if den == 0 {
                     return None;
                 }
-                Self::checked(crate::kernel::$round_div((num as $Wide) << $F, den as $Wide))
+                Self::checked(crate::kernel::$k::div(num, den))
             }
 
             /// Checked addition.
@@ -227,26 +206,26 @@ macro_rules! define_fixed {
             /// Checked multiplication, rounded to nearest (ties toward `+∞`).
             #[inline]
             pub const fn checked_mul(self, rhs: Self) -> Option<Self> {
-                Self::checked(crate::kernel::$mul(self.raw, rhs.raw))
+                Self::checked(crate::kernel::$k::mul(self.raw, rhs.raw))
             }
 
             /// Saturating multiplication, rounded to nearest (ties toward `+∞`).
             #[inline]
             pub const fn saturating_mul(self, rhs: Self) -> Self {
-                Self::saturate(crate::kernel::$mul(self.raw, rhs.raw))
+                Self::saturate(crate::kernel::$k::mul(self.raw, rhs.raw))
             }
 
             /// Wrapping multiplication, rounded to nearest (ties toward `+∞`).
             #[inline]
             pub const fn wrapping_mul(self, rhs: Self) -> Self {
-                Self { raw: crate::kernel::$mul(self.raw, rhs.raw) as $Bits }
+                Self::wrapped(crate::kernel::$k::mul(self.raw, rhs.raw))
             }
 
             /// Wrapping multiplication and whether it overflowed.
             #[inline]
             pub const fn overflowing_mul(self, rhs: Self) -> (Self, bool) {
-                let w = crate::kernel::$mul(self.raw, rhs.raw);
-                (Self { raw: w as $Bits }, !Self::fits(w))
+                let w = crate::kernel::$k::mul(self.raw, rhs.raw);
+                (Self::wrapped(w), !crate::kernel::$k::fits(w))
             }
 
             /// Checked division, rounded to nearest (ties toward `+∞`).
@@ -256,7 +235,7 @@ macro_rules! define_fixed {
                 if rhs.raw == 0 {
                     return None;
                 }
-                Self::checked(crate::kernel::$div(self.raw, rhs.raw))
+                Self::checked(crate::kernel::$k::div(self.raw, rhs.raw))
             }
 
             /// Saturating division, rounded to nearest (ties toward `+∞`).
@@ -266,7 +245,7 @@ macro_rules! define_fixed {
                 if rhs.raw == 0 {
                     return self.div_by_zero();
                 }
-                Self::saturate(crate::kernel::$div(self.raw, rhs.raw))
+                Self::saturate(crate::kernel::$k::div(self.raw, rhs.raw))
             }
 
             /// Wrapping division, rounded to nearest (ties toward `+∞`).
@@ -276,7 +255,7 @@ macro_rules! define_fixed {
                 if rhs.raw == 0 {
                     return self.div_by_zero();
                 }
-                Self { raw: crate::kernel::$div(self.raw, rhs.raw) as $Bits }
+                Self::wrapped(crate::kernel::$k::div(self.raw, rhs.raw))
             }
 
             /// Wrapping division and whether it overflowed. Division by zero
@@ -286,8 +265,8 @@ macro_rules! define_fixed {
                 if rhs.raw == 0 {
                     return (self.div_by_zero(), true);
                 }
-                let w = crate::kernel::$div(self.raw, rhs.raw);
-                (Self { raw: w as $Bits }, !Self::fits(w))
+                let w = crate::kernel::$k::div(self.raw, rhs.raw);
+                (Self::wrapped(w), !crate::kernel::$k::fits(w))
             }
 
             /// Checked remainder `self - rhs · trunc(self / rhs)` (exact, sign of `self`).
@@ -406,6 +385,40 @@ macro_rules! define_fixed {
                 Self { raw: self.raw.wrapping_mul(n) }
             }
 
+            /// `self · 2^n`, or `None` on overflow. Exact.
+            #[inline]
+            pub const fn checked_shl(self, n: u32) -> Option<Self> {
+                match crate::kernel::$k::shl(self.raw, n) {
+                    (raw, false) => Some(Self { raw }),
+                    (_, true) => None,
+                }
+            }
+
+            /// `self · 2^n`, saturating; the operator `<<` does the same. Exact
+            /// when in range; any `n` is accepted, `n ≥ BITS` gives `0`, `MAX` or `MIN`.
+            #[inline]
+            pub const fn saturating_shl(self, n: u32) -> Self {
+                match crate::kernel::$k::shl(self.raw, n) {
+                    (raw, false) => Self { raw },
+                    (_, true) => self.div_by_zero(),
+                }
+            }
+
+            /// `self · 2^n` modulo `2^BITS` of the raw value; `n ≥ BITS` gives `0`.
+            /// Unlike `wrapping_shl` of the primitive integers, `n` is not masked.
+            #[inline]
+            pub const fn wrapping_shl(self, n: u32) -> Self {
+                Self { raw: crate::kernel::$k::shl(self.raw, n).0 }
+            }
+
+            /// `self / 2^n`, rounded to nearest (ties toward `+∞`); the operator
+            /// `>>` does the same, so `x >> 1 == x / 2`. Never overflows; any `n`
+            /// is accepted, `n ≥ BITS` gives `0`.
+            #[inline]
+            pub const fn shr_round(self, n: u32) -> Self {
+                Self { raw: crate::kernel::$k::shr(self.raw, n) }
+            }
+
             /// Division by an integer, rounded to nearest (ties toward `+∞`),
             /// saturating. `n = 0` gives `MAX`, `MIN` or `0` by the sign of `self`.
             #[inline]
@@ -413,7 +426,7 @@ macro_rules! define_fixed {
                 if n == 0 {
                     return self.div_by_zero();
                 }
-                Self::saturate(crate::kernel::$round_div(self.raw as $Wide, n as $Wide))
+                Self::saturate(crate::kernel::$k::div_int(self.raw, n))
             }
 
             /// Division by an integer, rounded to nearest (ties toward `+∞`),
@@ -423,7 +436,7 @@ macro_rules! define_fixed {
                 if n == 0 {
                     return None;
                 }
-                Self::checked(crate::kernel::$round_div(self.raw as $Wide, n as $Wide))
+                Self::checked(crate::kernel::$k::div_int(self.raw, n))
             }
 
             /// `1 / self`, saturating; `1 / 0` gives `MAX`.
@@ -513,7 +526,7 @@ macro_rules! define_fixed {
             /// `(self + other) / 2` without overflow, rounded to nearest (ties toward `+∞`).
             #[inline]
             pub const fn midpoint(self, other: Self) -> Self {
-                Self { raw: (self.raw | other.raw) - ((self.raw ^ other.raw) >> 1) }
+                Self { raw: crate::kernel::$k::midpoint(self.raw, other.raw) }
             }
         }
 
@@ -543,6 +556,10 @@ macro_rules! define_fixed {
             #[inline]
             fn to_bits(self) -> $Bits {
                 self.raw
+            }
+            #[inline]
+            fn __raw_i128(self) -> i128 {
+                self.raw as i128
             }
             #[inline]
             fn saturating_from_int(n: i128) -> Self {
@@ -603,13 +620,13 @@ macro_rules! define_fixed {
         }
 
         impl_ops!($Name);
-        impl_round!($Name, $Bits, $Wide, $F);
-        impl_convert!($Name, $Bits, $F, [$($FromInt),*]);
+        impl_round!($Name, $Bits, $F, $k);
+        impl_convert!($Name, $Bits, $F, [$($FromInt),*], [$($TryFromInt),*]);
         impl_fmt!($Name, $UBits, $NB);
-        impl_parse!($Name, $Bits, $F);
+        impl_parse!($Name, $F);
         impl_bytes!($Name, $Bits, $NB);
         #[cfg(feature = "float-convert")]
-        impl_float!($Name, $Bits, $F);
+        impl_float!($Name, $F);
     };
 }
 
@@ -620,15 +637,13 @@ define_fixed! {
     FixedFloat8 {
         bits: i8,
         ubits: u8,
-        wide: i16,
         int: i8,
         frac: u8,
         frac_bits: 4,
         bytes: 1,
-        mul: mul8,
-        div: div8,
-        round_div: round_div8,
+        kernel: k8,
         from_ints: [],
+        try_from_ints: [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128],
     }
 }
 
@@ -639,15 +654,13 @@ define_fixed! {
     FixedFloat16 {
         bits: i16,
         ubits: u16,
-        wide: i32,
         int: i8,
         frac: u8,
         frac_bits: 8,
         bytes: 2,
-        mul: mul16,
-        div: div16,
-        round_div: round_div16,
+        kernel: k16,
         from_ints: [i8],
+        try_from_ints: [i16, i32, i64, i128, u8, u16, u32, u64, u128],
     }
 }
 
@@ -658,15 +671,13 @@ define_fixed! {
     FixedFloat32 {
         bits: i32,
         ubits: u32,
-        wide: i64,
         int: i16,
         frac: u16,
         frac_bits: 16,
         bytes: 4,
-        mul: mul32,
-        div: div32,
-        round_div: round_div32,
+        kernel: k32,
         from_ints: [i8, u8, i16],
+        try_from_ints: [i32, i64, i128, u16, u32, u64, u128],
     }
 }
 
@@ -677,22 +688,20 @@ define_fixed! {
     FixedFloat64 {
         bits: i64,
         ubits: u64,
-        wide: i128,
         int: i32,
         frac: u32,
         frac_bits: 32,
         bytes: 8,
-        mul: mul64,
-        div: div64,
-        round_div: round_div64,
+        kernel: k64,
         from_ints: [i8, u8, i16, u16, i32],
+        try_from_ints: [i64, i128, u32, u64, u128],
     }
 }
 
-impl_accumulator!(Accumulator8, FixedFloat8, i8, 4, scale: 8, product: [accumulator_product!(FixedFloat8, 4);]);
-impl_accumulator!(Accumulator16, FixedFloat16, i16, 8, scale: 16, product: [accumulator_product!(FixedFloat16, 8);]);
-impl_accumulator!(Accumulator32, FixedFloat32, i32, 16, scale: 32, product: [accumulator_product!(FixedFloat32, 16);]);
-impl_accumulator!(Accumulator64, FixedFloat64, i64, 32, scale: 32, product: []);
+impl_accumulator!(Accumulator8, FixedFloat8, 4, scale: 8, product: [accumulator_product!(FixedFloat8, 4);]);
+impl_accumulator!(Accumulator16, FixedFloat16, 8, scale: 16, product: [accumulator_product!(FixedFloat16, 8);]);
+impl_accumulator!(Accumulator32, FixedFloat32, 16, scale: 32, product: [accumulator_product!(FixedFloat32, 16);]);
+impl_accumulator!(Accumulator64, FixedFloat64, 32, scale: 32, product: []);
 
 impl_widen!(FixedFloat8 => FixedFloat16, FixedFloat32, FixedFloat64);
 impl_widen!(FixedFloat16 => FixedFloat32, FixedFloat64);

@@ -364,9 +364,21 @@ macro_rules! check_unary {
             x
         );
         assert_eq!(
+            x.checked_round().map(|v| v.to_bits() as i128),
+            Some(away).filter(|&v| fits(v, $bits)),
+            "checked_round {:?}",
+            x
+        );
+        assert_eq!(
             x.round_ties_even().to_bits() as i128,
             clamp(even, $bits),
             "round_ties_even {:?}",
+            x
+        );
+        assert_eq!(
+            x.checked_round_ties_even().map(|v| v.to_bits() as i128),
+            Some(even).filter(|&v| fits(v, $bits)),
+            "checked_round_ties_even {:?}",
             x
         );
         assert_eq!(
@@ -454,9 +466,20 @@ macro_rules! check_unary {
     }};
 }
 
-/// Unsigned integer from the environment variable `name`, if set and valid.
+/// Unsigned integer from the environment variable `name`, if it is set.
+///
+/// Panics when the variable is set but is not a decimal `u64`: silently
+/// falling back to a default would make a mistyped replay seed look like a
+/// passing replay.
 pub fn env_u64(name: &str) -> Option<u64> {
-    std::env::var(name).ok().and_then(|v| v.parse().ok())
+    match std::env::var(name) {
+        Ok(v) => Some(
+            v.parse()
+                .unwrap_or_else(|_| panic!("{}={:?} is not a decimal unsigned integer", name, v)),
+        ),
+        Err(std::env::VarError::NotPresent) => None,
+        Err(e) => panic!("{}: {}", name, e),
+    }
 }
 
 /// Seed from the environment variable `name`, or from the clock when it is
@@ -467,4 +490,144 @@ pub fn seed_from_env(name: &str) -> u64 {
             .duration_since(std::time::UNIX_EPOCH)
             .map_or(1, |d| d.as_nanos() as u64)
     })
+}
+
+/// Items each stream runs between checks of the deadline and the stop flag.
+pub const BATCH: u64 = 4096;
+
+/// What [`run_streams`] did: items run by all streams together and the sum of
+/// the values the body returned.
+pub struct Totals {
+    pub seed: u64,
+    pub items: u64,
+    pub tally: u64,
+}
+
+struct StreamGuard {
+    stop: std::sync::Arc<std::sync::atomic::AtomicBool>,
+    name: &'static str,
+    prefix: &'static str,
+    seed: u64,
+    stream: u64,
+    batch: u64,
+}
+
+impl Drop for StreamGuard {
+    fn drop(&mut self) {
+        if std::thread::panicking() {
+            self.stop.store(true, std::sync::atomic::Ordering::Relaxed);
+            eprintln!(
+                "{}: stream {} failed in batch {}; replay exactly with {p}_SEED={} {p}_STREAM={} {p}_BATCHES={}",
+                self.name,
+                self.stream,
+                self.batch,
+                self.seed,
+                self.stream,
+                self.batch + 1,
+                p = self.prefix,
+            );
+        }
+    }
+}
+
+/// Runs `body` on independent [`Pcg32`] streams, one thread each, in batches
+/// of [`BATCH`] items. Settings come from the environment, `P` = `prefix`:
+///
+/// * `P_SEED`: seed (default: the clock, printed);
+/// * `P_THREADS`: number of streams `0..n` (default: available cores);
+/// * `P_STREAM`: run only this stream, on one thread;
+/// * `P_BATCHES`: run exactly this many batches per stream, which makes the
+///   run independent of machine speed;
+/// * `P_SECS`: otherwise run until this deadline (default `default_secs`).
+///
+/// A failing stream prints the exact replay settings and stops the others.
+pub fn run_streams<F>(
+    name: &'static str,
+    prefix: &'static str,
+    default_secs: u64,
+    body: F,
+) -> Totals
+where
+    F: Fn(&mut Pcg32) -> u64 + Send + Sync + 'static,
+{
+    use std::sync::atomic::{AtomicBool, Ordering};
+    use std::sync::Arc;
+    use std::time::{Duration, Instant};
+
+    let var = |s: &str| env_u64(&format!("{}_{}", prefix, s));
+    let seed = seed_from_env(&format!("{}_SEED", prefix));
+    let streams: Vec<u64> = match var("STREAM") {
+        Some(k) => vec![k],
+        None => {
+            let n = var("THREADS").unwrap_or_else(|| {
+                std::thread::available_parallelism().map_or(4, |n| n.get() as u64)
+            });
+            (0..n).collect()
+        }
+    };
+    let batches = var("BATCHES");
+    let secs = var("SECS").unwrap_or(default_secs);
+    let limit = match batches {
+        Some(b) => format!("{} batches per stream", b),
+        None => format!("{} s", secs),
+    };
+    eprintln!(
+        "{}: seed {}, streams {:?}, {}; replay with {}_SEED={}",
+        name, seed, streams, limit, prefix, seed
+    );
+
+    let deadline = Instant::now() + Duration::from_secs(secs);
+    let stop = Arc::new(AtomicBool::new(false));
+    let body = Arc::new(body);
+    let handles: Vec<_> = streams
+        .into_iter()
+        .map(|stream| {
+            let stop = Arc::clone(&stop);
+            let body = Arc::clone(&body);
+            std::thread::spawn(move || {
+                let mut guard = StreamGuard {
+                    stop: Arc::clone(&stop),
+                    name,
+                    prefix,
+                    seed,
+                    stream,
+                    batch: 0,
+                };
+                let mut rng = Pcg32::new(seed, stream);
+                let mut tally = 0u64;
+                loop {
+                    let more = match batches {
+                        Some(b) => guard.batch < b,
+                        None => Instant::now() < deadline,
+                    };
+                    if !more || stop.load(Ordering::Relaxed) {
+                        break;
+                    }
+                    for _ in 0..BATCH {
+                        tally += body(&mut rng);
+                    }
+                    guard.batch += 1;
+                }
+                (guard.batch * BATCH, tally)
+            })
+        })
+        .collect();
+
+    let mut totals = Totals {
+        seed,
+        items: 0,
+        tally: 0,
+    };
+    let mut failed = false;
+    for h in handles {
+        match h.join() {
+            Ok((items, tally)) => {
+                totals.items += items;
+                totals.tally += tally;
+            }
+            Err(_) => failed = true,
+        }
+    }
+    assert!(!failed, "{} failed, see the replay line above", name);
+    totals
 }

@@ -4,7 +4,8 @@
 //! `FixedFloat8`: every pair for every binary operation, every value for unary
 //! operations, formatting and parsing. `FixedFloat16`: every value for unary
 //! operations; every pair for binary operations runs only with `--ignored`
-//! (2^32 pairs, nightly CI).
+//! (2^32 pairs, nightly CI). `FixedFloat32`: `parse(display(x)) = x` for
+//! every value, also only with `--ignored`.
 
 #![cfg(not(feature = "strict-overflow"))]
 
@@ -12,7 +13,7 @@
 mod common;
 
 use common::*;
-use fulcrum::{FixedFloat16, FixedFloat8};
+use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat8};
 
 #[test]
 fn fixed8_all_pairs() {
@@ -112,6 +113,50 @@ fn fixed16_all_pairs() {
                     for b in i16::MIN..=i16::MAX {
                         check_pair!(FixedFloat16, 16, 8, a, b);
                     }
+                }
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
+}
+
+struct Buf {
+    bytes: [u8; 64],
+    len: usize,
+}
+
+impl core::fmt::Write for Buf {
+    fn write_str(&mut self, s: &str) -> core::fmt::Result {
+        let end = self.len + s.len();
+        self.bytes[self.len..end].copy_from_slice(s.as_bytes());
+        self.len = end;
+        Ok(())
+    }
+}
+
+#[test]
+#[ignore = "2^32 values: run with --ignored --release"]
+fn fixed32_parse_display_round_trip() {
+    use core::fmt::Write;
+    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()) as u64;
+    let chunk = (1u64 << 32) / threads + 1;
+    let handles: Vec<_> = (0..threads)
+        .map(|t| {
+            std::thread::spawn(move || {
+                let start = i32::MIN as i64 + (t * chunk) as i64;
+                let end = (start + chunk as i64).min(i32::MAX as i64 + 1);
+                let mut buf = Buf {
+                    bytes: [0; 64],
+                    len: 0,
+                };
+                for raw in start..end {
+                    let x = FixedFloat32::from_bits(raw as i32);
+                    buf.len = 0;
+                    write!(buf, "{}", x).unwrap();
+                    let text = core::str::from_utf8(&buf.bytes[..buf.len]).unwrap();
+                    assert_eq!(text.parse::<FixedFloat32>(), Ok(x), "{}", text);
                 }
             })
         })

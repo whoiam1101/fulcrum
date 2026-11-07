@@ -4,22 +4,36 @@
 //! part grow. Narrowing (`TryFrom`) rounds the dropped fractional bits to
 //! nearest (ties toward `+∞`) and fails when the integer part does not fit.
 
+/// `±magnitude` as an `i128`, or `None` when it does not fit. Turns the sign
+/// and magnitude produced by parsing and by float decomposition into the input
+/// of `checked_from_scaled_bits`.
+#[inline]
+pub(crate) const fn signed(negative: bool, magnitude: u128) -> Option<i128> {
+    if negative {
+        if magnitude > 1 << 127 {
+            None
+        } else {
+            Some((magnitude as i128).wrapping_neg())
+        }
+    } else if magnitude > i128::MAX as u128 {
+        None
+    } else {
+        Some(magnitude as i128)
+    }
+}
+
 macro_rules! impl_convert {
-    ($Name:ident, $Bits:ty, $F:literal, [$($FromInt:ty),*]) => {
+    ($Name:ident, $Bits:ty, $F:literal, [$($FromInt:ty),*], [$($TryFromInt:ty),*]) => {
         impl $Name {
             /// Converts `raw / 2^src_frac` to this type, rounding dropped bits to
             /// nearest (ties toward `+∞`); `None` when the result is out of range.
+            ///
+            /// Every conversion into this type from a wider value goes through
+            /// here: integers, narrowing, parsing, floats and accumulators.
             #[inline]
-            pub const fn checked_from_scaled_bits(raw: i128, src_frac: u32) -> Option<Self> {
+            pub(crate) const fn checked_from_scaled_bits(raw: i128, src_frac: u32) -> Option<Self> {
                 let w = if src_frac >= $F {
-                    let s = src_frac - $F;
-                    if s == 0 {
-                        raw
-                    } else if s >= 128 {
-                        0
-                    } else {
-                        (raw >> s) + ((raw >> (s - 1)) & 1)
-                    }
+                    crate::kernel::shr_round(raw, src_frac - $F)
                 } else {
                     let s = $F - src_frac;
                     if raw > (i128::MAX >> s) || raw < (i128::MIN >> s) {
@@ -33,6 +47,53 @@ macro_rules! impl_convert {
                     None
                 }
             }
+
+            /// Converts `raw / 2^src_frac` to this type, rounding dropped bits to
+            /// nearest (ties toward `+∞`) and saturating by the sign of `raw`.
+            #[inline]
+            pub(crate) const fn saturating_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
+                match Self::checked_from_scaled_bits(raw, src_frac) {
+                    Some(v) => v,
+                    None if raw < 0 => Self::MIN,
+                    None => Self::MAX,
+                }
+            }
+
+            /// Converts `raw / 2^src_frac`, rounding dropped bits to nearest
+            /// (ties toward `+∞`) and keeping the low bits of the raw result.
+            #[inline]
+            pub(crate) const fn wrapping_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
+                let w = if src_frac >= $F {
+                    crate::kernel::shr_round(raw, src_frac - $F)
+                } else {
+                    raw.wrapping_shl($F - src_frac)
+                };
+                Self { raw: w as $Bits }
+            }
+
+            /// Converts any fixed-point value to this type, rounding dropped
+            /// fractional bits to nearest (ties toward `+∞`) and saturating when
+            /// the result is out of range. Widening is exact.
+            #[inline]
+            pub fn saturating_from<T: crate::FixedFloat>(x: T) -> Self {
+                Self::saturating_from_scaled_bits(x.__raw_i128(), T::FRAC_BITS)
+            }
+
+            /// Converts any fixed-point value to this type, rounding dropped
+            /// fractional bits to nearest (ties toward `+∞`) and wrapping the raw
+            /// result modulo `2^BITS` when it is out of range. Widening is exact.
+            #[inline]
+            pub fn wrapping_from<T: crate::FixedFloat>(x: T) -> Self {
+                Self::wrapping_from_scaled_bits(x.__raw_i128(), T::FRAC_BITS)
+            }
+
+            #[inline]
+            const fn checked_from_sign_magnitude(negative: bool, magnitude: u128) -> Option<Self> {
+                match crate::convert::signed(negative, magnitude) {
+                    Some(raw) => Self::checked_from_scaled_bits(raw, $F),
+                    None => None,
+                }
+            }
         }
 
         $(
@@ -40,6 +101,23 @@ macro_rules! impl_convert {
                 #[inline]
                 fn from(n: $FromInt) -> Self {
                     Self { raw: (n as $Bits) << $F }
+                }
+            }
+        )*
+
+        $(
+            impl core::convert::TryFrom<$TryFromInt> for $Name {
+                type Error = crate::OverflowError;
+                /// Converts an integer exactly, or fails when it is out of range.
+                #[inline]
+                fn try_from(n: $TryFromInt) -> Result<Self, Self::Error> {
+                    match i128::try_from(n) {
+                        Ok(n) => match Self::checked_from_int(n) {
+                            Some(v) => Ok(v),
+                            None => Err(crate::OverflowError),
+                        },
+                        Err(_) => Err(crate::OverflowError),
+                    }
                 }
             }
         )*
