@@ -70,9 +70,82 @@ pub(crate) const fn rescale(raw: i128, src_frac: u32, dst_frac: u32) -> (i128, b
     }
 }
 
+/// `div` and `div_int` of a kernel, in one of two forms with equal results.
+///
+/// `signed`: one signed truncating division of `2n + bias` by `2d`, where the
+/// bias `±(|d| − negative)` takes the sign of `n`. The quotient is then
+/// `sign · ⌊(2|n| + |d| − negative) / 2|d|⌋`, the same value as `magnitude`,
+/// with no sign handling after the division. Used by `k16` and `k32`.
+///
+/// `magnitude`: one unsigned division of the magnitudes, taken on the storage
+/// type before widening: a positive result is `⌊(2|n| + |d|) / 2|d|⌋ = ⌊x + ½⌋`;
+/// a negative one, whose tie goes toward zero in magnitude, is
+/// `⌊(2|n| + |d| − 1) / 2|d|⌋ = ⌈x − ½⌉`. Used by `k64`, where a signed `i128`
+/// division takes the absolute values again inside the runtime call, and by
+/// `k8`, where the signed form vectorizes worse.
+macro_rules! div_kernel {
+    (signed, $Bits:ty, $Wide:ty, $UWide:ty, $F:expr) => {
+        /// `round(n / d)`; `d` must be non-zero and `2·|n| + |d|` must fit
+        /// the wide type.
+        #[inline]
+        const fn round_div(n: $Wide, d: $Wide) -> $Wide {
+            let ud = d.unsigned_abs() as $Wide;
+            let sd = (d < 0) as $Wide;
+            let bias = if n < 0 { 1 - sd - ud } else { ud - sd };
+            ((n << 1) + bias) / (d << 1)
+        }
+
+        /// `round(a · 2^F / b)` for raw operands; `b` must be non-zero.
+        #[inline]
+        pub(crate) const fn div(a: $Bits, b: $Bits) -> $Wide {
+            round_div((a as $Wide) << $F, b as $Wide)
+        }
+
+        /// `round(a / n)` for a raw `a` and an integer `n`; `n` must be non-zero.
+        #[inline]
+        pub(crate) const fn div_int(a: $Bits, n: $Bits) -> $Wide {
+            round_div(a as $Wide, n as $Wide)
+        }
+    };
+    (magnitude, $Bits:ty, $Wide:ty, $UWide:ty, $F:expr) => {
+        /// `round(±un / ud)` with the sign `-` when `negative`; `ud` must be
+        /// non-zero and `2·un + ud` must fit the unsigned wide type.
+        #[inline]
+        const fn round_div(un: $UWide, ud: $UWide, negative: bool) -> $Wide {
+            let m = ((un << 1) + (ud - negative as $UWide)) / (ud << 1);
+            let m = m as $Wide;
+            if negative {
+                -m
+            } else {
+                m
+            }
+        }
+
+        /// `round(a · 2^F / b)` for raw operands; `b` must be non-zero.
+        #[inline]
+        pub(crate) const fn div(a: $Bits, b: $Bits) -> $Wide {
+            round_div(
+                (a.unsigned_abs() as $UWide) << $F,
+                b.unsigned_abs() as $UWide,
+                (a < 0) != (b < 0),
+            )
+        }
+
+        /// `round(a / n)` for a raw `a` and an integer `n`; `n` must be non-zero.
+        #[inline]
+        pub(crate) const fn div_int(a: $Bits, n: $Bits) -> $Wide {
+            round_div(
+                a.unsigned_abs() as $UWide,
+                n.unsigned_abs() as $UWide,
+                (a < 0) != (n < 0),
+            )
+        }
+    };
+}
+
 macro_rules! kernel {
     (
-        $k:ident, $Bits:ty, $Wide:ty, $UWide:ty, $Int:ty, $Frac:ty, $F:expr
+        $k:ident, $Bits:ty, $Wide:ty, $UWide:ty, $Int:ty, $Frac:ty, $F:expr, $div:ident, $branchless_div:expr
     ) => {
         pub(crate) mod $k {
             /// The wide intermediate: room for every result before it is
@@ -130,43 +203,36 @@ macro_rules! kernel {
                 ((int as $Wide) << $F) + frac as $Wide
             }
 
-            /// `round(a · b / 2^F)` for raw operands. Equal to
-            /// `shr_round(a · b, F)`; the headroom lets the half be added first.
+            /// `round(a · b / 2^F)` for raw operands, equal to
+            /// `shr_round(a · b, F)`. For an `i128` product it is written as the
+            /// floor plus the first dropped bit, which keeps the carry of the
+            /// half off the critical path; narrower products add the half
+            /// before the shift, which vectorizes better.
             #[inline]
             pub(crate) const fn mul(a: $Bits, b: $Bits) -> $Wide {
-                ((a as $Wide) * (b as $Wide) + HALF) >> $F
-            }
-
-            /// `round(n / d)`; `d` must be non-zero and `2·|n| + |d|` must fit
-            /// the unsigned wide type.
-            ///
-            /// One unsigned division of the magnitudes: a positive result is
-            /// `⌊(2|n| + |d|) / 2|d|⌋ = ⌊x + ½⌋`; a negative one, whose tie goes
-            /// toward zero in magnitude, is `⌊(2|n| + |d| − 1) / 2|d|⌋ = ⌈x − ½⌉`.
-            #[inline]
-            const fn round_div(n: $Wide, d: $Wide) -> $Wide {
-                let negative = (n < 0) != (d < 0);
-                let un = n.unsigned_abs();
-                let ud = d.unsigned_abs();
-                let m = ((un << 1) + ud - negative as $UWide) / (ud << 1);
-                let m = m as $Wide;
-                if negative {
-                    -m
+                let p = (a as $Wide) * (b as $Wide);
+                if <$Wide>::BITS == 128 {
+                    (p >> $F) + ((p >> ($F - 1)) & 1)
                 } else {
-                    m
+                    (p + HALF) >> $F
                 }
             }
 
-            /// `round(a · 2^F / b)` for raw operands; `b` must be non-zero.
-            #[inline]
-            pub(crate) const fn div(a: $Bits, b: $Bits) -> $Wide {
-                round_div((a as $Wide) << $F, b as $Wide)
-            }
+            div_kernel!($div, $Bits, $Wide, $UWide, $F);
 
-            /// `round(a / n)` for a raw `a` and an integer `n`; `n` must be non-zero.
+            /// `div(a, b)` for a non-zero `b`, and an unspecified value for
+            /// `b = 0`. In `k16` the division runs unconditionally, with no
+            /// branch on `b`, so that loops over it are not vectorized with a
+            /// predicated division scalarized lane by lane.
             #[inline]
-            pub(crate) const fn div_int(a: $Bits, n: $Bits) -> $Wide {
-                round_div(a as $Wide, n as $Wide)
+            pub(crate) const fn div_total(a: $Bits, b: $Bits) -> $Wide {
+                if $branchless_div {
+                    div(a, b | (b == 0) as $Bits)
+                } else if b == 0 {
+                    0
+                } else {
+                    div(a, b)
+                }
             }
 
             /// `⌈(a + b) / 2⌉ = shr_round(a + b, 1)` without overflow.
@@ -234,7 +300,7 @@ macro_rules! kernel {
     };
 }
 
-kernel!(k8, i8, i16, u16, i8, u8, 4);
-kernel!(k16, i16, i32, u32, i8, u8, 8);
-kernel!(k32, i32, i64, u64, i16, u16, 16);
-kernel!(k64, i64, i128, u128, i32, u32, 32);
+kernel!(k8, i8, i16, u16, i8, u8, 4, magnitude, false);
+kernel!(k16, i16, i32, u32, i8, u8, 8, signed, true);
+kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false);
+kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false);

@@ -232,41 +232,48 @@ macro_rules! define_fixed {
             /// `None` on overflow or division by zero.
             #[inline]
             pub const fn checked_div(self, rhs: Self) -> Option<Self> {
+                let w = crate::kernel::$k::div_total(self.raw, rhs.raw);
                 if rhs.raw == 0 {
-                    return None;
+                    None
+                } else {
+                    Self::checked(w)
                 }
-                Self::checked(crate::kernel::$k::div(self.raw, rhs.raw))
             }
 
             /// Saturating division, rounded to nearest (ties toward `+∞`).
             /// Division by zero gives `MAX`, `MIN` or `0` by the sign of `self`.
             #[inline]
             pub const fn saturating_div(self, rhs: Self) -> Self {
+                let w = crate::kernel::$k::div_total(self.raw, rhs.raw);
                 if rhs.raw == 0 {
-                    return self.div_by_zero();
+                    self.div_by_zero()
+                } else {
+                    Self::saturate(w)
                 }
-                Self::saturate(crate::kernel::$k::div(self.raw, rhs.raw))
             }
 
             /// Wrapping division, rounded to nearest (ties toward `+∞`).
             /// Division by zero gives the same result as [`Self::saturating_div`].
             #[inline]
             pub const fn wrapping_div(self, rhs: Self) -> Self {
+                let w = crate::kernel::$k::div_total(self.raw, rhs.raw);
                 if rhs.raw == 0 {
-                    return self.div_by_zero();
+                    self.div_by_zero()
+                } else {
+                    Self::wrapped(w)
                 }
-                Self::wrapped(crate::kernel::$k::div(self.raw, rhs.raw))
             }
 
             /// Wrapping division and whether it overflowed. Division by zero
             /// gives the result of [`Self::saturating_div`] and `true`.
             #[inline]
             pub const fn overflowing_div(self, rhs: Self) -> (Self, bool) {
+                let w = crate::kernel::$k::div_total(self.raw, rhs.raw);
                 if rhs.raw == 0 {
-                    return (self.div_by_zero(), true);
+                    (self.div_by_zero(), true)
+                } else {
+                    (Self::wrapped(w), !crate::kernel::$k::fits(w))
                 }
-                let w = crate::kernel::$k::div(self.raw, rhs.raw);
-                (Self::wrapped(w), !crate::kernel::$k::fits(w))
             }
 
             /// Checked remainder `self - rhs · trunc(self / rhs)` (exact, sign of `self`).
