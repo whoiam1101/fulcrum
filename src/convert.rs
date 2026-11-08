@@ -28,20 +28,15 @@ macro_rules! impl_convert {
             /// Converts `raw / 2^src_frac` to this type, rounding dropped bits to
             /// nearest (ties toward `+∞`); `None` when the result is out of range.
             ///
-            /// Every conversion into this type from a wider value goes through
-            /// here: integers, narrowing, parsing, floats and accumulators.
+            /// Every checked or saturating conversion into this type from an
+            /// `i128` with a scale goes through here: integers, narrowing,
+            /// parsing, floats and accumulators. The wrapping one,
+            /// `wrapping_from_scaled_bits`, shares the rescaling
+            /// (`kernel::rescale`) and keeps the low bits instead.
             #[inline]
             pub(crate) const fn checked_from_scaled_bits(raw: i128, src_frac: u32) -> Option<Self> {
-                let w = if src_frac >= $F {
-                    crate::kernel::shr_round(raw, src_frac - $F)
-                } else {
-                    let s = $F - src_frac;
-                    if raw > (i128::MAX >> s) || raw < (i128::MIN >> s) {
-                        return None;
-                    }
-                    raw << s
-                };
-                if w >= <$Bits>::MIN as i128 && w <= <$Bits>::MAX as i128 {
+                let (w, overflow) = crate::kernel::rescale(raw, src_frac, $F);
+                if !overflow && w >= <$Bits>::MIN as i128 && w <= <$Bits>::MAX as i128 {
                     Some(Self { raw: w as $Bits })
                 } else {
                     None
@@ -63,12 +58,7 @@ macro_rules! impl_convert {
             /// (ties toward `+∞`) and keeping the low bits of the raw result.
             #[inline]
             pub(crate) const fn wrapping_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
-                let w = if src_frac >= $F {
-                    crate::kernel::shr_round(raw, src_frac - $F)
-                } else {
-                    raw.wrapping_shl($F - src_frac)
-                };
-                Self { raw: w as $Bits }
+                Self { raw: crate::kernel::rescale(raw, src_frac, $F).0 as $Bits }
             }
 
             /// Converts any fixed-point value to this type, rounding dropped

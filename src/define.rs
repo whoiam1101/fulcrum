@@ -698,9 +698,9 @@ define_fixed! {
     }
 }
 
-impl_accumulator!(Accumulator8, FixedFloat8, 4, scale: 8, product: [accumulator_product!(FixedFloat8, 4);]);
-impl_accumulator!(Accumulator16, FixedFloat16, 8, scale: 16, product: [accumulator_product!(FixedFloat16, 8);]);
-impl_accumulator!(Accumulator32, FixedFloat32, 16, scale: 32, product: [accumulator_product!(FixedFloat32, 16);]);
+impl_accumulator!(Accumulator8, FixedFloat8, 4, scale: 8, product: [accumulator_product!(FixedFloat8);]);
+impl_accumulator!(Accumulator16, FixedFloat16, 8, scale: 16, product: [accumulator_product!(FixedFloat16);]);
+impl_accumulator!(Accumulator32, FixedFloat32, 16, scale: 32, product: [accumulator_product!(FixedFloat32);]);
 impl_accumulator!(Accumulator64, FixedFloat64, 32, scale: 32, product: []);
 
 impl_widen!(FixedFloat8 => FixedFloat16, FixedFloat32, FixedFloat64);

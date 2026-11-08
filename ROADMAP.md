@@ -22,6 +22,8 @@ Four types with arithmetic, rounding, conversions, exact parsing and formatting,
 
 Verified by: exhaustive tests of every pair for `FixedFloat8` and `FixedFloat16` and of `parse(display(x))` for every `FixedFloat32`, the rational oracle with edge-biased property tests, fuzzing of `parse`, `*`, `/` and formatting, stress and algebra runs, a golden hash on x86-64, ARM64 and 32-bit x86, and Kani on all four widths: `+ - neg abs`, `midpoint`, rounding, `to_int_*`, shifts, parts, bytes, narrowing, `from_int`, and `parse` without panics on strings up to 64 bytes; `*` and `mul_int` on 8..32 bits; `/`, `div_int`, `from_ratio` on 8 bits (16 bits is covered exhaustively); accumulator order independence on 8 bits.
 
+**Done when:** every check above passes in CI (the weekly jobs included), the golden hash is the same on x86-64, ARM64 and 32-bit x86 in debug and release, and the stage 1 debts below are closed. Speed is not part of the condition: speedups do not change result bits and ship as `v0.1.x`.
+
 ### Between 1 and 2 (`v0.1.x`)
 
 Stage 1 debts, closed in `v0.1.0`:

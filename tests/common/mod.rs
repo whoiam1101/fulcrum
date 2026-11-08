@@ -416,9 +416,42 @@ macro_rules! check_unary {
             x
         );
         assert_eq!(
+            x.overflowing_neg(),
+            ($T::from_bits(wrap(-ra, $bits) as _), !fits(-ra, $bits)),
+            "overflowing_neg {:?}",
+            x
+        );
+        assert_eq!(
             x.abs().to_bits() as i128,
             clamp(ra.abs(), $bits),
             "abs {:?}",
+            x
+        );
+        assert_eq!(
+            x.saturating_abs().to_bits() as i128,
+            clamp(ra.abs(), $bits),
+            "saturating_abs {:?}",
+            x
+        );
+        assert_eq!(
+            x.checked_abs().map(|v| v.to_bits() as i128),
+            Some(ra.abs()).filter(|&v| fits(v, $bits)),
+            "checked_abs {:?}",
+            x
+        );
+        assert_eq!(
+            x.wrapping_abs().to_bits() as i128,
+            wrap(ra.abs(), $bits),
+            "wrapping_abs {:?}",
+            x
+        );
+        assert_eq!(
+            x.overflowing_abs(),
+            (
+                $T::from_bits(wrap(ra.abs(), $bits) as _),
+                !fits(ra.abs(), $bits)
+            ),
+            "overflowing_abs {:?}",
             x
         );
         assert_eq!(

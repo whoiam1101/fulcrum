@@ -1,4 +1,4 @@
-//! Kani proof harnesses (docs/ARCHITECTURE.md §6.1.2).
+//! Kani proof harnesses.
 //!
 //! Run with `cargo kani`. Never compiled by a normal build. Kani also checks
 //! every arithmetic operation for overflow, so each harness proves "never

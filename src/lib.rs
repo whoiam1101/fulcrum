@@ -2,7 +2,7 @@
 //!
 //! Deterministic fixed-point math. Every operation gives bit-identical results
 //! on every platform (x86-64, ARM64, 32-bit targets); no floating point is used
-//! internally. Overflow is explicit and never panics.
+//! internally. Overflow is explicit: operators saturate and never panic.
 //!
 //! | Type | Format | Range | Step |
 //! |---|---|---|---|
@@ -18,15 +18,16 @@
 //! - `*` and `/` round to nearest, ties toward `+∞`; `+`, `-` and `%` are exact;
 //! - division by zero gives `MAX`, `MIN` or `0` by the sign of the dividend,
 //!   `x % 0` gives `0`, and the `checked_*` variants return `None`;
-//! - nothing panics;
+//! - nothing panics, unless the `strict-overflow` feature below is enabled;
 //! - [`Iterator::sum`] and the `Accumulator*` types are exact and do not depend
 //!   on the order of terms, so parallel reductions give the same bits for any
 //!   number of threads. Rounded multiplication is not associative:
 //!   [`Iterator::product`] and chains of `*` depend on the order, which the
 //!   caller must fix.
 //!
-//! The `strict-overflow` feature turns every saturation of an operator into a
-//! panic. It is meant for tests and CI of an engine, never for a shipped build.
+//! The `strict-overflow` feature turns every saturation of an operator, `<<`,
+//! [`Iterator::sum`] and [`Iterator::product`] into a panic; the explicit
+//! methods and `Accumulator*::finish` keep their semantics. It is meant for tests and CI of an engine, never for a shipped build.
 //!
 //! ```
 //! use fulcrum::{ff64, FixedFloat64};
@@ -50,7 +51,6 @@ extern crate alloc;
 extern crate std;
 
 mod kernel;
-mod wide;
 
 #[macro_use]
 mod bytes;
@@ -73,12 +73,15 @@ mod float;
 mod define;
 
 mod error;
-mod math;
 mod tables;
-mod vec;
 
 #[cfg(kani)]
 mod proofs;
+
+/// The README example, compiled and run as a doctest.
+#[cfg(doctest)]
+#[doc = include_str!("../README.md")]
+struct ReadmeDoctest;
 
 pub use define::{
     Accumulator16, Accumulator32, Accumulator64, Accumulator8, FixedFloat16, FixedFloat32,

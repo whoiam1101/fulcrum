@@ -1,7 +1,8 @@
 //! `f64` conversions behind the `float-convert` feature: for debugging, tests
 //! and rendering only. Both directions work on the IEEE 754 bit pattern with
-//! integer operations, so they are exact and deterministic and no floating
-//! point arithmetic is performed.
+//! integer operations, so they are exact and deterministic. No floating point
+//! arithmetic is performed; the only float operations are the exact
+//! `i128 → f64` cast of an integer and `f64::from_bits`/`to_bits`.
 
 pub(crate) enum FromF64 {
     Nan,

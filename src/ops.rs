@@ -2,8 +2,8 @@
 //! `saturating_*` and `overflowing_*` give explicit semantics.
 //!
 //! With the `strict-overflow` feature (for development and CI of the engine
-//! only) every operator, `Sum` and `Neg` panics instead of saturating, and
-//! division or remainder by zero panics too. The explicit methods keep their
+//! only) every operator, `Neg`, `<<`, `Sum` and `Product` panics instead of
+//! saturating, and division or remainder by zero panics too. The explicit methods keep their
 //! documented semantics in both modes.
 
 macro_rules! impl_ops {
@@ -97,17 +97,18 @@ macro_rules! impl_ops {
         }
 
         impl core::iter::Product for $Name {
-            /// Saturating multiplication in iteration order. Rounded
-            /// multiplication is not associative, so the order matters.
+            /// The `*` operator in iteration order: saturating, or panicking
+            /// with `strict-overflow`. Rounded multiplication is not
+            /// associative, so the order matters.
             fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
-                iter.fold(Self::ONE, Self::saturating_mul)
+                iter.fold(Self::ONE, |a, b| a * b)
             }
         }
 
         impl<'a> core::iter::Product<&'a $Name> for $Name {
-            /// Saturating multiplication in iteration order, see `Product<Self>`.
+            /// The `*` operator in iteration order, see `Product<Self>`.
             fn product<I: Iterator<Item = &'a Self>>(iter: I) -> Self {
-                iter.fold(Self::ONE, |a, b| a.saturating_mul(*b))
+                iter.fold(Self::ONE, |a, b| a * *b)
             }
         }
     };

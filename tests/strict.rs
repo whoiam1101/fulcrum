@@ -49,6 +49,12 @@ fn sum_overflow_panics() {
 }
 
 #[test]
+#[should_panic(expected = "strict-overflow")]
+fn product_overflow_panics() {
+    let _: FixedFloat8 = [FixedFloat8::MAX, FixedFloat8::MAX].iter().product();
+}
+
+#[test]
 fn in_range_operations_and_explicit_methods_do_not_panic() {
     let x = FixedFloat64::from_bits(3 << 31);
     assert_eq!(x + x, FixedFloat64::from_bits(3 << 32));
@@ -68,6 +74,8 @@ fn in_range_operations_and_explicit_methods_do_not_panic() {
         .iter()
         .sum();
     assert_eq!(s, FixedFloat8::MAX);
+    let p: FixedFloat8 = [FixedFloat8::HALF, FixedFloat8::HALF].into_iter().product();
+    assert_eq!(p, FixedFloat8::from_bits(4));
 }
 
 #[test]

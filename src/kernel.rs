@@ -2,15 +2,23 @@
 //! storage type or of its wide intermediate.
 //!
 //! `define_fixed!` names one module per type (`k8` … `k64`), and every module
-//! has the same functions. The rest of the crate never casts to or from the
-//! wide type `Wide`: it receives wide values from one kernel function and hands
-//! them to another (`narrow`, `saturate`, `wrap`, `fits`). Values given as an
-//! `i128` with an explicit scale are narrowed by `checked_from_scaled_bits`.
+//! has the same functions. Arithmetic outside the kernel does not cast to or
+//! from the wide type `Wide`: it receives wide values from one kernel function
+//! and hands them to another (`narrow`, `saturate`, `wrap`, `fits`).
 //!
-//! Every rounding kernel rounds to nearest with ties toward `+∞`, the rule of
-//! [`shr_round`]: `mul` and `midpoint` are `shr_round` of the exact sum or
-//! product, `div` and `div_int` the same rule for a quotient. The exceptions
-//! are `round_*`, the named integer roundings of `round.rs`. Saturation and
+//! A second currency, independent of the width, is an `i128` with an explicit
+//! scale. Conversions between widths, parsing, floats and the accumulators
+//! produce it, and `checked_from_scaled_bits` or `wrapping_from_scaled_bits`
+//! narrows it through [`rescale`]. For `k64` the wide type is `i128` as well;
+//! there the two share a Rust type but not a meaning: a scaled `i128` carries
+//! its own number of fractional bits.
+//!
+//! Every kernel that drops bits of an exact result rounds to nearest with ties
+//! toward `+∞`, the rule of [`shr_round`]: `mul` and `midpoint` are
+//! `shr_round` of the exact sum or product, `div` and `div_int` the same rule
+//! for a quotient, `shr` the same rule on the storage type. The exceptions are
+//! the named integer roundings of `round.rs`: `ceil`, `round_half_away` and
+//! `round_ties_even`; `to_int` is exact on their results. Saturation and
 //! wrapping are decided by the caller, so one kernel serves the checked,
 //! wrapping, saturating and overflowing variants.
 //!
@@ -20,7 +28,8 @@
 //! bits for multiplication.
 //!
 //! Written in the Rust subset that Aeneas understands (free functions over
-//! primitives, no generic traits, no closures), see docs/ARCHITECTURE.md §6.1.4.
+//! primitives, no generic traits, no closures), so that it can be translated
+//! for the Lean proofs of later stages.
 
 /// `round(n / 2^s)`, to nearest with ties toward `+∞`, for any `n` and `s`:
 /// `⌊n / 2^s⌋` plus the first dropped bit, so nothing overflows. The one
@@ -43,6 +52,22 @@ pub(crate) const fn shr_round(n: i128, s: u32) -> i128 {
 #[inline]
 pub(crate) const fn magnitude_rounds_up(negative: bool, half: bool, sticky: bool) -> bool {
     half && (!negative || sticky)
+}
+
+/// `raw / 2^src_frac` rescaled to `dst_frac` fractional bits: [`shr_round`]
+/// when bits are dropped, an exact shift otherwise. The second value is
+/// whether the exact shift overflowed `i128`; the first is then its low bits.
+#[inline]
+pub(crate) const fn rescale(raw: i128, src_frac: u32, dst_frac: u32) -> (i128, bool) {
+    if src_frac >= dst_frac {
+        (shr_round(raw, src_frac - dst_frac), false)
+    } else {
+        let s = dst_frac - src_frac;
+        (
+            raw.wrapping_shl(s),
+            raw > (i128::MAX >> s) || raw < (i128::MIN >> s),
+        )
+    }
 }
 
 macro_rules! kernel {

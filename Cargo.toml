@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2021"
 authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
 rust-version = "1.60"
+publish = false
 license = "Apache-2.0"
 description = "Deterministic fixed-point math: bit-identical results on every platform, no floats inside."
 repository = "https://github.com/whoiam1101/fulcrum"

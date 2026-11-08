@@ -46,7 +46,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 - **Text:** exact `parse` / `FromStr` and `Display` (every value prints exactly; `{:.N}` rounds ties to even), `Debug` with the raw bits, compile-time literals `ff8!` .. `ff64!`.
 - **Bytes:** `to_le_bytes` / `from_le_bytes` and big-endian, for snapshots, replays and checksums.
 - **Constants:** `PI`, `TAU`, `E`, `SQRT_2`, `LN_2` and more, correctly rounded for each type.
-- **Features:** `float-convert` (`f64` conversions for debugging and rendering, exact and bit-pattern based), `strict-overflow` (operators panic instead of saturating, for tests of the code that uses fulcrum), `alloc`, `std`.
+- **Features:** `float-convert` (`f64` conversions for debugging and rendering, exact and bit-pattern based), `strict-overflow` (operators, `<<`, `sum` and `product` panic instead of saturating, for tests of the code that uses fulcrum), `alloc`, `std`.
 
 Correctness: every pair of operands is checked exhaustively for `FixedFloat8` and `FixedFloat16`, wider types against an exact rational oracle, with fuzzing, a golden hash and Kani proofs. CI runs on x86-64 and ARM64 (Linux, macOS, Windows), 32-bit x86, and builds for `thumbv7em` without `std`. MSRV is Rust 1.60.
 

@@ -125,7 +125,7 @@ macro_rules! impl_accumulator {
 }
 
 macro_rules! accumulator_product {
-    ($Name:ident, $F:literal) => {
+    ($Name:ident) => {
         /// Adds the exact, unrounded product `a · b`. A dot product built with
         /// this method is rounded only once, in `finish`.
         #[inline]
