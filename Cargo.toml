@@ -1,6 +1,6 @@
 [package]
 name = "fulcrum"
-version = "0.1.0"
+version = "0.1.1"
 edition = "2021"
 authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
 rust-version = "1.60"

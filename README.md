@@ -13,7 +13,7 @@ Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `Fi
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.1.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.1.1" }
 ```
 
 ## Example
