@@ -4,7 +4,10 @@
 //! - only doc comments: `///` and `//!` in Rust, `/-- -/` and `/-! -/` in Lean,
 //!   none at all in TOML, YAML and `.gitignore`;
 //! - no platform-specific code and no floating point in `src`, except
-//!   `src/float.rs` behind the `float-convert` feature.
+//!   `src/float.rs` behind the `float-convert` feature;
+//! - no bare `$` in Markdown outside code: math only in the forms GitHub
+//!   renders without Markdown mangling it, ```` ```math ```` blocks and
+//!   `` $`…`$ `` inline.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -102,6 +105,53 @@ fn has_word(line: &str, word: &str) -> bool {
     false
 }
 
+fn backtick_run(chars: &[char], i: usize) -> usize {
+    chars[i..].iter().take_while(|&&c| c == '`').count()
+}
+
+/// Index just past the closing run of exactly `n` backticks at or after `from`.
+fn after_closing_run(chars: &[char], from: usize, n: usize) -> Option<usize> {
+    let mut i = from;
+    while i < chars.len() {
+        if chars[i] == '`' {
+            let run = backtick_run(chars, i);
+            if run == n {
+                return Some(i + run);
+            }
+            i += run;
+        } else {
+            i += 1;
+        }
+    }
+    None
+}
+
+/// A Markdown line outside code fences with `$$` display math or `$…$`
+/// inline math, which GitHub runs through Markdown first, so `\\`, `\_`,
+/// `\{` and `_…_` break; math in `` $`…`$ `` and code spans is fine.
+fn markdown_math_violation(line: &str) -> bool {
+    let chars: Vec<char> = line.chars().collect();
+    let mut i = 0;
+    while i < chars.len() {
+        match chars[i] {
+            '$' if chars.get(i + 1) == Some(&'`') => {
+                let n = backtick_run(&chars, i + 1);
+                match after_closing_run(&chars, i + 1 + n, n) {
+                    Some(end) if chars.get(end) == Some(&'$') => i = end + 1,
+                    _ => return true,
+                }
+            }
+            '$' => return true,
+            '`' => {
+                let n = backtick_run(&chars, i);
+                i = after_closing_run(&chars, i + n, n).unwrap_or(chars.len());
+            }
+            _ => i += 1,
+        }
+    }
+    false
+}
+
 /// A `src` line with platform-specific code or a floating-point type.
 fn platform_violation(line: &str) -> bool {
     PLATFORM_TOKENS.iter().any(|t| line.contains(t))
@@ -173,6 +223,37 @@ fn no_platform_code_in_src() {
 }
 
 #[test]
+fn markdown_math_renders_on_github() {
+    let root = root();
+    let mut found = Vec::new();
+    for path in files() {
+        if extension(&path) != "md" {
+            continue;
+        }
+        let text = match fs::read_to_string(&path) {
+            Ok(text) => text,
+            Err(_) => continue,
+        };
+        let mut fenced = false;
+        for (n, line) in text.lines().enumerate() {
+            if line.trim_start().starts_with("```") {
+                fenced = !fenced;
+                continue;
+            }
+            if !fenced && markdown_math_violation(line) {
+                let shown = path.strip_prefix(&root).unwrap_or(&path).display();
+                found.push(format!("{}:{}: {}", shown, n + 1, line.trim()));
+            }
+        }
+    }
+    assert!(
+        found.is_empty(),
+        "math outside ```math blocks and $`…`$ (GitHub mangles it):\n{}",
+        found.join("\n")
+    );
+}
+
+#[test]
 fn rules_catch_what_they_forbid() {
     let slashes = "/".repeat(2);
     assert!(rust_violation(&format!("let x = 1; {} note", slashes)));
@@ -192,4 +273,13 @@ fn rules_catch_what_they_forbid() {
     assert!(platform_violation("#[cfg(target_arch = \"x86_64\")]"));
     assert!(!platform_violation("let half64 = 1;"));
     assert!(!platform_violation("fn from_f64_bits() {}"));
+    assert!(markdown_math_violation("$$"));
+    assert!(markdown_math_violation("where $x_1$ and $y_2$"));
+    assert!(!markdown_math_violation("where $`x_1`$ and $`y_2`$"));
+    assert!(!markdown_math_violation("the `$Wide` metavariable"));
+    assert!(!markdown_math_violation(
+        "not `$…$` / `$$…$$`, but `` $`…`$ ``"
+    ));
+    assert!(markdown_math_violation("unclosed $`x"));
+    assert!(!markdown_math_violation("no math here"));
 }
