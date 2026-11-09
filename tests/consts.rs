@@ -2,8 +2,14 @@
 //! consistency across widths. Exactness against published digits is checked
 //! in `oracle/tests/consts.rs`.
 
+#[macro_use]
+mod common;
+
 use core::convert::TryFrom;
-use fulcrum::{FixedFloat, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+use fulcrum::*;
+
+/// The widest type: every narrower constant is its constant, rounded.
+type Widest = FixedFloat64;
 
 fn ulps(a: FixedFloat64, b: FixedFloat64) -> i64 {
     (a.to_bits() - b.to_bits()).abs()
@@ -52,8 +58,8 @@ macro_rules! same_as_narrowed {
     ($Small:ident: $($name:ident),*) => {
         $(
             assert_eq!(
-                $Small::try_from(FixedFloat64::$name),
-                Ok($Small::$name),
+                $Small::try_from(Widest::$name).ok(),
+                Some($Small::$name),
                 "{} of {}",
                 stringify!($name),
                 stringify!($Small)
@@ -62,17 +68,24 @@ macro_rules! same_as_narrowed {
     };
 }
 
+/// Calls `$m!($T: names)` with every constant that `$T` has: `FixedFloat8`
+/// has no `DEG_TO_RAD` (it rounds to zero) and no `RAD_TO_DEG` (out of range).
+macro_rules! with_constants {
+    ($m:ident, fixed8, $T:ident, $($rest:tt)*) => {
+        $m!($T: PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
+            FRAC_1_PI, FRAC_2_PI, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
+            E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO)
+    };
+    ($m:ident, $module:ident, $T:ident, $($rest:tt)*) => {
+        $m!($T: PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
+            FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3,
+            FRAC_1_SQRT_3, E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO)
+    };
+}
+
 #[test]
 fn narrower_types_agree_with_rounded_wider_values() {
-    same_as_narrowed!(FixedFloat32: PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
-    same_as_narrowed!(FixedFloat16: PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
-    same_as_narrowed!(FixedFloat8: PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
+    for_each_width!(with_constants!(same_as_narrowed,));
 }
 
 #[test]

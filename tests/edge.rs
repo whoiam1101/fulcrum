@@ -3,16 +3,14 @@
 
 #![cfg(not(feature = "strict-overflow"))]
 
+#[macro_use]
 mod common;
 
 use core::convert::TryFrom;
-use fulcrum::{
-    ff16, ff32, ff64, ff8, FixedFloat, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8,
-    OverflowError, ParseErrorKind,
-};
+use fulcrum::*;
 
 macro_rules! edge_suite {
-    ($module:ident, $T:ident, $lit:ident) => {
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
         mod $module {
             use super::*;
 
@@ -221,10 +219,7 @@ macro_rules! edge_suite {
     };
 }
 
-edge_suite!(fixed8, FixedFloat8, ff8);
-edge_suite!(fixed16, FixedFloat16, ff16);
-edge_suite!(fixed32, FixedFloat32, ff32);
-edge_suite!(fixed64, FixedFloat64, ff64);
+for_each_width!(edge_suite!());
 
 #[test]
 fn widening_is_lossless() {
@@ -423,6 +418,14 @@ fn f64_round_trip() {
 }
 
 macro_rules! try_from_ints {
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
+        try_from_ints!(
+            $T,
+            $bits,
+            $f,
+            [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128]
+        );
+    };
     ($T:ident, $bits:expr, $f:expr, [$($I:ty),*]) => {{
         $(
             for &n in &[
@@ -454,30 +457,7 @@ macro_rules! try_from_ints {
 
 #[test]
 fn integers_convert_by_try_from() {
-    try_from_ints!(
-        FixedFloat8,
-        8,
-        4,
-        [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128]
-    );
-    try_from_ints!(
-        FixedFloat16,
-        16,
-        8,
-        [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128]
-    );
-    try_from_ints!(
-        FixedFloat32,
-        32,
-        16,
-        [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128]
-    );
-    try_from_ints!(
-        FixedFloat64,
-        64,
-        32,
-        [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128]
-    );
+    for_each_i128_width!(try_from_ints!());
     assert_eq!(FixedFloat8::try_from(8i32), Err(OverflowError));
     assert_eq!(FixedFloat8::try_from(-8i64).map(|v| v.to_bits()), Ok(-128));
     assert_eq!(FixedFloat64::try_from(u128::MAX), Err(OverflowError));

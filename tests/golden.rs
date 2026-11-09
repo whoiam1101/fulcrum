@@ -6,16 +6,17 @@
 
 #![cfg(not(feature = "strict-overflow"))]
 
+#[macro_use]
 mod common;
 
 use common::{Fnv, Pcg32};
-use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+use fulcrum::*;
 
 const ROUNDS: usize = 250_000;
 const GOLDEN: u64 = 0x474e_b3e1_3cc2_cfd0;
 
 macro_rules! mix {
-    ($h:expr, $rng:expr, $T:ident, $bits:expr) => {{
+    ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
         let a = $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as _);
         let b = $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as _);
         for v in [
@@ -51,10 +52,7 @@ fn compute() -> u64 {
     let mut rng = Pcg32::new(0x5eed_f00d, 54);
     let mut h = Fnv::new();
     for _ in 0..ROUNDS {
-        mix!(h, rng, FixedFloat8, 8);
-        mix!(h, rng, FixedFloat16, 16);
-        mix!(h, rng, FixedFloat32, 32);
-        mix!(h, rng, FixedFloat64, 64);
+        for_each_width!(mix!(h, rng,));
     }
     h.finish()
 }

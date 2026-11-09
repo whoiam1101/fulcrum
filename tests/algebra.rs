@@ -22,10 +22,11 @@
 
 #![cfg(not(feature = "strict-overflow"))]
 
+#[macro_use]
 mod common;
 
 use common::*;
-use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+use fulcrum::*;
 
 /// Raw value of a random integer that fits the integer part of a
 /// `bits`-bit format with `frac_bits` fractional bits.
@@ -181,6 +182,15 @@ macro_rules! check_width {
     }};
 }
 
+/// [`check_width!`] on every width that `exhaustive_fixed8` does not
+/// enumerate, adding the count of triples that reached the `*` checks to `$mul`.
+macro_rules! stress_width {
+    ($rng:ident, $mul:ident, fixed8, $($rest:tt)*) => {};
+    ($rng:ident, $mul:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
+        $mul += check_width!($rng, $T, $Raw, $bits, $f);
+    };
+}
+
 #[test]
 fn documented_counterexamples() {
     type Q = FixedFloat8;
@@ -226,9 +236,9 @@ const MIN_MUL_PERCENT: u64 = 20;
 #[ignore = "randomized: set FULCRUM_ALGEBRA_* and run with --release --ignored"]
 fn algebra_stress() {
     let t = run_streams("algebra", "FULCRUM_ALGEBRA", 60, |rng| {
-        check_width!(rng, FixedFloat16, i16, 16, 8)
-            + check_width!(rng, FixedFloat32, i32, 32, 16)
-            + check_width!(rng, FixedFloat64, i64, 64, 32)
+        let mut mul = 0u64;
+        for_each_i128_width!(stress_width!(rng, mul,));
+        mul
     });
     let triples = t.items * 2 * 3;
     eprintln!(

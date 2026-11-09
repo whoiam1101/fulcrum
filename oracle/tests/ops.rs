@@ -1,14 +1,18 @@
 //! Property tests: every operation equals the exact rational oracle bit for bit.
 
-use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+#[macro_use]
+#[path = "../../tests/common/widths.rs"]
+mod widths;
+
+use fulcrum::*;
 use fulcrum_oracle::Format;
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use proptest::prelude::*;
 
 fn edge(bits: u32, frac: u32) -> impl Strategy<Value = i128> {
-    let min = -(1i128 << (bits - 1));
-    let max = (1i128 << (bits - 1)) - 1;
+    let min = i128::MIN >> (128 - bits);
+    let max = i128::MAX >> (128 - bits);
     let one = 1i128 << frac;
     let full = (min..=max).boxed();
     prop_oneof![
@@ -48,7 +52,7 @@ fn decimal_text() -> impl Strategy<Value = String> {
 }
 
 macro_rules! oracle_suite {
-    ($module:ident, $T:ident, $Bits:ty, $bits:expr, $frac:expr) => {
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Bits:ty, $bits:tt, $frac:tt) => {
         mod $module {
             use super::*;
 
@@ -121,7 +125,4 @@ macro_rules! oracle_suite {
     };
 }
 
-oracle_suite!(fixed8, FixedFloat8, i8, 8, 4);
-oracle_suite!(fixed16, FixedFloat16, i16, 16, 8);
-oracle_suite!(fixed32, FixedFloat32, i32, 32, 16);
-oracle_suite!(fixed64, FixedFloat64, i64, 64, 32);
+for_each_width!(oracle_suite!());

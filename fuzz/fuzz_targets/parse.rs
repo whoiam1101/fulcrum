@@ -3,12 +3,16 @@
 
 #![no_main]
 
-use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8, ParseErrorKind};
+#[macro_use]
+#[path = "../../tests/common/widths.rs"]
+mod widths;
+
+use fulcrum::*;
 use fulcrum_oracle::Format;
 use libfuzzer_sys::fuzz_target;
 
 macro_rules! check {
-    ($T:ident, $bits:expr, $frac:expr, $s:expr) => {{
+    ($s:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $frac:tt) => {{
         let fmt = Format {
             bits: $bits,
             frac: $frac,
@@ -31,9 +35,6 @@ macro_rules! check {
 
 fuzz_target!(|data: &[u8]| {
     if let Ok(s) = core::str::from_utf8(data) {
-        check!(FixedFloat8, 8, 4, s);
-        check!(FixedFloat16, 16, 8, s);
-        check!(FixedFloat32, 32, 16, s);
-        check!(FixedFloat64, 64, 32, s);
+        for_each_width!(check!(s,));
     }
 });

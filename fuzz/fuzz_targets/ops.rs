@@ -3,12 +3,16 @@
 
 #![no_main]
 
-use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+#[macro_use]
+#[path = "../../tests/common/widths.rs"]
+mod widths;
+
+use fulcrum::*;
 use fulcrum_oracle::Format;
 use libfuzzer_sys::fuzz_target;
 
 macro_rules! check {
-    ($T:ident, $Bits:ty, $bits:expr, $frac:expr, $data:expr) => {{
+    ($data:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Bits:ty, $bits:tt, $frac:tt) => {{
         const N: usize = core::mem::size_of::<$Bits>();
         if $data.len() >= 2 * N {
             let a = <$Bits>::from_le_bytes($data[..N].try_into().unwrap());
@@ -45,8 +49,5 @@ macro_rules! check {
 }
 
 fuzz_target!(|data: &[u8]| {
-    check!(FixedFloat8, i8, 8, 4, data);
-    check!(FixedFloat16, i16, 16, 8, data);
-    check!(FixedFloat32, i32, 32, 16, data);
-    check!(FixedFloat64, i64, 64, 32, data);
+    for_each_width!(check!(data,));
 });

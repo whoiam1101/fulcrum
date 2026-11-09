@@ -2,7 +2,11 @@
 //! checked against published decimal expansions (40 digits, independent of
 //! the series used by `tools/gen-tables`).
 
-use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+#[macro_use]
+#[path = "../../tests/common/widths.rs"]
+mod widths;
+
+use fulcrum::*;
 use fulcrum_oracle::Format;
 use num_bigint::BigInt;
 use num_rational::BigRational;
@@ -56,10 +60,11 @@ fn truth(name: &str) -> BigRational {
     }
 }
 
+/// Asserts that every named constant of `$T` is within half an ulp of the truth.
 macro_rules! check {
-    ($T:ident, $frac:literal; $($name:ident),*) => {
+    ($T:ident, $bits:tt, $frac:tt; $($name:ident),*) => {
         $(
-            let fmt = Format { bits: 64, frac: $frac };
+            let fmt = Format { bits: $bits, frac: $frac };
             let err = (fmt.exact($T::$name.to_bits() as i128) - truth(stringify!($name))).abs();
             let half_ulp = BigRational::new(BigInt::from(1), BigInt::from(1) << ($frac + 1));
             assert!(err < half_ulp, "{}::{} is not correctly rounded", stringify!($T), stringify!($name));
@@ -67,18 +72,22 @@ macro_rules! check {
     };
 }
 
+/// [`check!`] with every constant that the type has: `FixedFloat8` has no
+/// `DEG_TO_RAD` (it rounds to zero) and no `RAD_TO_DEG` (out of range).
+macro_rules! check_width {
+    (fixed8, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $frac:tt) => {
+        check!($T, $bits, $frac; PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
+            FRAC_1_PI, FRAC_2_PI, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
+            E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
+    };
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $frac:tt) => {
+        check!($T, $bits, $frac; PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
+            FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3,
+            FRAC_1_SQRT_3, E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
+    };
+}
+
 #[test]
 fn constants_are_correctly_rounded() {
-    check!(FixedFloat64, 32; PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
-    check!(FixedFloat32, 16; PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
-    check!(FixedFloat16, 8; PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, DEG_TO_RAD, RAD_TO_DEG, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
-    check!(FixedFloat8, 4; PI, TAU, FRAC_PI_2, FRAC_PI_3, FRAC_PI_4, FRAC_PI_6, FRAC_PI_8,
-        FRAC_1_PI, FRAC_2_PI, SQRT_2, FRAC_1_SQRT_2, SQRT_3, FRAC_1_SQRT_3,
-        E, LN_2, LN_10, LOG2_E, LOG2_10, LOG10_2, LOG10_E, GOLDEN_RATIO);
+    for_each_width!(check_width!());
 }

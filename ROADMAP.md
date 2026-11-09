@@ -50,8 +50,8 @@ Integrations, optional features, off by default (a build without features has no
 ## 2. `FixedFloat128` `v0.2.0`
 
 Prerequisites (do first, as `v0.1.x`):
-- [ ] One list of sizes for tests, so adding a width is one line instead of ~15 edits.
-- [ ] A test reference wider than `i128`: the current one stops at 64 bits. The oracle (`num-rational`) is the reference for 128 and 256 bits.
+- [x] One list of sizes for tests, so adding a width is one line instead of ~15 edits (`tests/common/widths.rs`).
+- [ ] A test reference wider than `i128`: the current one stops at 64 bits, and so do `Pcg32::edge_bits` and the `Widest` type of `tests/consts.rs`. The oracle (`num-rational`) is the reference for 128 and 256 bits.
 - [ ] Kani "no panic" for `*` and `/` of `FixedFloat64`, moved from stage 1: through Lean L3 on the kernel, or Kani on a reduced model.
 - [ ] A public constructor from raw bits with an arbitrary scale, designed for wide raw values. Until then it stays internal: in 0.1 it took an `i128`, which cannot hold a Q64.64 raw value with a larger scale.
 

@@ -3,6 +3,9 @@
 
 #![allow(dead_code)]
 
+#[macro_use]
+mod widths;
+
 /// PCG-XSH-RR 64/32 (O'Neill, 2014).
 pub struct Pcg32 {
     state: u64,

@@ -18,25 +18,35 @@
 mod common;
 
 use common::*;
-use fulcrum::{FixedFloat32, FixedFloat64};
+use fulcrum::*;
 
 /// One in this many pairs also runs the unary checks.
 const UNARY_EVERY: u32 = 64;
+
+/// Most digits after the point the `i128` reference of `rounded_decimal`
+/// formats without overflow for a 64-bit raw value.
+const MAX_REF_PRECISION: u32 = 19;
+
+/// One pair, and sometimes the unary checks, on every width that
+/// `tests/exhaustive.rs` does not enumerate.
+macro_rules! stress_width {
+    ($rng:ident, fixed8, $($rest:tt)*) => {};
+    ($rng:ident, fixed16, $($rest:tt)*) => {};
+    ($rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
+        let a = $rng.edge_bits($bits, $f) as $Raw;
+        let b = $rng.edge_bits($bits, $f) as $Raw;
+        check_pair!($T, $bits, $f, a, b);
+        if $rng.below(UNARY_EVERY) == 0 {
+            check_unary!($T, $bits, $f, a, core::cmp::min($f + 1, MAX_REF_PRECISION));
+        }
+    }};
+}
 
 #[test]
 #[ignore = "long running: set FULCRUM_STRESS_* and run with --ignored --release"]
 fn stress_fixed32_fixed64() {
     let t = run_streams("stress", "FULCRUM_STRESS", 60, |rng| {
-        let a = rng.edge_bits(32, 16) as i32;
-        let b = rng.edge_bits(32, 16) as i32;
-        check_pair!(FixedFloat32, 32, 16, a, b);
-        let c = rng.edge_bits(64, 32);
-        let d = rng.edge_bits(64, 32);
-        check_pair!(FixedFloat64, 64, 32, c, d);
-        if rng.below(UNARY_EVERY) == 0 {
-            check_unary!(FixedFloat32, 32, 16, a);
-            check_unary!(FixedFloat64, 64, 32, c, 19);
-        }
+        for_each_i128_width!(stress_width!(rng,));
         0
     });
     eprintln!(

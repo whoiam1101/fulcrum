@@ -3,13 +3,11 @@
 
 #![cfg(not(feature = "strict-overflow"))]
 
+#[macro_use]
 mod common;
 
 use common::{ref_round_div, Pcg32};
-use fulcrum::{
-    Accumulator16, Accumulator32, Accumulator64, Accumulator8, FixedFloat16, FixedFloat32,
-    FixedFloat64, FixedFloat8,
-};
+use fulcrum::*;
 
 fn shuffle<T>(rng: &mut Pcg32, v: &mut [T]) {
     for i in (1..v.len()).rev() {
@@ -19,7 +17,7 @@ fn shuffle<T>(rng: &mut Pcg32, v: &mut [T]) {
 }
 
 macro_rules! order_suite {
-    ($module:ident, $T:ident, $Acc:ident, $bits:expr, $products:expr) => {
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
         mod $module {
             use super::*;
 
@@ -97,7 +95,7 @@ macro_rules! order_suite {
 
             #[test]
             fn dot_product_rounds_once() {
-                if !$products {
+                if !<$Acc as DotAdd<$T>>::SUPPORTED {
                     return;
                 }
                 let mut rng = Pcg32::new(12, $bits);
@@ -130,6 +128,7 @@ macro_rules! order_suite {
 }
 
 trait DotAdd<T> {
+    const SUPPORTED: bool = true;
     fn dot(&mut self, a: T, b: T);
 }
 
@@ -148,6 +147,7 @@ dot_impl!(Accumulator16, FixedFloat16);
 dot_impl!(Accumulator32, FixedFloat32);
 
 impl DotAdd<FixedFloat64> for Accumulator64 {
+    const SUPPORTED: bool = false;
     fn dot(&mut self, _: FixedFloat64, _: FixedFloat64) {
         unreachable!("add_product for FixedFloat64 needs U256 (stage 2)");
     }
@@ -157,10 +157,7 @@ fn dot_add<T, A: DotAdd<T>>(acc: &mut A, a: T, b: T) {
     acc.dot(a, b);
 }
 
-order_suite!(fixed8, FixedFloat8, Accumulator8, 8, true);
-order_suite!(fixed16, FixedFloat16, Accumulator16, 16, true);
-order_suite!(fixed32, FixedFloat32, Accumulator32, 32, true);
-order_suite!(fixed64, FixedFloat64, Accumulator64, 64, false);
+for_each_i128_width!(order_suite!());
 
 #[test]
 fn multiplication_is_commutative_but_not_associative() {
@@ -176,15 +173,16 @@ fn multiplication_is_commutative_but_not_associative() {
     assert_eq!(four * (four * quarter), four);
 }
 
+macro_rules! thread_safe {
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
+        assert_traits::<$T>();
+        assert_traits::<$Acc>();
+    };
+}
+
+fn assert_traits<T: Send + Sync + Unpin + Copy + 'static>() {}
+
 #[test]
 fn types_are_thread_safe_values() {
-    fn assert_traits<T: Send + Sync + Unpin + Copy + 'static>() {}
-    assert_traits::<FixedFloat8>();
-    assert_traits::<FixedFloat16>();
-    assert_traits::<FixedFloat32>();
-    assert_traits::<FixedFloat64>();
-    assert_traits::<Accumulator8>();
-    assert_traits::<Accumulator16>();
-    assert_traits::<Accumulator32>();
-    assert_traits::<Accumulator64>();
+    for_each_width!(thread_safe!());
 }
