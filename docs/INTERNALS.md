@@ -6,8 +6,8 @@
 - $`W`$ — число битов хранения (8, 16, 32, 64), $`F = W/2`$ — число дробных битов.
 - $`r`$ — сырое значение (`raw`), целое со знаком из $`[-2^{W-1},\ 2^{W-1}-1]`$.
 - $`x = r / 2^F`$ — значение числа. Один ulp: $`\delta = 2^{-F}`$.
-- $`\lfloor\cdot\rfloor`$, $`\lceil\cdot\rceil`$ — пол и потолок; $`\operatorname{trunc}`$ — округление к нулю.
-- $`\operatorname{rnd}(t) = \lfloor t + \tfrac12 \rfloor`$ — **единое правило округления**: к ближайшему, середина к $`+\infty`$.
+- $`\lfloor\cdot\rfloor`$, $`\lceil\cdot\rceil`$ — пол и потолок; $`\mathrm{trunc}`$ — округление к нулю.
+- $`\mathrm{rnd}(t) = \lfloor t + \tfrac12 \rfloor`$ — **единое правило округления**: к ближайшему, середина к $`+\infty`$.
 
 ---
 
@@ -43,10 +43,10 @@ r = 2^F \cdot \underbrace{\lfloor r / 2^F \rfloor}_{\texttt{int\_part}} + \under
 Все операции, которые отбрасывают биты точного результата, кроме исключений ниже, возвращают
 
 ```math
-\operatorname{rnd}(t) = \left\lfloor t + \tfrac12 \right\rfloor,
+\mathrm{rnd}(t) = \left\lfloor t + \tfrac12 \right\rfloor,
 ```
 
-то есть ближайшее целое, а при равенстве — большее (середина к $`+\infty`$). Ошибка всегда $`|\operatorname{rnd}(t) - t| \le \tfrac12`$, в ulp результата.
+то есть ближайшее целое, а при равенстве — большее (середина к $`+\infty`$). Ошибка всегда $`|\mathrm{rnd}(t) - t| \le \tfrac12`$, в ulp результата.
 
 Почему не «к чётному» и не «от нуля»: правило $`\lfloor t + \frac12 \rfloor`$ — одно сложение и один сдвиг без ветвлений и без знака, его проще всего доказывать (Kani, Lean), и оно одинаково для `*`, `/`, `>>`, `parse`, сужения и аккумуляторов. Исключения названы явно: `round` (от нуля, как `f64::round`), `round_ties_even` и `{:.N}` в `Display` (к чётному, как форматирование `f64`), `to_f64` (к чётному, приведением `as f64`, §8).
 
@@ -55,7 +55,7 @@ r = 2^F \cdot \underbrace{\lfloor r / 2^F \rfloor}_{\texttt{int\_part}} + \under
 Для целого $`n`$ и $`s \ge 1`$ пусть $`n = q \cdot 2^s + \rho`$, $`0 \le \rho < 2^s`$. Тогда
 
 ```math
-\operatorname{rnd}\!\left(\frac{n}{2^s}\right) = q + \left[\rho \ge 2^{s-1}\right] = (n \gg s) + \big((n \gg (s-1)) \mathbin{\&} 1\big).
+\mathrm{rnd}\left(\frac{n}{2^s}\right) = q + \left[\rho \ge 2^{s-1}\right] = (n \gg s) + \big((n \gg (s-1)) \mathbin{\&} 1\big).
 ```
 
 Доказательство: $`n/2^s = q + \rho/2^s`$, где $`\rho/2^s \in [0, 1)`$; $`\lfloor q + \rho/2^s + \frac12 \rfloor = q + [\rho/2^s \ge \frac12]`$. Бит $`s-1`$ числа $`n`$ (в дополнительном коде, арифметический сдвиг) — старший бит $`\rho`$, то есть ровно $`[\rho \ge 2^{s-1}]`$. $`\square`$
@@ -64,7 +64,7 @@ r = 2^F \cdot \underbrace{\lfloor r / 2^F \rfloor}_{\texttt{int\_part}} + \under
 
 ### 2.3. Та же формула на знаке и модуле
 
-`parse` и `f64` работают со знаком и модулем $`m`$. Пусть отброшенная часть модуля — «первый бит» $`h`$ (половина) и «липкий» флаг $`s`$ (что-то ещё ненулевое). Для положительного числа $`\operatorname{rnd}`$ округляет модуль вверх при $`h`$; для отрицательного $`-m`$ равенство $`\operatorname{rnd}(-m) = -\lceil m - \frac12 \rceil`$ означает, что модуль округляется вверх только при $`h \wedge s`$ (строго больше половины):
+`parse` и `f64` работают со знаком и модулем $`m`$. Пусть отброшенная часть модуля — «первый бит» $`h`$ (половина) и «липкий» флаг $`s`$ (что-то ещё ненулевое). Для положительного числа $`\mathrm{rnd}`$ округляет модуль вверх при $`h`$; для отрицательного $`-m`$ равенство $`\mathrm{rnd}(-m) = -\lceil m - \frac12 \rceil`$ означает, что модуль округляется вверх только при $`h \wedge s`$ (строго больше половины):
 
 ```math
 \texttt{magnitude\_rounds\_up}(\text{neg}, h, s) = h \wedge (\lnot\,\text{neg} \vee s).
@@ -77,7 +77,7 @@ r = 2^F \cdot \underbrace{\lfloor r / 2^F \rfloor}_{\texttt{int\_part}} + \under
 | Вариант | Результат |
 |---|---|
 | `checked_*` | $`w`$, если $`\min \le w \le \max`$, иначе `None` (`kernel::narrow`) |
-| `saturating_*`, операторы | $`\operatorname{clamp}(w, \min, \max)`$ (`kernel::saturate`) |
+| `saturating_*`, операторы | $`\mathrm{clamp}(w, \min, \max)`$ (`kernel::saturate`) |
 | `wrapping_*` | $`w \bmod 2^W`$ в дополнительном коде (`kernel::wrap`, `as`-приведение) |
 | `overflowing_*` | `(wrap(w), !fits(w))` |
 
@@ -103,7 +103,7 @@ $`W`$-битное хранение, $`F = W/2`$, `Wide` имеет $`2W = 4F`$ 
 ### 3.3. Умножение
 
 ```math
-x_a x_b = \frac{r_a r_b}{2^{2F}} \quad\Longrightarrow\quad r_{a\cdot b} = \operatorname{rnd}\!\left(\frac{r_a r_b}{2^F}\right).
+x_a x_b = \frac{r_a r_b}{2^{2F}} \quad\Longrightarrow\quad r_{a\cdot b} = \mathrm{rnd}\left(\frac{r_a r_b}{2^F}\right).
 ```
 
 - `k8`, `k16`, `k32`: `(p + HALF) >> F`, где $`p = r_a r_b`$ в `Wide`, $`\text{HALF} = 2^{F-1}`$ (форма §2.2 с прибавлением, лучше векторизуется).
@@ -116,27 +116,27 @@ x_a x_b = \frac{r_a r_b}{2^{2F}} \quad\Longrightarrow\quad r_{a\cdot b} = \opera
 ### 3.4. Деление
 
 ```math
-\frac{x_a}{x_b} = \frac{r_a}{r_b} \quad\Longrightarrow\quad r_{a/b} = \operatorname{rnd}\!\left(\frac{r_a \cdot 2^F}{r_b}\right).
+\frac{x_a}{x_b} = \frac{r_a}{r_b} \quad\Longrightarrow\quad r_{a/b} = \mathrm{rnd}\left(\frac{r_a \cdot 2^F}{r_b}\right).
 ```
 
-Нужно $`\operatorname{rnd}(n/d)`$ для целых $`n, d`$, $`d \ne 0`$, одним аппаратным делением, которое в Rust усекает к нулю. Две равносильные формы.
+Нужно $`\mathrm{rnd}(n/d)`$ для целых $`n, d`$, $`d \ne 0`$, одним аппаратным делением, которое в Rust усекает к нулю. Две равносильные формы.
 
 Обозначим $`\nu = [\,n/d < 0\,]`$ — знак результата (1, если знаки $`n`$ и $`d`$ различны и $`n \neq 0`$).
 
 **Лемма.** Для $`u \ge 0`$, $`v > 0`$:
 
 ```math
-\operatorname{rnd}\!\left(\frac{u}{v}\right) = \left\lfloor \frac{2u + v}{2v} \right\rfloor,
+\mathrm{rnd}\left(\frac{u}{v}\right) = \left\lfloor \frac{2u + v}{2v} \right\rfloor,
 \qquad
-\operatorname{rnd}\!\left(-\frac{u}{v}\right) = -\left\lfloor \frac{2u + v - 1}{2v} \right\rfloor.
+\mathrm{rnd}\left(-\frac{u}{v}\right) = -\left\lfloor \frac{2u + v - 1}{2v} \right\rfloor.
 ```
 
-Доказательство. Первое: $`\lfloor u/v + \frac12 \rfloor = \lfloor (2u + v) / 2v \rfloor`$. Второе: $`\operatorname{rnd}(-t) = \lfloor -t + \frac12 \rfloor = -\lceil t - \frac12 \rceil`$, и для целых $`\lceil a/b \rceil = \lfloor (a + b - 1)/b \rfloor`$ при $`b > 0`$, с $`a = 2u - v`$, $`b = 2v`$: $`\lceil (2u - v)/2v \rceil = \lfloor (2u + v - 1)/2v \rfloor`$. $`\square`$
+Доказательство. Первое: $`\lfloor u/v + \frac12 \rfloor = \lfloor (2u + v) / 2v \rfloor`$. Второе: $`\mathrm{rnd}(-t) = \lfloor -t + \frac12 \rfloor = -\lceil t - \frac12 \rceil`$, и для целых $`\lceil a/b \rceil = \lfloor (a + b - 1)/b \rfloor`$ при $`b > 0`$, с $`a = 2u - v`$, $`b = 2v`$: $`\lceil (2u - v)/2v \rceil = \lfloor (2u + v - 1)/2v \rfloor`$. $`\square`$
 
 Обе формулы объединяются в
 
 ```math
-\operatorname{rnd}\!\left(\frac{n}{d}\right) = \operatorname{sign}(n/d) \cdot \left\lfloor \frac{2|n| + |d| - \nu}{2|d|} \right\rfloor.
+\mathrm{rnd}\left(\frac{n}{d}\right) = \mathrm{sign}(n/d) \cdot \left\lfloor \frac{2|n| + |d| - \nu}{2|d|} \right\rfloor.
 ```
 
 **Форма `magnitude`** (`k8`, `k64`): беззнаковое деление модулей ровно по этой формуле, знак ставится после. Модули берутся на ширине хранения до расширения: у `k64` это `u128`-деление, у которого нет второго взятия модуля внутри `__divti3`.
@@ -144,30 +144,30 @@ x_a x_b = \frac{r_a r_b}{2^{2F}} \quad\Longrightarrow\quad r_{a\cdot b} = \opera
 **Форма `signed`** (`k16`, `k32`): одно знаковое усекающее деление
 
 ```math
-q = \operatorname{trunc}\!\left(\frac{2n + b}{2d}\right),\qquad
+q = \mathrm{trunc}\left(\frac{2n + b}{2d}\right),\qquad
 b = \begin{cases} |d| - [d<0], & n \ge 0,\\ -\big(|d| - 1 + [d<0]\big), & n < 0. \end{cases}
 ```
 
-Проверка: при $`n \ge 0`$ имеем $`\nu = [d < 0]`$, и $`b = |d| - \nu \ge 0`$; при $`n < 0`$ имеем $`\nu = [d > 0] = 1 - [d<0]`$, и $`b = -(|d| - \nu) \le 0`$. Значит, $`b`$ имеет знак $`n`$ и $`|b| = |d| - \nu`$, числитель $`2n + b`$ имеет знак $`n`$ и модуль $`2|n| + |d| - \nu`$, а усекающее деление на $`2d`$ даёт $`\operatorname{sign}(n)\operatorname{sign}(d) \cdot \lfloor (2|n| + |d| - \nu)/2|d| \rfloor`$ — ровно формулу выше. $`\square`$ Знак после деления обрабатывать не нужно; у `k16` и `k32` это лучше векторизуется.
+Проверка: при $`n \ge 0`$ имеем $`\nu = [d < 0]`$, и $`b = |d| - \nu \ge 0`$; при $`n < 0`$ имеем $`\nu = [d > 0] = 1 - [d<0]`$, и $`b = -(|d| - \nu) \le 0`$. Значит, $`b`$ имеет знак $`n`$ и $`|b| = |d| - \nu`$, числитель $`2n + b`$ имеет знак $`n`$ и модуль $`2|n| + |d| - \nu`$, а усекающее деление на $`2d`$ даёт $`\mathrm{sign}(n)\mathrm{sign}(d) \cdot \lfloor (2|n| + |d| - \nu)/2|d| \rfloor`$ — ровно формулу выше. $`\square`$ Знак после деления обрабатывать не нужно; у `k16` и `k32` это лучше векторизуется.
 
 **Деление на ноль.** `div_total` вызывается при любом делителе и при $`b = 0`$ возвращает неопределённое значение: в `k16` делит на `b | (b == 0)` без ветвления, чтобы цикл векторизовался без предиката, в остальных ядрах возвращает $`0`$. Тип отбрасывает это значение и возвращает $`\max`$, $`\min`$ или $`0`$ по знаку делимого — значение, к которому стремится насыщающее деление при $`|x_b| \to 0`$.
 
-`div_int(n)` — та же формула без сдвига числителя: $`\operatorname{rnd}(r_a / n)`$.
+`div_int(n)` — та же формула без сдвига числителя: $`\mathrm{rnd}(r_a / n)`$.
 
 ### 3.5. Сдвиги
 
 ```math
 x \ll k = x \cdot 2^k:\quad r \mapsto r \cdot 2^k \text{ (точно, переполнение — если } (r \ll k) \gg k \ne r\text{)};
 \qquad
-x \gg k:\quad r \mapsto \operatorname{rnd}(r / 2^k).
+x \gg k:\quad r \mapsto \mathrm{rnd}(r / 2^k).
 ```
 
-`>>` — это `shr_round` на хранимом типе, а не арифметический сдвиг, поэтому `x >> 1 == x / 2` для любого `x` (оба равны $`\operatorname{rnd}(r/2)`$). При $`k \ge W`$: `<<` даёт $`0`$ или насыщение, `>>` даёт $`0`$ (для $`r = -1`$: $`\operatorname{rnd}(-2^{-k}) = 0`$).
+`>>` — это `shr_round` на хранимом типе, а не арифметический сдвиг, поэтому `x >> 1 == x / 2` для любого `x` (оба равны $`\mathrm{rnd}(r/2)`$). При $`k \ge W`$: `<<` даёт $`0`$ или насыщение, `>>` даёт $`0`$ (для $`r = -1`$: $`\mathrm{rnd}(-2^{-k}) = 0`$).
 
 ### 3.6. Середина
 
 ```math
-\texttt{midpoint}(a, b) = (a \mathbin{|} b) - \big((a \oplus b) \gg 1\big) = \left\lceil \frac{a+b}{2} \right\rceil = \operatorname{rnd}\!\left(\frac{a+b}{2}\right).
+\texttt{midpoint}(a, b) = (a \mathbin{|} b) - \big((a \oplus b) \gg 1\big) = \left\lceil \frac{a+b}{2} \right\rceil = \mathrm{rnd}\left(\frac{a+b}{2}\right).
 ```
 
 Доказательство: $`a + b = 2(a \mathbin{\&} b) + (a \oplus b)`$ и $`a \mathbin{|} b = (a \mathbin{\&} b) + (a \oplus b)`$. Тогда
@@ -176,7 +176,7 @@ x \gg k:\quad r \mapsto \operatorname{rnd}(r / 2^k).
 (a \mathbin{|} b) - \left\lfloor \frac{a \oplus b}{2} \right\rfloor = (a \mathbin{\&} b) + \left\lceil \frac{a \oplus b}{2} \right\rceil = \left\lceil \frac{a+b}{2} \right\rceil.
 ```
 
-Для целого $`t`$: $`\lceil t/2 \rceil = \lfloor t/2 + \frac12 \rfloor = \operatorname{rnd}(t/2)`$. Все промежуточные значения лежат между $`a`$ и $`b`$ по модулю, переполнения нет. $`\square`$
+Для целого $`t`$: $`\lceil t/2 \rceil = \lfloor t/2 + \frac12 \rfloor = \mathrm{rnd}(t/2)`$. Все промежуточные значения лежат между $`a`$ и $`b`$ по модулю, переполнения нет. $`\square`$
 
 ### 3.7. Округление к целому
 
@@ -187,7 +187,7 @@ x \gg k:\quad r \mapsto \operatorname{rnd}(r / 2^k).
 | `floor` | $`r \mathbin{\&} \lnot M`$ | $`2^F \lfloor r/2^F \rfloor`$ |
 | `ceil` | $`(r + M) \mathbin{\&} \lnot M`$ (в `Wide`) | $`2^F \lceil r/2^F \rceil`$ |
 | `trunc` | `floor` при $`r \ge 0`$; $`(r + M) \mathbin{\&} \lnot M`$ при $`r < 0`$ | к нулю |
-| `fract` | $`r - \operatorname{trunc}(r)`$ | со знаком $`x`$ |
+| `fract` | $`r - \mathrm{trunc}(r)`$ | со знаком $`x`$ |
 | `round` | $`r \ge 0`$: $`(r + H) \mathbin{\&} \lnot M`$; $`r < 0`$: $`-\big((H - r) \mathbin{\&} \lnot M\big)`$ | к ближайшему, середина от нуля |
 | `round_ties_even` | $`\lfloor\cdot\rfloor`$, $`+2^F`$ при $`f > H`$ или ($`f = H`$ и целая часть нечётна) | к ближайшему, к чётному |
 
@@ -199,12 +199,12 @@ x \gg k:\quad r \mapsto \operatorname{rnd}(r / 2^k).
 
 ```math
 \texttt{rescale}(n, s, F) = \begin{cases}
-\operatorname{rnd}(n / 2^{s-F}) & s \ge F \text{ (отбрасываем биты)},\\
+\mathrm{rnd}(n / 2^{s-F}) & s \ge F \text{ (отбрасываем биты)},\\
 n \cdot 2^{F-s} & s < F \text{ (точно; флаг, если вышли за i128)}.
 \end{cases}
 ```
 
-Затем проверка диапазона. Через `rescale` идут: целые ($`s = 0`$), сужение и расширение между ширинами ($`s = F_{\text{src}}`$), `parse` и `f64` (по знаку и модулю, §6, §8), `finish` аккумуляторов ($`s = S`$, §5). Поэтому правило округления у всех них одно, и сужение $`F_{\text{src}} > F_{\text{dst}}`$ — это $`\operatorname{rnd}(r / 2^{F_{\text{src}} - F_{\text{dst}}})`$.
+Затем проверка диапазона. Через `rescale` идут: целые ($`s = 0`$), сужение и расширение между ширинами ($`s = F_{\text{src}}`$), `parse` и `f64` (по знаку и модулю, §6, §8), `finish` аккумуляторов ($`s = S`$, §5). Поэтому правило округления у всех них одно, и сужение $`F_{\text{src}} > F_{\text{dst}}`$ — это $`\mathrm{rnd}(r / 2^{F_{\text{src}} - F_{\text{dst}}})`$.
 
 `wrapping_from` использует тот же `rescale` и берёт младшие $`W`$ бит результата.
 
@@ -214,13 +214,13 @@ n \cdot 2^{F-s} & s < F \text{ (точно; флаг, если вышли за i
 
 | Операция | Коммутативна | Ассоциативна |
 |---|---|---|
-| `+` с насыщением | да | только если ни одна частичная сумма не насыщается (или все слагаемые одного знака: тогда обе стороны $`= \operatorname{clamp}(a+b+c)`$) |
+| `+` с насыщением | да | только если ни одна частичная сумма не насыщается (или все слагаемые одного знака: тогда обе стороны $`= \mathrm{clamp}(a+b+c)`$) |
 | `wrapping_add` | да | да, в $`\mathbb{Z}/2^W`$ |
 | аккумулятор `add`/`merge` | да | да, в $`\mathbb{Z}/2^{128}`$ |
 | `*` | да | нет |
 | `min`, `max` | да | да |
 
-Неассоциативность `*`. В Q4.4: $`(\tfrac12 \cdot \tfrac12) \cdot \delta = \tfrac14 \cdot \delta = \operatorname{rnd}(\tfrac14)\delta = 0`$, а $`\tfrac12 \cdot (\tfrac12 \cdot \delta) = \tfrac12 \cdot \operatorname{rnd}(\tfrac12)\delta = \tfrac12 \cdot \delta = \delta`$.
+Неассоциативность `*`. В Q4.4: $`(\tfrac12 \cdot \tfrac12) \cdot \delta = \tfrac14 \cdot \delta = \mathrm{rnd}(\tfrac14)\delta = 0`$, а $`\tfrac12 \cdot (\tfrac12 \cdot \delta) = \tfrac12 \cdot \mathrm{rnd}(\tfrac12)\delta = \tfrac12 \cdot \delta = \delta`$.
 
 Граница расхождения (без насыщения). Пусть $`\varepsilon_1, \varepsilon_2 \in [-\frac12, \frac12]`$ — ошибки округления в ulp. Тогда
 
@@ -251,7 +251,7 @@ n \cdot 2^{F-s} & s < F \text{ (точно; флаг, если вышли за i
 
 Запас. Слагаемое по модулю не больше $`2^{W-1} \cdot 2^{S-F} = 2^{S+F-1}`$ (для `add`) или $`2^{2W-2}`$ (для `add_product`). Для `Accumulator32`: $`2^{47}`$ и $`2^{62}`$, то есть ошибки нет до $`2^{65}`$ произведений; для `Accumulator64`: $`2^{63}`$, до $`2^{64}`$ слагаемых. Отсюда консервативное «больше $`2^{63}`$ слагаемых» в документации.
 
-**`finish`** $`= \operatorname{clamp}\big(\operatorname{rnd}(\Sigma / 2^{S-F})\big)`$ — одно округление и одно насыщение на всю свёртку (`saturating_from_scaled_bits(Σ, S)`, §3.8). `Iterator::sum` — это аккумулятор и `finish`.
+**`finish`** $`= \mathrm{clamp}\big(\mathrm{rnd}(\Sigma / 2^{S-F})\big)`$ — одно округление и одно насыщение на всю свёртку (`saturating_from_scaled_bits(Σ, S)`, §3.8). `Iterator::sum` — это аккумулятор и `finish`.
 
 **Скалярное произведение.** Через `*` и `+`: $`n`$ округлений, ошибка до $`\frac n2`$ ulp и зависимость от порядка. Через `add_product`: точная сумма $`\sum r_{a_i} r_{b_i}`$ и одно округление, ошибка $`\le \frac12`$ ulp.
 
@@ -259,7 +259,7 @@ n \cdot 2^{F-s} & s < F \text{ (точно; флаг, если вышли за i
 
 ## 6. Разбор строк (`src/parse.rs`)
 
-Вход: $`\pm\, I.d_1 d_2 \dots d_k`$. Надо получить $`\operatorname{rnd}(2^F \cdot |x|)`$ с учётом знака по §2.3, точно, для строки любой длины.
+Вход: $`\pm\, I.d_1 d_2 \dots d_k`$. Надо получить $`\mathrm{rnd}(2^F \cdot |x|)`$ с учётом знака по §2.3, точно, для строки любой длины.
 
 **Целая часть** $`I`$ накапливается в `u128`; как только $`I > 2^{63}`$, ставится флаг переполнения (ни один тип 0.1 не вмещает $`|x| > 2^{31}`$, так что числа после флага не важны).
 
@@ -303,7 +303,7 @@ m = I \cdot 2^F + \lfloor B/2 \rfloor + \texttt{magnitude\_rounds\_up}(\text{neg
 
 Только целочисленная работа с битами IEEE 754; ни одной операции с плавающей точкой, кроме точного приведения целого.
 
-**Из `f64`.** $`x = (-1)^\sigma \cdot m \cdot 2^e`$, где $`m`$ — мантисса со скрытой единицей ($`m < 2^{53}`$), $`e`$ — несмещённый показатель (для денормалов $`e = -1074`$). Нужен $`\operatorname{rnd}(m \cdot 2^{e+F})`$. Пусть $`s = e + F`$:
+**Из `f64`.** $`x = (-1)^\sigma \cdot m \cdot 2^e`$, где $`m`$ — мантисса со скрытой единицей ($`m < 2^{53}`$), $`e`$ — несмещённый показатель (для денормалов $`e = -1074`$). Нужен $`\mathrm{rnd}(m \cdot 2^{e+F})`$. Пусть $`s = e + F`$:
 - $`s \ge 0`$: модуль $`m \cdot 2^s`$ точный; при $`s \ge 75`$ заведомо вне любого диапазона;
 - $`s < 0`$: $`q = m \gg (-s)`$, отброшенное $`\rho`$ даёт $`h = [\rho \ge 2^{-s-1}]`$ и $`\text{sticky} = [\rho \bmod 2^{-s-1} \ne 0]`$; при $`-s > 64`$ модуль округляется к нулю.
 
@@ -320,7 +320,7 @@ m = I \cdot 2^F + \lfloor B/2 \rfloor + \texttt{magnitude\_rounds\_up}(\text{neg
 Константа выдаётся для типа с $`F`$ дробными битами, только если
 
 ```math
-\operatorname{rnd}\!\left(\frac{\ell}{2^{P-F}}\right) = \operatorname{rnd}\!\left(\frac{u}{2^{P-F}}\right),
+\mathrm{rnd}\left(\frac{\ell}{2^{P-F}}\right) = \mathrm{rnd}\left(\frac{u}{2^{P-F}}\right),
 ```
 
 иначе генератор падает («precision too low»). Тогда выданное значение — правильно округлённое $`c`$ (по тому же правилу §2.1). Константа пропускается, если она вне диапазона типа или округляется в $`0`$.
@@ -333,8 +333,8 @@ e = \sum_{k \ge 0} \frac{1}{k!},
 ```
 
 ```math
-\ln 2 = 2\operatorname{artanh}\tfrac13,\qquad
-\ln 10 = 3\ln 2 + 2\operatorname{artanh}\tfrac19\ \ \left(\tfrac{1 + 1/9}{1 - 1/9} = \tfrac54\right),\qquad
+\ln 2 = 2\mathrm{artanh}\,\tfrac13,\qquad
+\ln 10 = 3\ln 2 + 2\mathrm{artanh}\,\tfrac19\ \ \left(\tfrac{1 + 1/9}{1 - 1/9} = \tfrac54\right),\qquad
 \sqrt n = \big\lfloor \sqrt{n \cdot 2^{2P}} \big\rfloor / 2^P,
 ```
 
@@ -380,9 +380,9 @@ flowchart TB
 
 | Утверждение | Где доказано или проверено |
 |---|---|
-| `>>` и сужение $`= \operatorname{rnd}(n/2^s)`$ | Kani против независимой формулы $`\lfloor (2n + 2^s) / 2^{s+1} \rfloor`$, все ширины |
-| `mul` $`= \operatorname{rnd}(r_a r_b / 2^F)`$ | Kani на 8–32 битах; перебор пар 8, 16 бит; оракул и стресс на 32, 64 |
-| `div`, `div_int`, `from_ratio` $`= \operatorname{rnd}(n/d)`$ (лемма §3.4) | Kani на 8 битах; перебор пар 8, 16 бит; оракул, фаззинг, стресс |
+| `>>` и сужение $`= \mathrm{rnd}(n/2^s)`$ | Kani против независимой формулы $`\lfloor (2n + 2^s) / 2^{s+1} \rfloor`$, все ширины |
+| `mul` $`= \mathrm{rnd}(r_a r_b / 2^F)`$ | Kani на 8–32 битах; перебор пар 8, 16 бит; оракул и стресс на 32, 64 |
+| `div`, `div_int`, `from_ratio` $`= \mathrm{rnd}(n/d)`$ (лемма §3.4) | Kani на 8 битах; перебор пар 8, 16 бит; оракул, фаззинг, стресс |
 | `+ - neg abs`, `midpoint`, округления, `to_int_*`, сдвиги, части, байты, сужение, `from_int` | Kani на всех четырёх ширинах против спецификации |
 | `parse` не паникует | Kani, строки до 64 байт, все ширины (через контракты `double` и `fraction_bits`) |
 | `parse(display(x)) = x` | перебор всех $`2^{32}`$ значений `FixedFloat32` (еженедельно) |

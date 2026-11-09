@@ -7,7 +7,7 @@
 //!   `src/float.rs` behind the `float-convert` feature;
 //! - no bare `$` in Markdown outside code: math only in the forms GitHub
 //!   renders without Markdown mangling it, ```` ```math ```` blocks and
-//!   `` $`…`$ `` inline.
+//!   `` $`…`$ `` inline, and no `\operatorname`, which GitHub refuses.
 
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -126,6 +126,14 @@ fn after_closing_run(chars: &[char], from: usize, n: usize) -> Option<usize> {
     None
 }
 
+/// GitHub math refuses these macros with "The following macros are not
+/// allowed"; `\operatorname{f}` is written `\mathrm{f}` instead.
+const FORBIDDEN_MATH_MACROS: &[&str] = &["\\operatorname"];
+
+fn has_forbidden_math_macro(line: &str) -> bool {
+    FORBIDDEN_MATH_MACROS.iter().any(|m| line.contains(m))
+}
+
 /// A Markdown line outside code fences with `$$` display math or `$…$`
 /// inline math, which GitHub runs through Markdown first, so `\\`, `\_`,
 /// `\{` and `_…_` break; math in `` $`…`$ `` and code spans is fine.
@@ -137,7 +145,13 @@ fn markdown_math_violation(line: &str) -> bool {
             '$' if chars.get(i + 1) == Some(&'`') => {
                 let n = backtick_run(&chars, i + 1);
                 match after_closing_run(&chars, i + 1 + n, n) {
-                    Some(end) if chars.get(end) == Some(&'$') => i = end + 1,
+                    Some(end) if chars.get(end) == Some(&'$') => {
+                        let math: String = chars[i + 1 + n..end - n].iter().collect();
+                        if has_forbidden_math_macro(&math) {
+                            return true;
+                        }
+                        i = end + 1;
+                    }
                     _ => return true,
                 }
             }
@@ -235,12 +249,19 @@ fn markdown_math_renders_on_github() {
             Err(_) => continue,
         };
         let mut fenced = false;
+        let mut math = false;
         for (n, line) in text.lines().enumerate() {
             if line.trim_start().starts_with("```") {
                 fenced = !fenced;
+                math = fenced && line.trim() == "```math";
                 continue;
             }
-            if !fenced && markdown_math_violation(line) {
+            let bad = if fenced {
+                math && has_forbidden_math_macro(line)
+            } else {
+                markdown_math_violation(line)
+            };
+            if bad {
                 let shown = path.strip_prefix(&root).unwrap_or(&path).display();
                 found.push(format!("{}:{}: {}", shown, n + 1, line.trim()));
             }
@@ -281,5 +302,8 @@ fn rules_catch_what_they_forbid() {
         "not `$…$` / `$$…$$`, but `` $`…`$ ``"
     ));
     assert!(markdown_math_violation("unclosed $`x"));
+    assert!(markdown_math_violation("$`\\operatorname{rnd}(t)`$"));
+    assert!(!markdown_math_violation("$`\\mathrm{rnd}(t)`$"));
+    assert!(!markdown_math_violation("no `\\operatorname` in math"));
     assert!(!markdown_math_violation("no math here"));
 }
