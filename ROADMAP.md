@@ -18,7 +18,7 @@ Every new type (stages 2, 3) and every new function (stages 4–8) comes with th
 
 ## 1. Integer core ✅ `v0.1.0`
 
-Four types with arithmetic, rounding, conversions, exact parsing and formatting, literals, bytes, up to 23 correctly rounded constants per type and exact accumulators. See [What is in 0.1](README.md#what-is-in-01).
+Four types with arithmetic, rounding, conversions, exact parsing and formatting, literals, bytes, up to 23 correctly rounded constants per type and exact accumulators. See the [API guide](API.md).
 
 Verified by: exhaustive tests of every pair for `FixedFloat8` and `FixedFloat16` and of `parse(display(x))` for every `FixedFloat32`, the rational oracle with edge-biased property tests, fuzzing of `parse`, `*`, `/` and formatting, stress and algebra runs, a golden hash on x86-64, ARM64 and 32-bit x86, and Kani on all four widths: `+ - neg abs`, `midpoint`, rounding, `to_int_*`, shifts, parts, bytes, narrowing, `from_int`, and `parse` without panics on strings up to 64 bytes; `*` and `mul_int` on 8..32 bits; `/`, `div_int`, `from_ratio` on 8 bits (16 bits is covered exhaustively); accumulator order independence on 8 bits.
 
