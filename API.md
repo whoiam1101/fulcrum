@@ -1,17 +1,17 @@
-# fulcrum 0.2: API guide
+# fulcrum 0.3: API guide
 
 **English** · [Русский](API.ru.md)
 
-How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.2.0`.
+How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.3.0`.
 
 ## 1. Setup
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.2.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.3.0" }
 ```
 
-The crate is `no_std`, has no dependencies, MSRV 1.60, no `unsafe`. Features (all off by default):
+The crate is `no_std`, has no required dependencies, MSRV 1.60, and no `unsafe` outside the optional `bytemuck` feature. Features (all off by default):
 
 | Feature | What it adds |
 |---|---|
@@ -19,6 +19,9 @@ The crate is `no_std`, has no dependencies, MSRV 1.60, no `unsafe`. Features (al
 | `std` | `std::error::Error` for `ParseError` and `OverflowError` (enables `alloc`) |
 | `float-convert` | `to_f64`, `checked_from_f64`, `saturating_from_f64`, for debugging and rendering |
 | `strict-overflow` | operators panic instead of saturating, for tests and CI of an engine only |
+| `serde` | `Serialize`, `Deserialize`: a decimal string in human-readable formats, the raw integer in binary ones (§14) |
+| `bytemuck` | `Pod`, `Zeroable`, for casting slices to bytes; the only `unsafe` of the crate (two trait impls) |
+| `num-traits` | `Zero`, `One`, `Bounded`, `Num`, `Signed` |
 
 Everything public is at the crate root: `use fulcrum::{ff32, FixedFloat32, FixedFloat};`.
 
@@ -157,6 +160,27 @@ assert_eq!(ff64!(10).lerp(ff64!(20), ff64!(0.25)), ff64!(12.5));
 
 The explicit methods keep their semantics under `strict-overflow`: they saturate, like `abs` and `mul_int`.
 
+### Square roots: `sqrt`, `rsqrt`, `hypot`
+
+All three are correctly rounded to nearest (error ≤ ½ ulp): the result is the representable value nearest to the exact root. There are no ties: a root is never exactly halfway between two values.
+
+| Method | Value | Outside the domain or range | `checked_*` |
+|---|---|---|---|
+| `x.sqrt()` | `√x`; never overflows | `x < 0` gives `0` | `checked_sqrt`: `None` for `x < 0` |
+| `x.rsqrt()` | `1 / √x`; never overflows for `x > 0` | `x ≤ 0` gives `MAX`, like `recip(0)` | `checked_rsqrt`: `None` for `x ≤ 0` |
+| `x.hypot(y)` | `√(x² + y²)`, the squares are exact and never overflow | saturates | `checked_hypot` |
+
+```rust
+use fulcrum::{ff32, FixedFloat32};
+
+assert_eq!(ff32!(2).sqrt(), FixedFloat32::SQRT_2);
+assert_eq!(ff32!(4).rsqrt(), ff32!(0.5));
+assert_eq!(ff32!(3).hypot(ff32!(-4)), ff32!(5));
+assert_eq!(FixedFloat32::MAX.hypot(FixedFloat32::MAX), FixedFloat32::MAX);
+```
+
+`rsqrt` is one rounding of `1 / √x`, more accurate than `x.sqrt().recip()`, which rounds twice.
+
 ## 5. Rounding and integers
 
 | Method | Rule | Overflow |
@@ -280,7 +304,7 @@ Sealed: only fulcrum's types implement it. It requires `Copy + Default + Ord + H
 Contents:
 - `type Bits`;
 - constants `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`.
+- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`.
 
 ```rust
 use fulcrum::FixedFloat;
@@ -290,7 +314,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §14 says so). The trait grows with the stages: `sqrt` joins in stage 3 and `sin_cos` in stage 4.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` joins in stage 4.
 
 ## 12. `strict-overflow`
 
@@ -302,7 +326,7 @@ For tests only:
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.2.0", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.3.0", features = ["strict-overflow"] }
 ```
 
 Cargo unifies features, so under `cargo test` of your crate the feature is enabled for the normal dependency too.
@@ -313,15 +337,23 @@ Cargo unifies features, so under `cargo test` of your crate the feature is enabl
 
 Use it for debugging, tests, rendering and loading input data. Once a value has gone through `f64` arithmetic, determinism is lost: never feed `f64` back into simulation logic.
 
-## 14. Guarantees
+## 14. `serde`, `bytemuck`, `num-traits`
+
+`serde`: human-readable formats (JSON, YAML, TOML) get the exact decimal string of `Display`, so `parse` gives the same bits back: `ff64!(12.5)` is `"12.5"`, `ff64!(0.1)` is `"0.1000000000931322574615478515625"`. They also accept an integer number, converted exactly, and only together with `float-convert` a floating-point number such as `12.6` without quotes, rounded like `checked_from_f64`; without `float-convert` it is an error, so a float never sneaks into the logic. Binary formats (bincode, postcard) get the raw integer: `FixedFloat64` takes 8 bytes, in the format's own byte order.
+
+`bytemuck`: `Pod` and `Zeroable`, so `bytemuck::cast_slice` turns `&[FixedFloat64]` into `&[i64]` or `&[u8]` and back without copying (structure-of-arrays data, buffers for a renderer). The bytes are in native order, like `to_bits().to_ne_bytes()`; for files and the network use `to_le_bytes` (§8).
+
+`num-traits`: `Zero`, `One`, `Bounded`, `Num` and `Signed` with the semantics of the operators: saturating, rounded to nearest. `Num::from_str_radix` accepts only radix 10; `Signed::abs_sub(a, b)` is `max(a - b, 0)`.
+
+## 15. Guarantees
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 
-## 15. Common mistakes
+## 16. Common mistakes
 
 - **Chains of `*` are not associative:** `(a * b) * c` may differ from `a * (b * c)` by an ulp. The order of operations is part of deterministic logic; keep it fixed. For sums of products, use `add_product`.
 - **`fold` with `+` instead of `sum`** saturates on intermediate values. For a deterministic parallel sum, use only `sum` or accumulators.
