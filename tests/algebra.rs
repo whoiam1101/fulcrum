@@ -101,14 +101,14 @@ macro_rules! check_triple {
         );
         assert_eq!(
             x.wrapping_add(y).wrapping_add(z).to_bits() as i128,
-            wrap(sum, $bits),
+            spec::wrap(sum, $bits),
             "wrapping_add sum {}",
             ctx()
         );
 
         let left = x.checked_add(y).and_then(|s| s.checked_add(z));
         let right = y.checked_add(z).and_then(|s| x.checked_add(s));
-        if fits(ra + rb, $bits) && fits(rb + rc, $bits) && fits(sum, $bits) {
+        if spec::fits(ra + rb, $bits) && spec::fits(rb + rc, $bits) && spec::fits(sum, $bits) {
             assert_eq!(left, right, "checked_add associates {}", ctx());
             assert_eq!(
                 left.map(|v| v.to_bits() as i128),
@@ -122,13 +122,13 @@ macro_rules! check_triple {
         if (ra >= 0 && rb >= 0 && rc >= 0) || (ra <= 0 && rb <= 0 && rc <= 0) {
             assert_eq!(
                 ((x + y) + z).to_bits() as i128,
-                clamp(sum, $bits),
+                spec::saturate(sum, $bits),
                 "+ same sign, left {}",
                 ctx()
             );
             assert_eq!(
                 (x + (y + z)).to_bits() as i128,
-                clamp(sum, $bits),
+                spec::saturate(sum, $bits),
                 "+ same sign, right {}",
                 ctx()
             );

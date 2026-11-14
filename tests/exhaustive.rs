@@ -44,9 +44,9 @@ fn fixed8_parse_rounding_below_ulp() {
         let lim = 1i32 << (7 + extra);
         for raw in -lim - 64..lim + 64 {
             let text = exact_decimal(raw as i128, 4 + extra);
-            let expected = ref_round_div(raw as i128, 1 << extra);
+            let expected = spec::round_div(raw as i128, 1 << extra);
             let parsed = text.parse::<FixedFloat8>();
-            if fits(expected, 8) {
+            if spec::fits(expected, 8) {
                 assert_eq!(
                     parsed.map(|v| v.to_bits() as i128),
                     Ok(expected),
@@ -81,12 +81,12 @@ fn fixed8_parse_rounding_below_ulp() {
                 "0".repeat(40)
             );
             let nudged = if raw < 0 {
-                ref_round_div(raw as i128 * 2 - 1, 1 << (extra + 1))
+                spec::round_div(raw as i128 * 2 - 1, 1 << (extra + 1))
             } else {
-                ref_round_div(raw as i128 * 2 + 1, 1 << (extra + 1))
+                spec::round_div(raw as i128 * 2 + 1, 1 << (extra + 1))
             };
             let parsed_sticky = sticky.parse::<FixedFloat8>();
-            if fits(nudged, 8) {
+            if spec::fits(nudged, 8) {
                 assert_eq!(
                     parsed_sticky.map(|v| v.to_bits() as i128),
                     Ok(nudged),

@@ -1,10 +1,16 @@
-//! Shared test helpers without external crates: a PCG32 generator and
-//! edge-biased value generators.
+//! Shared test helpers without external crates: a PCG32 generator,
+//! edge-biased value generators and `spec`, the integer reference of
+//! `reference.rs` over `i128`.
 
 #![allow(dead_code)]
 
 #[macro_use]
 mod widths;
+
+#[macro_use]
+mod reference;
+
+reference!(spec, i128);
 
 /// PCG-XSH-RR 64/32 (O'Neill, 2014).
 pub struct Pcg32 {
@@ -107,43 +113,6 @@ impl Fnv {
     }
 }
 
-/// Reference rounding `floor(n / d + 1/2)` written independently of the
-/// library kernels: via the exact quotient and remainder.
-pub fn ref_round_div(n: i128, d: i128) -> i128 {
-    assert!(d != 0);
-    let (n, d) = if d < 0 { (-n, -d) } else { (n, d) };
-    let q = n.div_euclid(d);
-    let r = n.rem_euclid(d);
-    if 2 * r >= d {
-        q + 1
-    } else {
-        q
-    }
-}
-
-pub fn clamp(v: i128, bits: u32) -> i128 {
-    let min = -(1i128 << (bits - 1));
-    let max = (1i128 << (bits - 1)) - 1;
-    v.max(min).min(max)
-}
-
-pub fn fits(v: i128, bits: u32) -> bool {
-    clamp(v, bits) == v
-}
-
-pub fn wrap(v: i128, bits: u32) -> i128 {
-    let shift = 128 - bits;
-    (v << shift) >> shift
-}
-
-pub fn div_by_zero(a: i128, bits: u32) -> i128 {
-    match a.signum() {
-        1 => (1i128 << (bits - 1)) - 1,
-        -1 => -(1i128 << (bits - 1)),
-        _ => 0,
-    }
-}
-
 pub fn exact_decimal(raw: i128, frac_bits: u32) -> String {
     let neg = raw < 0;
     let mag = raw.unsigned_abs();
@@ -194,19 +163,19 @@ macro_rules! check_pair {
         let sum = ra + rb;
         assert_eq!(
             x.saturating_add(y).to_bits() as i128,
-            clamp(sum, $bits),
+            crate::common::spec::saturate(sum, $bits),
             "add {}",
             ctx()
         );
         assert_eq!(
             x.wrapping_add(y).to_bits() as i128,
-            wrap(sum, $bits),
+            crate::common::spec::wrap(sum, $bits),
             "wrapping_add {}",
             ctx()
         );
         assert_eq!(
             x.checked_add(y).is_some(),
-            fits(sum, $bits),
+            crate::common::spec::fits(sum, $bits),
             "checked_add {}",
             ctx()
         );
@@ -214,39 +183,42 @@ macro_rules! check_pair {
         let diff = ra - rb;
         assert_eq!(
             (x - y).to_bits() as i128,
-            clamp(diff, $bits),
+            crate::common::spec::saturate(diff, $bits),
             "sub {}",
             ctx()
         );
         assert_eq!(
             x.overflowing_sub(y),
-            ($T::from_bits(wrap(diff, $bits) as _), !fits(diff, $bits)),
+            (
+                $T::from_bits(crate::common::spec::wrap(diff, $bits) as _),
+                !crate::common::spec::fits(diff, $bits)
+            ),
             "overflowing_sub {}",
             ctx()
         );
 
-        let prod = crate::common::ref_round_div(ra * rb, 1i128 << $f);
+        let prod = crate::common::spec::mul(ra, rb, $f);
         assert_eq!(
             (x * y).to_bits() as i128,
-            clamp(prod, $bits),
+            crate::common::spec::saturate(prod, $bits),
             "mul {}",
             ctx()
         );
         assert_eq!(
             x.wrapping_mul(y).to_bits() as i128,
-            wrap(prod, $bits),
+            crate::common::spec::wrap(prod, $bits),
             "wrapping_mul {}",
             ctx()
         );
         assert_eq!(
             x.overflowing_mul(y).1,
-            !fits(prod, $bits),
+            !crate::common::spec::fits(prod, $bits),
             "overflowing_mul {}",
             ctx()
         );
         assert_eq!(
             x.checked_mul(y).map(|v| v.to_bits() as i128),
-            Some(prod).filter(|p| fits(*p, $bits)),
+            Some(prod).filter(|p| crate::common::spec::fits(*p, $bits)),
             "checked_mul {}",
             ctx()
         );
@@ -254,7 +226,7 @@ macro_rules! check_pair {
         if rb == 0 {
             assert_eq!(
                 (x / y).to_bits() as i128,
-                div_by_zero(ra, $bits),
+                crate::common::spec::div_by_zero(ra, $bits),
                 "div0 {}",
                 ctx()
             );
@@ -268,31 +240,31 @@ macro_rules! check_pair {
             assert_eq!((x % y).to_bits(), 0, "rem0 {}", ctx());
             assert_eq!(x.checked_rem(y), None, "checked_rem0 {}", ctx());
         } else {
-            let quot = crate::common::ref_round_div(ra << $f, rb);
+            let quot = crate::common::spec::div(ra, rb, $f);
             assert_eq!(
                 (x / y).to_bits() as i128,
-                clamp(quot, $bits),
+                crate::common::spec::saturate(quot, $bits),
                 "div {}",
                 ctx()
             );
             assert_eq!(
                 x.wrapping_div(y).to_bits() as i128,
-                wrap(quot, $bits),
+                crate::common::spec::wrap(quot, $bits),
                 "wrapping_div {}",
                 ctx()
             );
             assert_eq!(
                 x.checked_div(y).map(|v| v.to_bits() as i128),
-                Some(quot).filter(|q| fits(*q, $bits)),
+                Some(quot).filter(|q| crate::common::spec::fits(*q, $bits)),
                 "checked_div {}",
                 ctx()
             );
             let rem = ra - rb * (ra / rb);
             assert_eq!((x % y).to_bits() as i128, rem, "rem {}", ctx());
-            let int_quot = crate::common::ref_round_div(ra, rb);
+            let int_quot = crate::common::spec::round_div(ra, rb);
             assert_eq!(
                 x.div_int($b).to_bits() as i128,
-                clamp(int_quot, $bits),
+                crate::common::spec::saturate(int_quot, $bits),
                 "div_int {}",
                 ctx()
             );
@@ -301,18 +273,18 @@ macro_rules! check_pair {
         let mul_int = ra * rb;
         assert_eq!(
             x.mul_int($b).to_bits() as i128,
-            clamp(mul_int, $bits),
+            crate::common::spec::saturate(mul_int, $bits),
             "mul_int {}",
             ctx()
         );
 
-        let mid = crate::common::ref_round_div(ra + rb, 2);
+        let mid = crate::common::spec::round_div(ra + rb, 2);
         assert_eq!(x.midpoint(y).to_bits() as i128, mid, "midpoint {}", ctx());
         assert_eq!(x.min(y).to_bits() as i128, ra.min(rb), "min {}", ctx());
         assert_eq!(x.max(y).to_bits() as i128, ra.max(rb), "max {}", ctx());
         assert_eq!(
             x.abs_diff(y).to_bits() as i128,
-            clamp((ra - rb).abs(), $bits),
+            crate::common::spec::saturate((ra - rb).abs(), $bits),
             "abs_diff {}",
             ctx()
         );
@@ -348,13 +320,13 @@ macro_rules! check_unary {
         assert_eq!(x.floor().to_bits() as i128, floor, "floor {:?}", x);
         assert_eq!(
             x.ceil().to_bits() as i128,
-            clamp(ceil, $bits),
+            crate::common::spec::saturate(ceil, $bits),
             "ceil {:?}",
             x
         );
         assert_eq!(
             x.checked_ceil().is_some(),
-            fits(ceil, $bits),
+            crate::common::spec::fits(ceil, $bits),
             "checked_ceil {:?}",
             x
         );
@@ -362,25 +334,25 @@ macro_rules! check_unary {
         assert_eq!(x.fract().to_bits() as i128, ra - trunc, "fract {:?}", x);
         assert_eq!(
             x.round().to_bits() as i128,
-            clamp(away, $bits),
+            crate::common::spec::saturate(away, $bits),
             "round {:?}",
             x
         );
         assert_eq!(
             x.checked_round().map(|v| v.to_bits() as i128),
-            Some(away).filter(|&v| fits(v, $bits)),
+            Some(away).filter(|&v| crate::common::spec::fits(v, $bits)),
             "checked_round {:?}",
             x
         );
         assert_eq!(
             x.round_ties_even().to_bits() as i128,
-            clamp(even, $bits),
+            crate::common::spec::saturate(even, $bits),
             "round_ties_even {:?}",
             x
         );
         assert_eq!(
             x.checked_round_ties_even().map(|v| v.to_bits() as i128),
-            Some(even).filter(|&v| fits(v, $bits)),
+            Some(even).filter(|&v| crate::common::spec::fits(v, $bits)),
             "checked_round_ties_even {:?}",
             x
         );
@@ -405,54 +377,62 @@ macro_rules! check_unary {
             x
         );
 
-        assert_eq!((-x).to_bits() as i128, clamp(-ra, $bits), "neg {:?}", x);
+        assert_eq!(
+            (-x).to_bits() as i128,
+            crate::common::spec::saturate(-ra, $bits),
+            "neg {:?}",
+            x
+        );
         assert_eq!(
             x.wrapping_neg().to_bits() as i128,
-            wrap(-ra, $bits),
+            crate::common::spec::wrap(-ra, $bits),
             "wrapping_neg {:?}",
             x
         );
         assert_eq!(
             x.checked_neg().is_some(),
-            fits(-ra, $bits),
+            crate::common::spec::fits(-ra, $bits),
             "checked_neg {:?}",
             x
         );
         assert_eq!(
             x.overflowing_neg(),
-            ($T::from_bits(wrap(-ra, $bits) as _), !fits(-ra, $bits)),
+            (
+                $T::from_bits(crate::common::spec::wrap(-ra, $bits) as _),
+                !crate::common::spec::fits(-ra, $bits)
+            ),
             "overflowing_neg {:?}",
             x
         );
         assert_eq!(
             x.abs().to_bits() as i128,
-            clamp(ra.abs(), $bits),
+            crate::common::spec::saturate(ra.abs(), $bits),
             "abs {:?}",
             x
         );
         assert_eq!(
             x.saturating_abs().to_bits() as i128,
-            clamp(ra.abs(), $bits),
+            crate::common::spec::saturate(ra.abs(), $bits),
             "saturating_abs {:?}",
             x
         );
         assert_eq!(
             x.checked_abs().map(|v| v.to_bits() as i128),
-            Some(ra.abs()).filter(|&v| fits(v, $bits)),
+            Some(ra.abs()).filter(|&v| crate::common::spec::fits(v, $bits)),
             "checked_abs {:?}",
             x
         );
         assert_eq!(
             x.wrapping_abs().to_bits() as i128,
-            wrap(ra.abs(), $bits),
+            crate::common::spec::wrap(ra.abs(), $bits),
             "wrapping_abs {:?}",
             x
         );
         assert_eq!(
             x.overflowing_abs(),
             (
-                $T::from_bits(wrap(ra.abs(), $bits) as _),
-                !fits(ra.abs(), $bits)
+                $T::from_bits(crate::common::spec::wrap(ra.abs(), $bits) as _),
+                !crate::common::spec::fits(ra.abs(), $bits)
             ),
             "overflowing_abs {:?}",
             x
@@ -464,9 +444,9 @@ macro_rules! check_unary {
             x
         );
         let recip = if ra == 0 {
-            div_by_zero(one, $bits)
+            crate::common::spec::div_by_zero(one, $bits)
         } else {
-            clamp(crate::common::ref_round_div(one << $f, ra), $bits)
+            crate::common::spec::saturate(crate::common::spec::round_div(one << $f, ra), $bits)
         };
         assert_eq!(x.recip().to_bits() as i128, recip, "recip {:?}", x);
 
