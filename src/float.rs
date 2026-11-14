@@ -92,3 +92,14 @@ macro_rules! impl_float {
         }
     };
 }
+
+/// The floating-point method of the `serde` visitor of `src/serialize.rs`,
+/// here because floating point lives only in this file.
+#[cfg(feature = "serde")]
+macro_rules! serde_visit_float {
+    ($Name:ident) => {
+        fn visit_f64<E: serde::de::Error>(self, v: f64) -> Result<$Name, E> {
+            $Name::checked_from_f64(v).ok_or_else(|| E::custom(crate::OverflowError))
+        }
+    };
+}

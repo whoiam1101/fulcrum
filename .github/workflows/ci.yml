@@ -35,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal && rustup default ${{ matrix.toolchain }}
-      - run: cargo test --features std,float-convert
+      - run: cargo test --features std,float-convert,serde,bytemuck,num-traits
       - run: cargo test --features std,float-convert --release
       - run: cargo test --features strict-overflow --test strict
       - if: github.event_name == 'schedule'
@@ -100,7 +100,25 @@ jobs:
       - uses: actions/checkout@v7
       - run: rustup toolchain install 1.60 --profile minimal
       - run: cargo +1.60 build
+      - run: cargo +1.60 build --features serde
+      - run: cargo +1.60 build --features bytemuck
+      - run: cargo +1.60 build --features num-traits
       - run: cargo +1.60 build --all-features
+
+  features:
+    name: features ${{ matrix.features }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        features: [serde, bytemuck, num-traits, "serde,float-convert", "serde,bytemuck,num-traits,float-convert"]
+    defaults:
+      run:
+        working-directory: integrations
+    steps:
+      - uses: actions/checkout@v7
+      - run: cargo build --manifest-path ../Cargo.toml --features ${{ matrix.features }}
+      - run: cargo test --features ${{ matrix.features }}
 
   targets:
     name: i686 test, thumbv7em no_std build
@@ -120,6 +138,8 @@ jobs:
       - run: rustup component add clippy rustfmt
       - run: cargo fmt --check
       - run: cargo clippy --all-targets -- -D warnings
+      - run: cargo clippy --all-targets --all-features -- -D warnings
+      - run: cargo clippy --manifest-path integrations/Cargo.toml --all-targets --all-features -- -D warnings
       - name: generated tables are up to date
         run: cargo run --manifest-path tools/gen-tables/Cargo.toml -- --check
 

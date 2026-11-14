@@ -16,6 +16,8 @@
 //! - operators `+ - * / %` and unary `-` saturate; `checked_*`, `wrapping_*`,
 //!   `saturating_*` and `overflowing_*` methods give explicit control;
 //! - `*` and `/` round to nearest, ties toward `+∞`; `+`, `-` and `%` are exact;
+//! - `sqrt`, `rsqrt` and `hypot` are correctly rounded; `hypot` squares
+//!   exactly and never overflows before the root;
 //! - division by zero gives `MAX`, `MIN` or `0` by the sign of the dividend,
 //!   `x % 0` gives `0`, and the `checked_*` variants return `None`;
 //! - nothing panics, unless the `strict-overflow` feature below is enabled;
@@ -28,6 +30,10 @@
 //! The `strict-overflow` feature turns every saturation of an operator, `<<`,
 //! [`Iterator::sum`] and [`Iterator::product`] into a panic; the explicit
 //! methods and `Accumulator*::finish` keep their semantics. It is meant for tests and CI of an engine, never for a shipped build.
+//!
+//! Optional features, off by default: `serde` (a decimal string in
+//! human-readable formats, the raw integer in binary ones), `bytemuck` (`Pod`
+//! and `Zeroable`, the only `unsafe` of the crate) and `num-traits`.
 //!
 //! ```
 //! use fulcrum::{ff64, FixedFloat64};
@@ -42,7 +48,7 @@
 //! ```
 
 #![no_std]
-#![forbid(unsafe_code)]
+#![deny(unsafe_code)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
@@ -70,6 +76,15 @@ mod accumulate;
 #[cfg(feature = "float-convert")]
 #[macro_use]
 mod float;
+#[cfg(feature = "serde")]
+#[macro_use]
+mod serialize;
+#[cfg(feature = "bytemuck")]
+#[macro_use]
+mod pod;
+#[cfg(feature = "num-traits")]
+#[macro_use]
+mod num;
 #[macro_use]
 mod define;
 
@@ -184,6 +199,8 @@ pub trait FixedFloat:
     fn ceil(self) -> Self;
     /// Nearest integer, ties away from zero, saturating.
     fn round(self) -> Self;
+    /// `√self`, correctly rounded; a negative `self` gives `0`.
+    fn sqrt(self) -> Self;
 }
 
 macro_rules! literal_macro {

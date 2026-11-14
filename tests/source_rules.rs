@@ -5,6 +5,8 @@
 //!   none at all in TOML, YAML and `.gitignore`;
 //! - no platform-specific code and no floating point in `src`, except
 //!   `src/float.rs` behind the `float-convert` feature;
+//! - no `unsafe` in `src`, except the two trait impls of `src/pod.rs` behind
+//!   the `bytemuck` feature;
 //! - no bare `$` in Markdown outside code: math only in the forms GitHub
 //!   renders without Markdown mangling it, ```` ```math ```` blocks and
 //!   `` $`…`$ `` inline, and no `\operatorname`, which GitHub refuses.
@@ -236,6 +238,30 @@ fn no_platform_code_in_src() {
     );
 }
 
+/// A `src` line with an `unsafe` block, function, trait or impl.
+fn unsafe_violation(line: &str) -> bool {
+    let code = line.trim_start();
+    !code.starts_with("//") && has_word(code, "unsafe")
+}
+
+#[test]
+fn unsafe_only_in_pod() {
+    let src = root().join("src");
+    let pod = src.join("pod.rs");
+    let found = violations(|path| {
+        if extension(path) == "rs" && path.starts_with(&src) && path != pod {
+            Some(unsafe_violation as fn(&str) -> bool)
+        } else {
+            None
+        }
+    });
+    assert!(
+        found.is_empty(),
+        "unsafe in src (allowed only in src/pod.rs, behind the bytemuck feature):\n{}",
+        found.join("\n")
+    );
+}
+
 #[test]
 fn markdown_math_renders_on_github() {
     let root = root();
@@ -294,6 +320,10 @@ fn rules_catch_what_they_forbid() {
     assert!(platform_violation("#[cfg(target_arch = \"x86_64\")]"));
     assert!(!platform_violation("let half64 = 1;"));
     assert!(!platform_violation("fn from_f64_bits() {}"));
+    assert!(unsafe_violation("    unsafe impl Send for X {}"));
+    assert!(unsafe_violation("let y = unsafe { x };"));
+    assert!(!unsafe_violation("/// never unsafe"));
+    assert!(!unsafe_violation("#![deny(unsafe_code)]"));
     assert!(markdown_math_violation("$$"));
     assert!(markdown_math_violation("where $x_1$ and $y_2$"));
     assert!(!markdown_math_violation("where $`x_1`$ and $`y_2`$"));

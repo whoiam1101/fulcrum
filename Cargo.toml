@@ -1,6 +1,6 @@
 [package]
 name = "fulcrum"
-version = "0.2.0"
+version = "0.3.0"
 edition = "2021"
 authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
 rust-version = "1.60"
@@ -19,9 +19,17 @@ alloc = []
 std = ["alloc"]
 float-convert = []
 strict-overflow = []
+serde = ["dep:serde"]
+bytemuck = ["dep:bytemuck"]
+num-traits = ["dep:num-traits"]
+
+[dependencies]
+serde = { version = "1.0.100", optional = true, default-features = false }
+bytemuck = { version = "1.7", optional = true, default-features = false }
+num-traits = { version = "0.2.14", optional = true, default-features = false }
 
 [lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 missing_docs = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
 

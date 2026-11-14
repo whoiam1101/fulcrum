@@ -1,0 +1,27 @@
+[package]
+name = "fulcrum-integrations"
+version = "0.0.0"
+edition = "2021"
+authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
+license = "Apache-2.0"
+publish = false
+description = "Tests of the optional serde, bytemuck and num-traits features of fulcrum through their public traits."
+
+[workspace]
+
+[features]
+default = []
+serde = ["fulcrum/serde"]
+bytemuck = ["fulcrum/bytemuck", "dep:bytemuck"]
+num-traits = ["fulcrum/num-traits", "dep:num-traits"]
+float-convert = ["fulcrum/float-convert"]
+
+[dependencies]
+fulcrum = { path = ".." }
+bytemuck = { version = "1", optional = true }
+num-traits = { version = "0.2", optional = true }
+
+[dev-dependencies]
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+bincode = "1"
