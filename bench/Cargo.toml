@@ -18,9 +18,14 @@ serde_json = "1"
 [dev-dependencies]
 criterion = { version = "0.8", default-features = false, features = ["cargo_bench_support"] }
 fixed = "1"
+gungraun = "0.20"
 
 [[bench]]
 name = "ops"
+harness = false
+
+[[bench]]
+name = "instr"
 harness = false
 
 [profile.bench]

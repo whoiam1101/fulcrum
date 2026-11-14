@@ -26,7 +26,7 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
-use fulcrum_bench::inputs;
+use fulcrum_bench::{divisor, ff16, ff32, ff64, ff8, inputs, operand, q32_32, radicand};
 use std::hint::black_box;
 
 const N: usize = 4096;
@@ -110,19 +110,6 @@ macro_rules! bench_ops {
     }};
 }
 
-fn operand(x: u64) -> i64 {
-    ((x >> 40) as i64 & ((1 << 18) - 1)) - (1 << 17)
-}
-
-fn divisor(x: u64) -> i64 {
-    let m = (1 << 15) + ((x >> 40) as i64 % (3 << 15));
-    if x & 1 == 0 {
-        m
-    } else {
-        -m
-    }
-}
-
 /// Operands for a dependent chain `x = op(x, y)` that keeps `|x|` in
 /// `[0.25, 4)`.
 ///
@@ -162,14 +149,12 @@ fn to_f64(q16: i64) -> f64 {
 
 fn ops(c: &mut Criterion) {
     use fixed::types::{I16F16, I32F32, I8F8};
-    let f8 = |q: i64| FixedFloat8::from_bits((q >> 12) as i8);
-    let f16 = |q: i64| FixedFloat16::from_bits((q >> 8) as i16);
 
     bench_ops!(
         c,
         "fulcrum/FixedFloat8",
         FixedFloat8,
-        f8,
+        ff8,
         |x, y| x + y,
         |x, y| x * y,
         |x, y| x / y
@@ -178,7 +163,7 @@ fn ops(c: &mut Criterion) {
         c,
         "fulcrum/FixedFloat16",
         FixedFloat16,
-        f16,
+        ff16,
         |x, y| x + y,
         |x, y| x * y,
         |x, y| x / y
@@ -418,19 +403,6 @@ fn combined(c: &mut Criterion) {
     bench_int_combined!(c, "int/i64", i64, q32_32);
 }
 
-/// A Q16.16 raw operand as a Q32.32 raw value.
-fn q32_32(q: i64) -> i64 {
-    q << 16
-}
-
-fn ff32(q: i64) -> FixedFloat32 {
-    FixedFloat32::from_bits(q as i32)
-}
-
-fn ff64(q: i64) -> FixedFloat64 {
-    FixedFloat64::from_bits(q32_32(q))
-}
-
 /// One root function over 4096 operands for each implementation.
 macro_rules! bench_roots {
     ($c:expr, $name:literal, $T:ty, $make:expr, sqrt: $sqrt:expr, rsqrt: $rsqrt:expr, hypot: $hypot:expr) => {{
@@ -473,11 +445,6 @@ macro_rules! bench_roots {
         });
         g.finish();
     }};
-}
-
-/// A Q16.16 raw operand in `(0, 256)`.
-fn radicand(x: u64) -> i64 {
-    ((x >> 40) as i64 & ((1 << 24) - 1)) | 1
 }
 
 fn roots(c: &mut Criterion) {

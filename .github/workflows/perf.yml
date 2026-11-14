@@ -1,0 +1,97 @@
+name: perf
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "bench/**"
+      - ".github/workflows/perf.yml"
+  pull_request:
+    paths:
+      - "src/**"
+      - "Cargo.toml"
+      - "bench/**"
+      - ".github/workflows/perf.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: perf-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: never
+  GUNGRAUN_COLOR: never
+  INSTRUCTION_LIMIT: "ir=1%"
+
+jobs:
+  instructions:
+    name: instruction counts against the base commit
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - run: sudo apt-get update && sudo apt-get install -y valgrind
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: gungraun-runner@0.20.0
+      - name: base commit
+        id: base
+        env:
+          EVENT: ${{ github.event_name }}
+          PR_BASE: ${{ github.event.pull_request.base.sha }}
+          BEFORE: ${{ github.event.before }}
+        run: |
+          case "$EVENT" in
+            pull_request) base="$PR_BASE" ;;
+            push) base="$BEFORE" ;;
+            *) base="" ;;
+          esac
+          if [ -z "$base" ] || ! git cat-file -e "$base^{commit}" 2>/dev/null; then
+            base="$(git rev-parse HEAD~1)"
+          fi
+          echo "base $base"
+          echo "sha=$base" >> "$GITHUB_OUTPUT"
+      - name: baseline, the benchmarks of head on the sources of base
+        id: baseline
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+          CARGO_TARGET_DIR: ${{ runner.temp }}/target
+          GUNGRAUN_HOME: ${{ runner.temp }}/gungraun
+        run: |
+          git worktree add --detach "$RUNNER_TEMP/base" "$BASE"
+          rm -rf "$RUNNER_TEMP/base/bench"
+          cp -r bench "$RUNNER_TEMP/base/bench"
+          cd "$RUNNER_TEMP/base/bench"
+          if cargo bench --bench instr -- --save-baseline=base; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::the benchmarks of head do not build on the base commit, nothing to compare"
+            echo "ready=false" >> "$GITHUB_OUTPUT"
+          fi
+      - name: head against the baseline
+        if: steps.baseline.outputs.ready == 'true'
+        working-directory: bench
+        env:
+          CARGO_TARGET_DIR: ${{ runner.temp }}/target
+          GUNGRAUN_HOME: ${{ runner.temp }}/gungraun
+        run: |
+          set -o pipefail
+          cargo bench --bench instr -- --baseline=base --callgrind-limits="$INSTRUCTION_LIMIT" | tee "$RUNNER_TEMP/instr.txt"
+      - name: summary
+        if: always() && steps.baseline.outputs.ready == 'true'
+        env:
+          BASE: ${{ steps.base.outputs.sha }}
+        run: |
+          {
+            echo "Instruction counts, head against $BASE, limit $INSTRUCTION_LIMIT"
+            echo '```'
+            grep -E '^instr::|Instructions:|Gungraun result' "$RUNNER_TEMP/instr.txt" || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
