@@ -5,7 +5,9 @@
 //!
 //! A difference counts only when the 95% confidence intervals of the two
 //! medians do not overlap and the medians differ by at least 5%; otherwise the
-//! pair is reported as on par.
+//! pair is reported as on par. A benchmark missing from the results is an
+//! error: the report lists the missing ids and exits with status 1 instead of
+//! printing a table with holes.
 
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -32,6 +34,56 @@ const PAIRS: [(&str, &str); 3] = [
 ];
 
 const NATIVE: [(&str, &str); 2] = [("FixedFloat32", "f32"), ("FixedFloat64", "f64")];
+
+const INTS: [&str; 3] = ["i32", "i64", "i128"];
+
+const COMBINED: [(&str, &str); 4] = [
+    ("mul_add", "`mul_add`"),
+    ("mul_div", "`mul_div`"),
+    ("lerp", "`lerp`"),
+    ("dot", "dot product, 4096 terms"),
+];
+
+const COMBINED_PAIRS: [(&str, &str); 2] = [("FixedFloat32", "I16F16"), ("FixedFloat64", "I32F32")];
+
+const COMBINED_INTS: [&str; 2] = ["i32", "i64"];
+
+/// Criterion's full id of one benchmark.
+fn id(mode: &str, op: &str, imp: &str, ty: &str) -> String {
+    format!("{}/{}/{}/{}", mode, op, imp, ty)
+}
+
+/// Integers run only the throughput loops, so their latency cells stay empty.
+fn measured(mode: &str, imp: &str) -> bool {
+    imp != "int" || mode == "throughput"
+}
+
+/// Every benchmark id the report reads; all must be present.
+fn expected() -> Vec<String> {
+    let mut ids = Vec::new();
+    for (mode, op, _) in CASES {
+        for (ours, theirs) in PAIRS {
+            ids.push(id(mode, op, "fulcrum", ours));
+            ids.push(id(mode, op, "fixed-sat", theirs));
+        }
+        for (_, native) in NATIVE {
+            ids.push(id(mode, op, "native", native));
+        }
+        for int in INTS.iter().filter(|_| measured(mode, "int")) {
+            ids.push(id(mode, op, "int", int));
+        }
+    }
+    for (op, _) in COMBINED {
+        for (ours, theirs) in COMBINED_PAIRS {
+            ids.push(id("throughput", op, "fulcrum", ours));
+            ids.push(id("throughput", op, "fixed-sat", theirs));
+        }
+        for int in COMBINED_INTS {
+            ids.push(id("throughput", op, "int", int));
+        }
+    }
+    ids
+}
 
 /// Median time per operation and its 95% confidence interval, in ns.
 #[derive(Clone, Copy)]
@@ -162,24 +214,32 @@ struct Report {
 }
 
 impl Report {
-    fn get(&self, mode: &str, op: &str, imp: &str, ty: &str) -> Option<Est> {
-        self.data
-            .get(&format!("{}/{}/{}/{}", mode, op, imp, ty))
-            .copied()
+    /// One result; `main` has checked that every id of [`expected`] exists.
+    fn get(&self, mode: &str, op: &str, imp: &str, ty: &str) -> Est {
+        self.data[&id(mode, op, imp, ty)]
     }
 
-    fn vs_fixed(&self, mode: &str, op: &str, ours: &str, theirs: &str) -> Option<Verdict> {
-        Some(compare(
-            self.get(mode, op, "fulcrum", ours)?,
-            self.get(mode, op, "fixed-sat", theirs)?,
-        ))
+    /// `ns` of one result, or `—` where nothing is measured.
+    fn cell(&self, mode: &str, op: &str, imp: &str, ty: &str) -> String {
+        if measured(mode, imp) {
+            ns(self.get(mode, op, imp, ty).ns)
+        } else {
+            "—".to_string()
+        }
     }
 
-    fn vs_native(&self, mode: &str, op: &str, ours: &str, native: &str) -> Option<Verdict> {
-        Some(compare(
-            self.get(mode, op, "fulcrum", ours)?,
-            self.get(mode, op, "native", native)?,
-        ))
+    fn vs_fixed(&self, mode: &str, op: &str, ours: &str, theirs: &str) -> Verdict {
+        compare(
+            self.get(mode, op, "fulcrum", ours),
+            self.get(mode, op, "fixed-sat", theirs),
+        )
+    }
+
+    fn vs_native(&self, mode: &str, op: &str, ours: &str, native: &str) -> Verdict {
+        compare(
+            self.get(mode, op, "fulcrum", ours),
+            self.get(mode, op, "native", native),
+        )
     }
 
     fn speed_table(&self, s: &mut String) {
@@ -187,35 +247,74 @@ impl Report {
         for (ours, theirs) in PAIRS {
             let _ = write!(s, " | `{}` | `fixed` {}", ours, theirs);
         }
-        s.push_str(" | `f32` | `f64` |\n|---|");
-        for _ in 0..PAIRS.len() * 2 + 2 {
+        s.push_str(" | `f32` | `f64` | `i32` | `i64` | `i128` |\n|---|");
+        for _ in 0..PAIRS.len() * 2 + 5 {
             s.push_str("---:|");
         }
         s.push('\n');
         for (mode, op, label) in CASES {
             let _ = write!(s, "| {}", label);
             for (ours, theirs) in PAIRS {
-                let a = self.get(mode, op, "fulcrum", ours);
-                let b = self.get(mode, op, "fixed-sat", theirs);
-                let v = match (a, b) {
-                    (Some(a), Some(b)) => compare(a, b),
-                    _ => Verdict::Even,
-                };
-                let cell = |e: Option<Est>, bold: bool| match e {
-                    Some(e) if bold => format!("**{}**", ns(e.ns)),
-                    Some(e) => ns(e.ns),
-                    None => "—".to_string(),
-                };
+                let (a, b) = (
+                    self.get(mode, op, "fulcrum", ours),
+                    self.get(mode, op, "fixed-sat", theirs),
+                );
+                let v = compare(a, b);
                 let _ = write!(
                     s,
                     " | {} | {}",
-                    cell(a, matches!(v, Verdict::Faster(_))),
-                    cell(b, matches!(v, Verdict::Slower(_)))
+                    bold_ns(a, matches!(v, Verdict::Faster(_))),
+                    bold_ns(b, matches!(v, Verdict::Slower(_)))
                 );
             }
-            for native in ["f32", "f64"] {
-                let e = self.get(mode, op, "native", native);
-                let _ = write!(s, " | {}", e.map_or("—".to_string(), |e| ns(e.ns)));
+            for (_, native) in NATIVE {
+                let _ = write!(s, " | {}", self.cell(mode, op, "native", native));
+            }
+            for int in INTS {
+                let _ = write!(s, " | {}", self.cell(mode, op, "int", int));
+            }
+            s.push_str(" |\n");
+        }
+    }
+
+    fn combined_table(&self, s: &mut String) {
+        s.push_str("| ");
+        for (ours, theirs) in COMBINED_PAIRS {
+            let _ = write!(
+                s,
+                "| `{}` | `fixed` {} | `{}` vs `{}` ",
+                ours, theirs, ours, theirs
+            );
+        }
+        for int in COMBINED_INTS {
+            let _ = write!(s, "| `{}` ", int);
+        }
+        s.push_str("|\n|---|");
+        for _ in 0..COMBINED_PAIRS.len() {
+            s.push_str("---:|---:|---|");
+        }
+        for _ in 0..COMBINED_INTS.len() {
+            s.push_str("---:|");
+        }
+        s.push('\n');
+        for (op, label) in COMBINED {
+            let _ = write!(s, "| {}", label);
+            for (ours, theirs) in COMBINED_PAIRS {
+                let (a, b) = (
+                    self.get("throughput", op, "fulcrum", ours),
+                    self.get("throughput", op, "fixed-sat", theirs),
+                );
+                let v = compare(a, b);
+                let _ = write!(
+                    s,
+                    " | {} | {} | {}",
+                    bold_ns(a, matches!(v, Verdict::Faster(_))),
+                    bold_ns(b, matches!(v, Verdict::Slower(_))),
+                    verdict_text(v)
+                );
+            }
+            for int in COMBINED_INTS {
+                let _ = write!(s, " | {}", self.cell("throughput", op, "int", int));
             }
             s.push_str(" |\n");
         }
@@ -237,12 +336,18 @@ impl Report {
         for (mode, op, label) in CASES {
             let _ = write!(s, "| {}", label);
             for (ours, theirs) in PAIRS {
-                let v = self.vs_fixed(mode, op, ours, theirs);
-                let _ = write!(s, " | {}", v.map_or("—".to_string(), verdict_text));
+                let _ = write!(
+                    s,
+                    " | {}",
+                    verdict_text(self.vs_fixed(mode, op, ours, theirs))
+                );
             }
             for (ours, native) in NATIVE {
-                let v = self.vs_native(mode, op, ours, native);
-                let _ = write!(s, " | {}", v.map_or("—".to_string(), verdict_text));
+                let _ = write!(
+                    s,
+                    " | {}",
+                    verdict_text(self.vs_native(mode, op, ours, native))
+                );
             }
             s.push_str(" |\n");
         }
@@ -252,9 +357,13 @@ impl Report {
         let mut all = Vec::new();
         for (mode, op, label) in CASES {
             for (ours, theirs) in PAIRS {
-                if let Some(v) = self.vs_fixed(mode, op, ours, theirs) {
-                    all.push((op, label, ours, theirs, v));
-                }
+                all.push((
+                    op,
+                    label,
+                    ours,
+                    theirs,
+                    self.vs_fixed(mode, op, ours, theirs),
+                ));
             }
         }
         let faster = all
@@ -339,23 +448,49 @@ impl Report {
             );
         }
 
+        let combined: Vec<Verdict> = COMBINED
+            .iter()
+            .flat_map(|&(op, _)| {
+                COMBINED_PAIRS
+                    .iter()
+                    .map(move |&(ours, theirs)| self.vs_fixed("throughput", op, ours, theirs))
+            })
+            .collect();
+        let c_faster = combined
+            .iter()
+            .filter(|v| matches!(v, Verdict::Faster(_)))
+            .count();
+        let c_slower = combined
+            .iter()
+            .filter(|v| matches!(v, Verdict::Slower(_)))
+            .count();
+        let _ = writeln!(
+            s,
+            "- **Combined operations** (`mul_add`, `mul_div`, `lerp`, dot product) against `fixed`: faster in {} of {} cases, on par in {}, slower in {}.",
+            c_faster,
+            combined.len(),
+            combined.len() - c_faster - c_slower,
+            c_slower
+        );
+
         for (ours, native) in NATIVE {
             let parts: Vec<String> = CASES
                 .iter()
-                .filter_map(|&(mode, op, label)| {
-                    self.vs_native(mode, op, ours, native)
-                        .map(|v| format!("{} {}", label, verdict_text(v)))
+                .map(|&(mode, op, label)| {
+                    format!(
+                        "{} {}",
+                        label,
+                        verdict_text(self.vs_native(mode, op, ours, native))
+                    )
                 })
                 .collect();
-            if !parts.is_empty() {
-                let _ = writeln!(
-                    s,
-                    "- **Cost of determinism**, `{}` vs hardware `{}`: {}.",
-                    ours,
-                    native,
-                    parts.join("; ")
-                );
-            }
+            let _ = writeln!(
+                s,
+                "- **Cost of determinism**, `{}` vs hardware `{}`: {}.",
+                ours,
+                native,
+                parts.join("; ")
+            );
         }
     }
 
@@ -378,12 +513,21 @@ impl Report {
         self.speed_table(&mut s);
         s.push_str("\n### fulcrum compared with each competitor\n\n");
         self.verdict_table(&mut s);
+        s.push_str("\n### Combined operations, ns per operation (throughput)\n\n");
+        s.push_str(
+            "fulcrum rounds `mul_add`, `mul_div`, `lerp` and the dot product (`Accumulator::add_product`) once, to nearest. \
+             `fixed` uses `saturating_mul_add` and `saturating_lerp`, which truncate, `x * y / z`, which truncates twice, \
+             and a sum of saturating products, which truncates every term. \
+             Integers run the same loops with wrapping `x * y + z`, `x * y / z`, `x + (y - x) * t` and a sum of products.\n\n",
+        );
+        self.combined_table(&mut s);
         s.push_str(
             "\n### How to read this\n\n\
              - A difference is reported only when the 95% confidence intervals of the two medians do not overlap and the medians differ by at least 5%; everything else is *on par*. \
              Absolute numbers depend on the runner's CPU, ratios measured in the same run are what to compare.\n\
              - `fixed` is measured with `saturating_*`, the closest to fulcrum semantics. \
              fulcrum additionally rounds `*` and `/` to nearest, while `fixed` truncates: fulcrum does more work per operation and returns a more accurate result.\n\
+             - `i32`/`i64`/`i128` are plain integer arithmetic on the same loops, without rounding or saturation: a reference point for the cost of the integer operations themselves.\n\
              - `f32`/`f64` are the speed ceiling: hardware floats are fast, but their results may differ between platforms and compilers. \
              The gap shows the price of bit-identical results.\n\
              - Reproduce locally: `cd bench && cargo bench --bench ops && cargo run --release --bin report`.\n",
@@ -404,6 +548,14 @@ impl Report {
             );
         }
         s
+    }
+}
+
+fn bold_ns(e: Est, bold: bool) -> String {
+    if bold {
+        format!("**{}**", ns(e.ns))
+    } else {
+        ns(e.ns)
     }
 }
 
@@ -482,10 +634,40 @@ fn main() {
         );
         std::process::exit(1);
     }
+    let missing: Vec<String> = expected()
+        .into_iter()
+        .filter(|id| !data.contains_key(id))
+        .collect();
+    if !missing.is_empty() {
+        eprintln!(
+            "missing benchmark results in {}:\n  {}\nrun `cargo bench --bench ops` first",
+            criterion.display(),
+            missing.join("\n  ")
+        );
+        std::process::exit(1);
+    }
     let report = Report { data };
 
     let date = today();
     let commit = run("git", &["rev-parse", "--short", "HEAD"]).unwrap_or_else(|| "?".into());
+    let dirty = run(
+        "git",
+        &[
+            "status",
+            "--porcelain",
+            "--untracked-files=no",
+            "--",
+            "../src",
+            "../Cargo.toml",
+            ".",
+        ],
+    )
+    .is_some();
+    let commit = if dirty {
+        format!("`{}` with uncommitted changes", commit)
+    } else {
+        format!("`{}`", commit)
+    };
     let rustc = run("rustc", &["-V"]).unwrap_or_else(|| "rustc ?".into());
     let machine = if env::var("GITHUB_ACTIONS").ok().as_deref() == Some("true") {
         "GitHub-hosted runner"
@@ -493,7 +675,7 @@ fn main() {
         "local machine"
     };
     let env_line = format!(
-        "Measured on {}, commit `{}`, {}: {}, {} {}, {}.",
+        "Measured on {}, commit {}, {}: {}, {} {}, {}.",
         date,
         commit,
         machine,
