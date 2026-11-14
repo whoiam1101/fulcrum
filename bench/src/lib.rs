@@ -1,4 +1,7 @@
-//! Shared inputs for the benchmarks: deterministic pseudo-random operands.
+//! Shared inputs for the benchmarks: deterministic pseudo-random operands,
+//! and the accuracy table of the square roots.
+
+pub mod accuracy;
 
 /// `n` pseudo-random `u64` values from a fixed seed (SplitMix64).
 pub fn inputs(n: usize, seed: u64) -> Vec<u64> {

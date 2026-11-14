@@ -19,6 +19,10 @@
 //! `mul_div` is `x * y / z`, truncated twice, and its dot product sums
 //! saturating products, truncated per term, while fulcrum rounds to nearest
 //! once (`add_product` for the dot product).
+//!
+//! Square roots (`sqrt`, `rsqrt`, `hypot`) are measured for throughput on
+//! operands in `(0, 256)`, against the software floats of `libm` and the
+//! hardware floats of `std` (`rsqrt` of a float is `1 / x.sqrt()`).
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
@@ -427,5 +431,70 @@ fn ff64(q: i64) -> FixedFloat64 {
     FixedFloat64::from_bits(q32_32(q))
 }
 
-criterion_group!(benches, ops, combined);
+/// One root function over 4096 operands for each implementation.
+macro_rules! bench_roots {
+    ($c:expr, $name:literal, $T:ty, $make:expr, sqrt: $sqrt:expr, rsqrt: $rsqrt:expr, hypot: $hypot:expr) => {{
+        let a: Vec<$T> = inputs(N, 9)
+            .into_iter()
+            .map(|x| $make(radicand(x)))
+            .collect();
+        let b: Vec<$T> = inputs(N, 10)
+            .into_iter()
+            .map(|x| $make(radicand(x)))
+            .collect();
+        let mut out: Vec<$T> = a.clone();
+        let (sqrt, rsqrt, hypot) = ($sqrt, $rsqrt, $hypot);
+        let mut g = $c.benchmark_group("throughput");
+        g.throughput(Throughput::Elements(N as u64));
+        g.bench_function(BenchmarkId::new("sqrt", $name), |bn| {
+            bn.iter(|| {
+                for (o, x) in out.iter_mut().zip(black_box(&a)) {
+                    *o = sqrt(*x);
+                }
+                black_box(&out);
+            })
+        });
+        g.bench_function(BenchmarkId::new("rsqrt", $name), |bn| {
+            bn.iter(|| {
+                for (o, x) in out.iter_mut().zip(black_box(&a)) {
+                    *o = rsqrt(*x);
+                }
+                black_box(&out);
+            })
+        });
+        g.bench_function(BenchmarkId::new("hypot", $name), |bn| {
+            bn.iter(|| {
+                let (a, b) = (black_box(&a), black_box(&b));
+                for ((o, x), y) in out.iter_mut().zip(a).zip(b) {
+                    *o = hypot(*x, *y);
+                }
+                black_box(&out);
+            })
+        });
+        g.finish();
+    }};
+}
+
+/// A Q16.16 raw operand in `(0, 256)`.
+fn radicand(x: u64) -> i64 {
+    ((x >> 40) as i64 & ((1 << 24) - 1)) | 1
+}
+
+fn roots(c: &mut Criterion) {
+    bench_roots!(c, "fulcrum/FixedFloat32", FixedFloat32, ff32,
+        sqrt: |x: FixedFloat32| x.sqrt(), rsqrt: |x: FixedFloat32| x.rsqrt(), hypot: |x: FixedFloat32, y| x.hypot(y));
+    bench_roots!(c, "fulcrum/FixedFloat64", FixedFloat64, ff64,
+        sqrt: |x: FixedFloat64| x.sqrt(), rsqrt: |x: FixedFloat64| x.rsqrt(), hypot: |x: FixedFloat64, y| x.hypot(y));
+    let n32 = |q: i64| to_f64(q) as f32;
+    bench_roots!(c, "libm/f32", f32, n32,
+        sqrt: libm::sqrtf, rsqrt: |x: f32| 1.0 / libm::sqrtf(x), hypot: libm::hypotf);
+    bench_roots!(c, "libm/f64", f64, to_f64,
+        sqrt: libm::sqrt, rsqrt: |x: f64| 1.0 / libm::sqrt(x), hypot: libm::hypot);
+    bench_roots!(c, "native/f32", f32, n32,
+        sqrt: |x: f32| x.sqrt(), rsqrt: |x: f32| 1.0 / x.sqrt(), hypot: |x: f32, y| x.hypot(y));
+    bench_roots!(c, "native/f64", f64, to_f64,
+        sqrt: |x: f64| x.sqrt(), rsqrt: |x: f64| 1.0 / x.sqrt(), hypot: |x: f64, y| x.hypot(y));
+}
+
+criterion_group!(benches, ops, combined, roots);
 criterion_main!(benches);

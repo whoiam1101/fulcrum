@@ -48,6 +48,18 @@ const COMBINED_PAIRS: [(&str, &str); 2] = [("FixedFloat32", "I16F16"), ("FixedFl
 
 const COMBINED_INTS: [&str; 2] = ["i32", "i64"];
 
+const ROOTS: [(&str, &str); 3] = [
+    ("sqrt", "`sqrt`"),
+    ("rsqrt", "`rsqrt`"),
+    ("hypot", "`hypot`"),
+];
+
+/// fulcrum type, its float, and the column labels of the float.
+const ROOT_GROUPS: [(&str, &str); 2] = [("FixedFloat32", "f32"), ("FixedFloat64", "f64")];
+
+/// Operands per function and implementation in the accuracy table.
+const ACCURACY_SAMPLES: usize = 100_000;
+
 /// Criterion's full id of one benchmark.
 fn id(mode: &str, op: &str, imp: &str, ty: &str) -> String {
     format!("{}/{}/{}/{}", mode, op, imp, ty)
@@ -80,6 +92,13 @@ fn expected() -> Vec<String> {
         }
         for int in COMBINED_INTS {
             ids.push(id("throughput", op, "int", int));
+        }
+    }
+    for (op, _) in ROOTS {
+        for (ours, float) in ROOT_GROUPS {
+            ids.push(id("throughput", op, "fulcrum", ours));
+            ids.push(id("throughput", op, "libm", float));
+            ids.push(id("throughput", op, "native", float));
         }
     }
     ids
@@ -320,6 +339,43 @@ impl Report {
         }
     }
 
+    fn vs_float(&self, op: &str, ours: &str, imp: &str, float: &str) -> Verdict {
+        compare(
+            self.get("throughput", op, "fulcrum", ours),
+            self.get("throughput", op, imp, float),
+        )
+    }
+
+    fn roots_table(&self, s: &mut String) {
+        s.push('|');
+        for (ours, float) in ROOT_GROUPS {
+            let _ = write!(
+                s,
+                " | `{}` | `libm` `{}` | `std` `{}` | `{}` vs `libm`",
+                ours, float, float, ours
+            );
+        }
+        s.push_str(" |\n|---|");
+        for _ in ROOT_GROUPS {
+            s.push_str("---:|---:|---:|---|");
+        }
+        s.push('\n');
+        for (op, label) in ROOTS {
+            let _ = write!(s, "| {}", label);
+            for (ours, float) in ROOT_GROUPS {
+                let _ = write!(
+                    s,
+                    " | {} | {} | {} | {}",
+                    ns(self.get("throughput", op, "fulcrum", ours).ns),
+                    ns(self.get("throughput", op, "libm", float).ns),
+                    ns(self.get("throughput", op, "native", float).ns),
+                    verdict_text(self.vs_float(op, ours, "libm", float))
+                );
+            }
+            s.push_str(" |\n");
+        }
+    }
+
     fn verdict_table(&self, s: &mut String) {
         s.push('|');
         for (ours, theirs) in PAIRS {
@@ -473,6 +529,26 @@ impl Report {
             c_slower
         );
 
+        for (ours, float) in ROOT_GROUPS {
+            let parts: Vec<String> = ROOTS
+                .iter()
+                .map(|&(op, label)| {
+                    format!(
+                        "{} {}",
+                        label,
+                        verdict_text(self.vs_float(op, ours, "libm", float))
+                    )
+                })
+                .collect();
+            let _ = writeln!(
+                s,
+                "- **Square roots**, `{}` vs `libm` `{}` (fulcrum correctly rounded, floats not once stored in the format, see the accuracy table): {}.",
+                ours,
+                float,
+                parts.join("; ")
+            );
+        }
+
         for (ours, native) in NATIVE {
             let parts: Vec<String> = CASES
                 .iter()
@@ -521,6 +597,14 @@ impl Report {
              Integers run the same loops with wrapping `x * y + z`, `x * y / z`, `x + (y - x) * t` and a sum of products.\n\n",
         );
         self.combined_table(&mut s);
+        s.push_str("\n### Square roots, ns per operation (throughput)\n\n");
+        s.push_str(
+            "Operands in `(0, 256)`. fulcrum `sqrt`, `rsqrt` and `hypot` are correctly rounded to nearest. \
+             `libm` is the software float library, `std` the hardware square root; `rsqrt` of a float is `1 / x.sqrt()`.\n\n",
+        );
+        self.roots_table(&mut s);
+        s.push_str("\n### Accuracy of square roots\n\n");
+        accuracy_table(&mut s);
         s.push_str(
             "\n### How to read this\n\n\
              - A difference is reported only when the 95% confidence intervals of the two medians do not overlap and the medians differ by at least 5%; everything else is *on par*. \
@@ -548,6 +632,34 @@ impl Report {
             );
         }
         s
+    }
+}
+
+/// The accuracy table of `fulcrum_bench::accuracy`, deterministic and
+/// independent of the timing results.
+fn accuracy_table(s: &mut String) {
+    let _ = writeln!(
+        s,
+        "Error in ulps of the fixed-point format against the exact root, over {} operands per row: \
+         half uniform over the positive raw range, half uniform in the exponent; `hypot` on pairs below half of `MAX`. \
+         Floats get the operand converted to the nearest float and their result rounded to nearest into the same format, \
+         as a program that computes in floats and stores fixed-point. \
+         Generated by [`bench/src/accuracy.rs`](bench/src/accuracy.rs).\n",
+        ACCURACY_SAMPLES
+    );
+    s.push_str("| Function | Format | Implementation | max error, ulp | mean error, ulp | correctly rounded |\n|---|---|---|---:|---:|---:|\n");
+    for row in fulcrum_bench::accuracy::table(ACCURACY_SAMPLES) {
+        let a = row.accuracy;
+        let _ = writeln!(
+            s,
+            "| `{}` | {} | {} | {:.3} | {:.4} | {:.3}% |",
+            row.op,
+            row.format,
+            row.imp,
+            a.max,
+            a.mean,
+            100.0 * a.correct
+        );
     }
 }
 

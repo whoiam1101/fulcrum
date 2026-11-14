@@ -11,6 +11,8 @@ description = "Speed and accuracy comparison of fulcrum with competitors (docs/A
 
 [dependencies]
 fulcrum = { path = ".." }
+libm = "0.2"
+num-bigint = "0.4"
 serde_json = "1"
 
 [dev-dependencies]
