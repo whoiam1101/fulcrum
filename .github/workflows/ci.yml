@@ -3,6 +3,7 @@ name: ci
 on:
   push:
     branches: [main]
+    tags: ["v*"]
   pull_request:
   schedule:
     - cron: "0 3 * * 0"
@@ -17,6 +18,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  JUST_VERSION: "1.58.0"
 
 jobs:
   test:
@@ -33,8 +35,13 @@ jobs:
             toolchain: nightly
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v7
-      - run: rustup toolchain install ${{ matrix.toolchain }} --profile minimal && rustup default ${{ matrix.toolchain }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal && rustup default "$TOOLCHAIN"
+        shell: bash
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
       - run: cargo test --features std,float-convert,serde,bytemuck,num-traits
       - run: cargo test --features std,float-convert --release
       - run: cargo test --features strict-overflow --test strict
@@ -47,13 +54,17 @@ jobs:
       run:
         working-directory: oracle
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: cargo test --release
 
   algebra:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: cargo test --release --test algebra -- --include-ignored --nocapture
         env:
           FULCRUM_ALGEBRA_SEED: "1"
@@ -64,7 +75,9 @@ jobs:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: cargo test --release --test stress -- --ignored --nocapture
         env:
           FULCRUM_STRESS_SECS: "1200"
@@ -84,12 +97,18 @@ jobs:
       run:
         working-directory: fuzz
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: rustup toolchain install nightly --profile minimal
-      - run: cargo install --locked cargo-fuzz
-      - run: cargo +nightly fuzz run ${{ matrix.target }} -- -max_total_time=600
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: cargo-fuzz
+      - run: cargo +nightly fuzz run "$TARGET" -- -max_total_time=600
+        env:
+          TARGET: ${{ matrix.target }}
       - if: failure()
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
         with:
           name: fuzz-${{ matrix.target }}
           path: fuzz/artifacts
@@ -97,13 +116,14 @@ jobs:
   msrv:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: rustup toolchain install 1.60 --profile minimal
-      - run: cargo +1.60 build
-      - run: cargo +1.60 build --features serde
-      - run: cargo +1.60 build --features bytemuck
-      - run: cargo +1.60 build --features num-traits
-      - run: cargo +1.60 build --all-features
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }}
+      - run: just msrv
 
   features:
     name: features ${{ matrix.features }}
@@ -116,15 +136,35 @@ jobs:
       run:
         working-directory: integrations
     steps:
-      - uses: actions/checkout@v7
-      - run: cargo build --manifest-path ../Cargo.toml --features ${{ matrix.features }}
-      - run: cargo test --features ${{ matrix.features }}
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: cargo build --manifest-path ../Cargo.toml --features "$FEATURES"
+        env:
+          FEATURES: ${{ matrix.features }}
+      - run: cargo test --features "$FEATURES"
+        env:
+          FEATURES: ${{ matrix.features }}
+
+  powerset:
+    name: every feature combination
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }},cargo-hack
+      - run: just hack
 
   targets:
     name: i686 test, thumbv7em no_std build
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: sudo apt-get update && sudo apt-get install -y gcc-multilib
       - run: rustup target add i686-unknown-linux-gnu thumbv7em-none-eabihf
       - run: cargo test --target i686-unknown-linux-gnu
@@ -134,20 +174,92 @@ jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: rustup component add clippy rustfmt
-      - run: cargo fmt --check
-      - run: cargo clippy --all-targets -- -D warnings
-      - run: cargo clippy --all-targets --all-features -- -D warnings
-      - run: cargo clippy --manifest-path integrations/Cargo.toml --all-targets --all-features -- -D warnings
-      - name: generated tables are up to date
-        run: cargo run --manifest-path tools/gen-tables/Cargo.toml -- --check
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }},typos@1.52.2
+      - run: just lint
+
+  miri:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install nightly --profile minimal --component miri
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }}
+      - run: just miri
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup component add llvm-tools-preview
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }},cargo-llvm-cov
+      - run: set -o pipefail && just cov | tee coverage.txt
+      - run: |
+          {
+            echo '```'
+            cat coverage.txt
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  semver:
+    name: semver of the release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: cargo-semver-checks
+      - name: the version bump covers every API change since the previous tag
+        run: |
+          version="v$(cargo metadata --no-deps --format-version 1 | jq -r '.packages[] | select(.name == "fulcrum") | .version')"
+          previous="$(git describe --tags --abbrev=0 --exclude "$version" HEAD)"
+          if git rev-parse -q --verify "refs/tags/$version" >/dev/null && [ "$(git rev-parse "$version^{commit}")" != "$(git rev-parse HEAD)" ]; then
+            echo "$version is already released, no release in this commit"
+            exit 0
+          fi
+          echo "checking $version against $previous"
+          cargo semver-checks --all-features --baseline-rev "$previous"
+
+  mutants:
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }},cargo-mutants
+      - run: just mutants --jobs 4
+      - if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9
+        with:
+          name: mutants
+          path: mutants.out
 
   kani:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v7
-      - uses: model-checking/kani-github-action@v1
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f
         with:
           args: -Z stubbing
 
@@ -157,6 +269,8 @@ jobs:
       run:
         working-directory: verify/lean
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
       - run: curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
       - run: ~/.elan/bin/lake build
