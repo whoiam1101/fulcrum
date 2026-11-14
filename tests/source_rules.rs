@@ -209,7 +209,12 @@ fn only_doc_comments() {
             "rs" => Some(rust_violation as fn(&str) -> bool),
             "toml" | "yml" | "yaml" => Some(config_violation),
             "lean" if path.starts_with(&lean) => Some(lean_violation),
-            _ if name == ".gitignore" => Some(config_violation),
+            _ if name == ".gitignore"
+                || name.eq_ignore_ascii_case("justfile")
+                || name == ".justfile" =>
+            {
+                Some(config_violation)
+            }
             _ => None,
         }
     });
