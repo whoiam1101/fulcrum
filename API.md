@@ -1,14 +1,14 @@
-# fulcrum 0.1: API guide
+# fulcrum 0.2: API guide
 
 **English** · [Русский](API.ru.md)
 
-How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.1.1`.
+How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.2.0`.
 
 ## 1. Setup
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.1.1" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.2.0" }
 ```
 
 The crate is `no_std`, has no dependencies, MSRV 1.60, no `unsafe`. Features (all off by default):
@@ -65,6 +65,7 @@ let parts = FixedFloat32::from_parts(-2, 49152);
 | `saturating_from_ratio(num, den)`, `checked_from_ratio` (in the raw type) | to nearest, ties up | saturates / `None`; `den = 0` behaves like division by zero |
 | `from_bits(raw)` | — | always exact |
 | `from_parts(int, frac)`, `checked_from_parts` | — | saturates / `None` |
+| `checked_from_scaled_bits(raw, src_frac)`, `saturating_from_scaled_bits`, `wrapping_from_scaled_bits`: `raw / 2^src_frac` for any `i128` and any `src_frac` | to nearest, ties up, once | `None` / saturates by the sign of `raw` / low bits |
 | `saturating_from_f64(x)`, `checked_from_f64(x)` (feature `float-convert`) | to nearest, ties up | saturates / `None`; `NaN` gives `0` / `None` |
 
 `From` integers: `FixedFloat16` from `i8`; `FixedFloat32` from `i8`, `u8`, `i16`; `FixedFloat64` from `i8`, `u8`, `i16`, `u16`, `i32`. `FixedFloat8` has none: not even `i8` fits.
@@ -134,6 +135,27 @@ Same as the primitive integers. Everything below is a `const fn`.
 | `recip()` | `1 / x`, saturating |
 | `sqr()` | `x · x`, saturating |
 | `mul_int(n)`, `div_int(n)` | multiplication (exact) and division (rounded) by an integer of the raw type |
+
+### Rounded once: `mul_add`, `mul_div`, `lerp`
+
+These compute the exact result of three operands and round and saturate it once. The intermediate product is never rounded or saturated, so they are more accurate than the same chain of operators and do not fail when only an intermediate value is out of range.
+
+| Method | Value | Out of range | `checked_*` |
+|---|---|---|---|
+| `x.mul_add(a, b)` | `x · a + b` | saturates | `checked_mul_add` |
+| `x.mul_div(a, b)` | `x · a / b`; `b = 0` gives `MAX`, `MIN` or `0` by the sign of `x · a` | saturates | `checked_mul_div`, `None` also for `b = 0` |
+| `a.lerp(b, t)` | `a + (b - a) · t`: `t = 0` gives `a`, `t = 1` gives `b` exactly, other `t` extrapolate | saturates | `checked_lerp` |
+
+```rust
+use fulcrum::{ff64, FixedFloat64};
+
+let big = FixedFloat64::MAX;
+assert_eq!(big * big / big, FixedFloat64::ONE);
+assert_eq!(big.mul_div(big, big), big);
+assert_eq!(ff64!(10).lerp(ff64!(20), ff64!(0.25)), ff64!(12.5));
+```
+
+The explicit methods keep their semantics under `strict-overflow`: they saturate, like `abs` and `mul_int`.
 
 ## 5. Rounding and integers
 
@@ -230,7 +252,7 @@ assert_eq!(f, FixedFloat32::MAX - FixedFloat32::ONE);
 |---|---|
 | `T::accumulator()`, `AccumulatorN::new()`, `ZERO`, `Default` | empty |
 | `add(x)`, `sub(x)`, `extend(iter)`, `collect()` | exact addition |
-| `add_product(a, b)` (8, 16, 32 bits) | exact unrounded product |
+| `add_product(a, b)` | exact unrounded product |
 | `merge(other)`, `Sum<AccumulatorN>` | combine partial sums; associative and commutative |
 | `finish()` | rounds and saturates once |
 | `checked_finish()` | `None` when the total is out of range |
@@ -245,7 +267,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 
 Any split between threads and any tree of `merge` calls gives the same bits. An accumulator is `Copy`, `Eq` and `Hash`: its state can be compared and sent over the network.
 
-**A dot product** built with `add_product` is rounded once instead of at every term, so it is more accurate and still order-independent. For `FixedFloat32`, `0.1·0.1 + 0.1·0.1` gives `0.0200042724609375` through `add_product` and `0.019989013671875` through `*` and `+`. `Accumulator64` has no `add_product` yet: the exact product of two `i64` at scale `2⁻⁶⁴` does not fit an `i128`. It comes in stage 2 together with `U256`.
+**A dot product** built with `add_product` is rounded once instead of at every term, so it is more accurate and still order-independent. For `FixedFloat32`, `0.1·0.1 + 0.1·0.1` gives `0.0200042724609375` through `add_product` and `0.019989013671875` through `*` and `+`. `Accumulator64` keeps a 256-bit state, so its products at scale `2⁻⁶⁴` are exact too.
 
 **`Iterator::product`** is just `*` in iteration order. Rounded multiplication is not associative, so the caller fixes the order.
 
@@ -268,7 +290,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §14 says so). The trait grows with the stages: `sqrt` joins in stage 4 and `sin_cos` in stage 5.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §14 says so). The trait grows with the stages: `sqrt` joins in stage 3 and `sin_cos` in stage 4.
 
 ## 12. `strict-overflow`
 
@@ -280,7 +302,7 @@ For tests only:
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.1.1", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.2.0", features = ["strict-overflow"] }
 ```
 
 Cargo unifies features, so under `cargo test` of your crate the feature is enabled for the normal dependency too.
@@ -295,7 +317,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 
