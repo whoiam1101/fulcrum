@@ -84,8 +84,16 @@ Speed and tooling, moved to [Between 3 and 4](#between-3-and-4-v03x).
 Speed and tooling:
 - [ ] Division: `/` is 1.08–1.17× slower than `fixed` on 16 bits and in the latency of 32 bits (README benchmarks, x86-64).
 - [ ] `mul_div` of `FixedFloat64` on aarch64: measure the `u128` division against `divlu`, which has no hardware 128/64 instruction to compete with there.
-- [ ] Instruction-count regression tests (`iai-callgrind`) and an `cargo asm` check of `mul`, `div`, `saturating_add` on x86-64 and aarch64.
+- [x] Instruction-count regression gate: `bench/benches/instr.rs` (gungraun) runs on every push to `main` and every PR against the base commit and fails above +1 % instructions (`.github/workflows/perf.yml`).
+- [ ] A `cargo asm` check of `mul`, `div`, `saturating_add` on x86-64 and aarch64.
 - [ ] `rust_decimal` as a competitor.
+
+Quality gates:
+- [x] `pre-commit` hooks (`.pre-commit-config.yaml`): file hygiene, gitleaks, typos, actionlint, zizmor, rustfmt and clippy on every manifest, the source rules; tests, MSRV build and `cargo deny` before push.
+- [x] CI: clippy and rustfmt on every manifest, rustdoc without warnings, typos, Miri on the `unsafe` of `src/pod.rs`, line coverage with a floor, every feature combination (`cargo hack`), semver of each release against the previous tag, weekly mutation testing; actions pinned by commit, gitleaks and zizmor in `security.yml`, Dependabot with a 7-day cooldown.
+- [x] `justfile`: one recipe per local check; the local hooks of `pre-commit` and the CI jobs `lint`, `msrv`, `powerset`, `miri`, `coverage`, `mutants` call the recipes. The CI `test` matrix (it runs on Windows) and the `audit.yml` matrix (one cargo-deny job per manifest) keep their own lists.
+- [ ] Coverage of `integrations/` merged into the report (`num.rs` and `serialize.rs` show 0 % today), then raise the floor from 80 %.
+- [ ] Miri on more than `pod.rs`: the edge tests take over 30 minutes under Miri, they need a reduced input set first.
 - [ ] Square roots without division: `isqrt` through a Newton iteration for `1/√x` (multiplications only) with the same exact descent, so the bits stay the same. Today the roots take 5–26 ns, 3.3–16× slower than `libm` (README); the dependent hardware divisions of `k32::isqrt` and the one `u128` division of `k64` are the cost.
 
 ## 4. Trigonometry `v0.4.0`

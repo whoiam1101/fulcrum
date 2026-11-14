@@ -45,6 +45,8 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 - [Roadmap](ROADMAP.md): stages up to 1.0, what each delivers and how it is verified.
 - [Security](SECURITY.md): a determinism bug is treated as a vulnerability.
 
+Local checks are recipes of the [`justfile`](justfile): `just` lists them, `just check` runs the fast ones, `just all` the gate before a push (lint, tests, oracle, MSRV, feature combinations, `cargo deny`). CI calls the same recipes where it can; the OS and target matrices, fuzzing, Kani and Lean stay in `.github/workflows`. Before contributing, install the hooks: `pre-commit install` (gitleaks, typos, actionlint, zizmor and the fast recipes on commit; tests, the MSRV build and `cargo deny` before push).
+
 Verified by exhaustive tests of `FixedFloat8` and `FixedFloat16`, an exact rational oracle, fuzzing, Kani proofs and a golden hash on x86-64, ARM64 and 32-bit x86. CI runs on Linux, macOS and Windows and builds for `thumbv7em` without `std`.
 
 ## Benchmarks
