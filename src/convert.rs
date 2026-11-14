@@ -26,15 +26,27 @@ macro_rules! impl_convert {
     ($Name:ident, $Bits:ty, $F:literal, [$($FromInt:ty),*], [$($TryFromInt:ty),*]) => {
         impl $Name {
             /// Converts `raw / 2^src_frac` to this type, rounding dropped bits to
-            /// nearest (ties toward `+∞`); `None` when the result is out of range.
+            /// nearest (ties toward `+∞`) once; `None` when the result is out of
+            /// range. Any `src_frac` is accepted: `src_frac = 0` converts an
+            /// integer, `src_frac > FRAC_BITS` drops bits, `src_frac < FRAC_BITS`
+            /// adds zero bits.
+            ///
+            #[doc = concat!(
+                "```\n",
+                "use fulcrum::", stringify!($Name), " as F;\n",
+                "assert_eq!(F::checked_from_scaled_bits(3, 1), Some(F::ONE + F::HALF));\n",
+                "assert_eq!(F::checked_from_scaled_bits(-1, 200), Some(F::ZERO));\n",
+                "assert_eq!(F::checked_from_scaled_bits(i128::MAX, 0), None);\n",
+                "```"
+            )]
             ///
             /// Every checked or saturating conversion into this type from an
             /// `i128` with a scale goes through here: integers, narrowing,
             /// parsing, floats and accumulators. The wrapping one,
-            /// `wrapping_from_scaled_bits`, shares the rescaling
-            /// (`kernel::rescale`) and keeps the low bits instead.
+            /// `wrapping_from_scaled_bits`, shares the rescaling and keeps the
+            /// low bits instead.
             #[inline]
-            pub(crate) const fn checked_from_scaled_bits(raw: i128, src_frac: u32) -> Option<Self> {
+            pub const fn checked_from_scaled_bits(raw: i128, src_frac: u32) -> Option<Self> {
                 let (w, overflow) = crate::kernel::rescale(raw, src_frac, $F);
                 if !overflow && w >= <$Bits>::MIN as i128 && w <= <$Bits>::MAX as i128 {
                     Some(Self { raw: w as $Bits })
@@ -44,9 +56,9 @@ macro_rules! impl_convert {
             }
 
             /// Converts `raw / 2^src_frac` to this type, rounding dropped bits to
-            /// nearest (ties toward `+∞`) and saturating by the sign of `raw`.
+            /// nearest (ties toward `+∞`) once and saturating by the sign of `raw`.
             #[inline]
-            pub(crate) const fn saturating_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
+            pub const fn saturating_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
                 match Self::checked_from_scaled_bits(raw, src_frac) {
                     Some(v) => v,
                     None if raw < 0 => Self::MIN,
@@ -55,9 +67,10 @@ macro_rules! impl_convert {
             }
 
             /// Converts `raw / 2^src_frac`, rounding dropped bits to nearest
-            /// (ties toward `+∞`) and keeping the low bits of the raw result.
+            /// (ties toward `+∞`) once and keeping the low `BITS` bits of the
+            /// exact raw result.
             #[inline]
-            pub(crate) const fn wrapping_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
+            pub const fn wrapping_from_scaled_bits(raw: i128, src_frac: u32) -> Self {
                 Self { raw: crate::kernel::rescale(raw, src_frac, $F).0 as $Bits }
             }
 
