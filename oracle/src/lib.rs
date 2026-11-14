@@ -109,6 +109,43 @@ impl Format {
         self.settle(r)
     }
 
+    /// Raw value nearest to `√x` for `x ≥ 0`, ties toward `+∞` (there are
+    /// none), without range check: `s = ⌊√⌊x · 4^frac⌋⌋` is the floor of the
+    /// scaled root, and the root rounds up when `(s + ½)² ≤ x · 4^frac`.
+    pub fn round_sqrt(self, x: &BigRational) -> BigInt {
+        let scaled = x * BigRational::from_integer(BigInt::one() << (2 * self.frac));
+        let s = scaled.to_integer().sqrt();
+        let half = BigRational::new(&s * 2 + 1, BigInt::from(2));
+        if &half * &half <= scaled {
+            s + 1
+        } else {
+            s
+        }
+    }
+
+    /// `√x` correctly rounded; `x < 0` gives `0` with the flag `false`.
+    pub fn sqrt(self, x: i128) -> (i128, bool) {
+        if x < 0 {
+            return (0, false);
+        }
+        self.settle(self.round_sqrt(&self.exact(x)))
+    }
+
+    /// `1 / √x` correctly rounded and saturated; `x ≤ 0` gives `MAX` with
+    /// the flag `false`.
+    pub fn rsqrt(self, x: i128) -> (i128, bool) {
+        if x <= 0 {
+            return (self.max().to_i128().unwrap(), false);
+        }
+        self.settle(self.round_sqrt(&self.exact(x).recip()))
+    }
+
+    /// `√(x² + y²)` correctly rounded and saturated.
+    pub fn hypot(self, x: i128, y: i128) -> (i128, bool) {
+        let sum = self.exact(x) * self.exact(x) + self.exact(y) * self.exact(y);
+        self.settle(self.round_sqrt(&sum))
+    }
+
     /// `Σ a·b` rounded once and saturated.
     pub fn dot(self, a: &[i128], b: &[i128]) -> (i128, bool) {
         let sum = a.iter().zip(b).fold(BigRational::zero(), |s, (&x, &y)| {

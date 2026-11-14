@@ -31,6 +31,18 @@ fn scaled(n: i128, f: u32) -> BigRational {
     BigRational::new(BigInt::from(n), BigInt::one() << f)
 }
 
+fn round_sqrt(num: i128, den: i128) -> i128 {
+    let (num, den) = (BigInt::from(num), BigInt::from(den));
+    let s = (&num / &den).sqrt();
+    let twice = &s * 2 + 1;
+    let s = if &twice * &twice * &den <= num * 4 {
+        s + 1
+    } else {
+        s
+    };
+    s.to_i128().expect("fits i128")
+}
+
 fn raw() -> impl Strategy<Value = i128> {
     prop_oneof![
         1 => Just(i64::MIN as i128),
@@ -79,6 +91,16 @@ proptest! {
         if c != 0 {
             prop_assert_eq!(spec::mul_div(a, b, c), round(&x * &y / &z * &unit));
         }
+    }
+
+    #[test]
+    fn sqrt_ratio(num in prop_oneof![1 => 0i128..=64, 4 => 0i128..=1 << 98], den in prop_oneof![1 => 1i128..=8, 4 => 1i128..=i64::MAX as i128]) {
+        prop_assume!((num as u128) < 1u128 << 98);
+        let s = spec::sqrt_ratio(num, den);
+        prop_assert_eq!(s, round_sqrt(num, den));
+        prop_assert!(spec::is_sqrt_ratio(s, num, den));
+        prop_assert!(!spec::is_sqrt_ratio(s + 1, num, den));
+        prop_assert!(s == 0 || !spec::is_sqrt_ratio(s - 1, num, den));
     }
 
     #[test]

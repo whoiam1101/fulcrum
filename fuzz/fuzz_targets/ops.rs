@@ -1,5 +1,6 @@
 //! Arbitrary operands: no operation panics; `*`, `/`, `mul_add`, `mul_div`,
-//! `lerp` and their `checked_*` equal the exact rational oracle; `+`, `-`
+//! `lerp`, `sqrt`, `rsqrt`, `hypot` and their `checked_*` equal the exact
+//! rational oracle; `+`, `-`
 //! saturate exactly; `%` is exact.
 
 #![no_main]
@@ -30,6 +31,15 @@ macro_rules! check {
             let (div, div_fits) = fmt.div(a as i128, b as i128);
             assert_eq!((x / y).to_bits() as i128, div);
             assert_eq!(x.checked_div(y).is_some(), div_fits);
+            let (sqrt, sqrt_fits) = fmt.sqrt(a as i128);
+            assert_eq!(x.sqrt().to_bits() as i128, sqrt);
+            assert_eq!(x.checked_sqrt().is_some(), sqrt_fits);
+            let (rsqrt, rsqrt_fits) = fmt.rsqrt(a as i128);
+            assert_eq!(x.rsqrt().to_bits() as i128, rsqrt);
+            assert_eq!(x.checked_rsqrt().is_some(), rsqrt_fits);
+            let (hypot, hypot_fits) = fmt.hypot(a as i128, b as i128);
+            assert_eq!(x.hypot(y).to_bits() as i128, hypot);
+            assert_eq!(x.checked_hypot(y).is_some(), hypot_fits);
             assert_eq!((x + y).to_bits(), a.saturating_add(b));
             assert_eq!((x - y).to_bits(), a.saturating_sub(b));
             if b != 0 {

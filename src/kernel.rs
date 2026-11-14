@@ -143,16 +143,56 @@ macro_rules! div_kernel {
     };
 }
 
+/// The start of `isqrt` for `n ≥ 2`, a value `> 0` near `√n`.
+///
+/// `table`: `SQRT_START` at the leading bits of `n` taken in pairs, `t`,
+/// scaled back; within about `2^-8` of `√n` once `t ≥ 64`. One Newton step
+/// leaves a relative error of about `2^-17`.
+///
+/// `half`: `isqrt` of the kernel `half`, whose unsigned wide type has half
+/// the width. When `n` fits below `2^(BITS/2 - 1)` that is already the
+/// result. Otherwise it runs on the leading `BITS/2 - 2` or `BITS/2 - 1` bits,
+/// `n >> 2j` for an even shift: `(⌊√(n >> 2j)⌋ + 1) · 2^j > √n`, within about
+/// `2^-(BITS/4 - 2)` of it, so one Newton step on the wide type leaves an
+/// error of a few units. Most divisions then run on the narrower type, in
+/// hardware, instead of a software routine for `u128`.
+macro_rules! sqrt_start {
+    (table, $UWide:ty, $n:ident) => {{
+        let bits = <$UWide>::BITS - $n.leading_zeros();
+        let j = if bits <= 8 { 0 } else { (bits - 7) / 2 };
+        let t = super::SQRT_START[($n >> (2 * j)) as usize] as $UWide;
+        if j >= 8 {
+            t << (j - 8)
+        } else {
+            t >> (8 - j)
+        }
+    }};
+    ($half:ident, $UWide:ty, $n:ident) => {{
+        let bits = <$UWide>::BITS - $n.leading_zeros();
+        let low = super::$half::UWide::BITS - 1;
+        if bits <= low {
+            return super::$half::isqrt($n as super::$half::UWide) as $UWide;
+        }
+        let j = (bits - low + 1) / 2;
+        (super::$half::isqrt(($n >> (2 * j)) as super::$half::UWide) as $UWide + 1) << j
+    }};
+}
+
 macro_rules! kernel {
     (
-        $k:ident, $Bits:ty, $Wide:ty, $UWide:ty, $Int:ty, $Frac:ty, $F:expr, $div:ident, $branchless_div:expr
+        $k:ident, $Bits:ty, $Wide:ty, $UWide:ty, $Int:ty, $Frac:ty, $F:expr, $div:ident, $branchless_div:expr,
+        $steps:expr, $start:ident
     ) => {
         pub(crate) mod $k {
             /// The wide intermediate: room for every result before it is
             /// narrowed to the storage type.
             pub(crate) type Wide = $Wide;
 
+            /// The unsigned wide type: the argument of `isqrt`.
+            pub(crate) type UWide = $UWide;
+
             const ONE: $Wide = 1 << $F;
+            const NEWTON_STEPS: u32 = $steps;
             const MASK: $Wide = ONE - 1;
             const HALF: $Wide = 1 << ($F - 1);
 
@@ -273,6 +313,84 @@ macro_rules! kernel {
                 }
             }
 
+            /// `⌊√n⌋` for `n ≤ 2^(BITS - 1)`: a start from [`sqrt_start!`],
+            /// a fixed number of Newton steps `x ← ⌊(x + ⌊n / x⌋) / 2⌋`,
+            /// then `x ← x - 1` while `x² > n`.
+            ///
+            /// The result does not depend on the start or on the number of
+            /// steps: one step from any `x > 0` gives `x ≥ ⌊√n⌋` (the mean of
+            /// `x` and `n / x` is at least `√n`, and flooring keeps it at
+            /// least `⌊√n⌋`), every later step keeps that bound, and the
+            /// final loop stops exactly at `⌊√n⌋`. The steps only make the
+            /// loop short: each step squares the relative error of the
+            /// start, and `NEWTON_STEPS` steps leave at most one correction
+            /// (measured on every 16- and 32-bit argument and on samples of
+            /// wider ones). After a step `x` exceeds `√n` by a relative
+            /// `2^-16` for large `n` and by a unit or two for small `n`, so
+            /// `x²` fits the type for `n ≤ 2^(BITS - 1)`; Kani checks that
+            /// the squares fit and the loops stop on 16- and 32-bit arguments.
+            ///
+            /// With the `half` start, an `n` below `2^(BITS/2 - 1)` returns
+            /// the exact `isqrt` of the narrower kernel before any step.
+            #[inline]
+            pub(crate) const fn isqrt(n: UWide) -> UWide {
+                if n < 2 {
+                    return n;
+                }
+                let mut x = sqrt_start!($start, $UWide, n);
+                let mut i = 0;
+                while i < NEWTON_STEPS {
+                    x = (x + n / x) >> 1;
+                    i += 1;
+                }
+                while x * x > n {
+                    x -= 1;
+                }
+                x
+            }
+
+            /// `round(√n)`: `⌊√n⌋ + 1` when `n ≥ (⌊√n⌋ + ½)²`, which for an
+            /// integer `n` is `n - s² > s`. There are no ties: `(s + ½)²`
+            /// is not an integer. `⌊√n⌋ < 2^(BITS/2)`, so `s · s` fits.
+            #[inline]
+            const fn sqrt_round(n: $UWide) -> $UWide {
+                let s = isqrt(n);
+                s + ((n - s * s > s) as $UWide)
+            }
+
+            /// `round(√(a · 2^F))`, the raw square root of a raw `a ≥ 0`,
+            /// correctly rounded. `a · 2^F < 2^(3F - 1)`, and the root is
+            /// below `2^(3F/2)`, inside the storage range.
+            #[inline]
+            pub(crate) const fn sqrt(a: $Bits) -> $Bits {
+                sqrt_round((a as $UWide) << $F) as $Bits
+            }
+
+            /// `round(√(2^(3F) / a))`, the raw `1 / √x` of a raw `a > 0`,
+            /// correctly rounded: `s = ⌊√⌊2^(3F) / a⌋⌋ = ⌊√(2^(3F) / a)⌋`,
+            /// plus one when `(2s + 1)² · a < 2^(3F + 2)`; equality would need
+            /// an odd square dividing a power of two, so there are no ties.
+            /// The root is at most `2^(3F/2)`, inside the storage range, and
+            /// `(2s + 1)² · a < 2^(3F + 2) + 2^(5F/2 + 2) + 2^(2F)` fits the
+            /// unsigned wide type.
+            #[inline]
+            pub(crate) const fn rsqrt(a: $Bits) -> $Bits {
+                let ua = a as $UWide;
+                let s = isqrt(((1 as $UWide) << (3 * $F)) / ua);
+                let odd = 2 * s + 1;
+                (s + ((odd * odd * ua < (1 as $UWide) << (3 * $F + 2)) as $UWide)) as $Bits
+            }
+
+            /// `round(√(a² + b²))` for raw operands, correctly rounded. The
+            /// sum of squares is at most `2^(4F - 1)` and fits the unsigned
+            /// wide type; the root may exceed the storage range.
+            #[inline]
+            pub(crate) const fn hypot(a: $Bits, b: $Bits) -> $Wide {
+                let ua = a.unsigned_abs() as $UWide;
+                let ub = b.unsigned_abs() as $UWide;
+                sqrt_round(ua * ua + ub * ub) as $Wide
+            }
+
             /// `⌈(a + b) / 2⌉ = shr_round(a + b, 1)` without overflow.
             #[inline]
             pub(crate) const fn midpoint(a: $Bits, b: $Bits) -> $Bits {
@@ -338,7 +456,29 @@ macro_rules! kernel {
     };
 }
 
-kernel!(k8, i8, i16, u16, i8, u8, 4, magnitude, false);
-kernel!(k16, i16, i32, u32, i8, u8, 8, signed, true);
-kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false);
-kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false);
+kernel!(k8, i8, i16, u16, i8, u8, 4, magnitude, false, 1, table);
+kernel!(k16, i16, i32, u32, i8, u8, 8, signed, true, 1, table);
+kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false, 2, table);
+kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false, 1, k32);
+
+/// `⌊256 · √(t + ½)⌋` for `t < 256`: the start of `isqrt` for an argument
+/// whose leading bits, taken in pairs, are `t`. Within `2^-8` of the root of
+/// any argument with those leading bits once `t ≥ 64`. Computed by the
+/// compiler from the definition: the largest `s` with `s² ≤ (2t + 1) · 2^15`,
+/// searched upward from the previous entry, since the entries grow with `t`.
+const SQRT_START: [u16; 256] = sqrt_start();
+
+const fn sqrt_start() -> [u16; 256] {
+    let mut table = [0u16; 256];
+    let mut t = 0;
+    let mut s = 0u32;
+    while t < 256 {
+        let v = ((2 * t + 1) as u32) << 15;
+        while (s + 1) * (s + 1) <= v {
+            s += 1;
+        }
+        table[t] = s as u16;
+        t += 1;
+    }
+    table
+}

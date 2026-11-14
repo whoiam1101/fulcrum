@@ -116,6 +116,19 @@ macro_rules! oracle_suite {
                 }
 
                 #[test]
+                fn roots(a in edge($bits, $frac), b in edge($bits, $frac)) {
+                    let (sqrt, sqrt_ok) = FMT.sqrt(a);
+                    prop_assert_eq!(v(a).sqrt().to_bits() as i128, sqrt);
+                    prop_assert_eq!(v(a).checked_sqrt().is_some(), sqrt_ok);
+                    let (rsqrt, rsqrt_ok) = FMT.rsqrt(a);
+                    prop_assert_eq!(v(a).rsqrt().to_bits() as i128, rsqrt);
+                    prop_assert_eq!(v(a).checked_rsqrt().is_some(), rsqrt_ok);
+                    let (hypot, hypot_ok) = FMT.hypot(a, b);
+                    prop_assert_eq!(v(a).hypot(v(b)).to_bits() as i128, hypot);
+                    prop_assert_eq!(v(a).checked_hypot(v(b)).is_some(), hypot_ok);
+                }
+
+                #[test]
                 fn dot(pairs in proptest::collection::vec((edge($bits, $frac), edge($bits, $frac)), 0..40)) {
                     let (a, b): (Vec<i128>, Vec<i128>) = pairs.into_iter().unzip();
                     let (expected, fits) = FMT.dot(&a, &b);

@@ -464,6 +464,59 @@ macro_rules! define_fixed {
                 self.saturating_mul(self)
             }
 
+            /// `√self`, correctly rounded to nearest; never overflows. A
+            /// negative `self` gives `0`.
+            #[inline]
+            pub const fn sqrt(self) -> Self {
+                match self.checked_sqrt() {
+                    Some(root) => root,
+                    None => Self::ZERO,
+                }
+            }
+
+            /// `√self`, correctly rounded, or `None` when `self < 0`.
+            #[inline]
+            pub const fn checked_sqrt(self) -> Option<Self> {
+                if self.raw < 0 {
+                    return None;
+                }
+                Some(Self { raw: crate::kernel::$k::sqrt(self.raw) })
+            }
+
+            /// `1 / √self`, correctly rounded to nearest; never overflows for
+            /// `self > 0`. `self ≤ 0` gives `MAX`, like `1 / 0` in [`Self::recip`].
+            #[inline]
+            pub const fn rsqrt(self) -> Self {
+                match self.checked_rsqrt() {
+                    Some(root) => root,
+                    None => Self::MAX,
+                }
+            }
+
+            /// `1 / √self`, correctly rounded, or `None` when `self ≤ 0`.
+            #[inline]
+            pub const fn checked_rsqrt(self) -> Option<Self> {
+                if self.raw <= 0 {
+                    return None;
+                }
+                Some(Self { raw: crate::kernel::$k::rsqrt(self.raw) })
+            }
+
+            /// `√(self² + other²)`, correctly rounded to nearest and
+            /// saturated: the squares are exact, so nothing overflows before
+            /// the root.
+            #[inline]
+            pub const fn hypot(self, other: Self) -> Self {
+                Self::saturate(crate::kernel::$k::hypot(self.raw, other.raw))
+            }
+
+            /// `√(self² + other²)`, correctly rounded, or `None` when the
+            /// result is out of range.
+            #[inline]
+            pub const fn checked_hypot(self, other: Self) -> Option<Self> {
+                Self::checked(crate::kernel::$k::hypot(self.raw, other.raw))
+            }
+
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
             pub const fn signum(self) -> Self {
@@ -677,6 +730,10 @@ macro_rules! define_fixed {
             fn round(self) -> Self {
                 Self::round(self)
             }
+            #[inline]
+            fn sqrt(self) -> Self {
+                Self::sqrt(self)
+            }
         }
 
         impl_ops!($Name);
@@ -687,6 +744,12 @@ macro_rules! define_fixed {
         impl_bytes!($Name, $Bits, $NB);
         #[cfg(feature = "float-convert")]
         impl_float!($Name, $F);
+        #[cfg(feature = "serde")]
+        impl_serde!($Name, $Bits);
+        #[cfg(feature = "bytemuck")]
+        impl_pod!($Name);
+        #[cfg(feature = "num-traits")]
+        impl_num_traits!($Name);
     };
 }
 

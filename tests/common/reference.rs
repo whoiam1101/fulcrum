@@ -89,6 +89,58 @@ macro_rules! reference {
                 a + round_shift((b - a) * t, f)
             }
 
+            /// `round(√(num / den))`, ties toward `+∞` (a square root of a
+            /// rational has none: `(2s + 1)² · den = 4 · num` needs an odd
+            /// square dividing a power of two times `num`, checked exactly
+            /// all the same). The floor is the largest `s` with
+            /// `s² · den ≤ num`, found by binary search with checked
+            /// products, not by Newton's iteration. `num ≥ 0`, `den > 0`,
+            /// `4 · num` and `(2s + 1)² · den` fit `R`.
+            pub fn sqrt_ratio(num: $R, den: $R) -> $R {
+                assert!(num >= 0 && den > 0);
+                let le = |s: $R| match s.checked_mul(s).and_then(|q| q.checked_mul(den)) {
+                    Some(q) => q <= num,
+                    None => false,
+                };
+                let mut lo: $R = 0;
+                let mut hi: $R = 1;
+                while le(hi) {
+                    lo = hi;
+                    hi *= 2;
+                }
+                while hi - lo > 1 {
+                    let mid = lo + (hi - lo) / 2;
+                    if le(mid) {
+                        lo = mid;
+                    } else {
+                        hi = mid;
+                    }
+                }
+                let up = (2 * lo + 1) * (2 * lo + 1) * den;
+                if up <= 4 * num {
+                    lo + 1
+                } else {
+                    lo
+                }
+            }
+
+            /// `round(√n)` for `n ≥ 0`: [`sqrt_ratio`] with `den = 1`.
+            pub fn sqrt(n: $R) -> $R {
+                sqrt_ratio(n, 1)
+            }
+
+            /// Whether `s` is `round(√(num / den))`, ties toward `+∞`:
+            /// `s - ½ ≤ √(num / den) < s + ½`, that is
+            /// `(2s - 1)² · den ≤ 4 · num < (2s + 1)² · den`, the lower
+            /// bound dropped for `s = 0`. A check without a search, for
+            /// exhaustive runs. `s ≥ 0`, `num ≥ 0`, `den > 0`, and
+            /// `(2s + 1)² · den` and `4 · num` fit `R`.
+            pub fn is_sqrt_ratio(s: $R, num: $R, den: $R) -> bool {
+                let below = (2 * s + 1) * (2 * s + 1) * den;
+                let above = (2 * s - 1) * (2 * s - 1) * den;
+                s >= 0 && 4 * num < below && (s == 0 || above <= 4 * num)
+            }
+
             /// `v` clamped to the range of a signed `bits`-bit integer;
             /// `bits < BITS`.
             pub fn saturate(v: $R, bits: u32) -> $R {

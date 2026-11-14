@@ -661,3 +661,72 @@ fn div_no_panic_64() {
         x.checked_mul_div(y, z),
     );
 }
+
+macro_rules! isqrt_spec {
+    ($name:ident, $k:ident, $U:ty, $unwind:literal) => {
+        /// `kernel::isqrt` is `⌊√n⌋` for every `n ≤ 2^(BITS - 1)` of the
+        /// unsigned wide type: `s² ≤ n < (s + 1)²`, both loops stop within
+        /// the unwinding bound, and nothing overflows.
+        #[kani::proof]
+        #[kani::unwind($unwind)]
+        fn $name() {
+            let n: $U = kani::any();
+            kani::assume(n <= 1 << (<$U>::BITS - 1));
+            let s = crate::kernel::$k::isqrt(n);
+            assert!(s.checked_mul(s).map_or(false, |q| q <= n));
+            assert!((s + 1).checked_mul(s + 1).map_or(true, |q| q > n));
+        }
+    };
+}
+
+isqrt_spec!(isqrt_spec_8, k8, u16, 4);
+isqrt_spec!(isqrt_spec_16, k16, u32, 4);
+
+macro_rules! roots_spec {
+    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr, $unwind:literal) => {
+        /// `sqrt`, `rsqrt`, `hypot` and their `checked_*` are correctly
+        /// rounded: [`is_sqrt_ratio`](r32::is_sqrt_ratio), the definition of
+        /// rounding to nearest, holds for the result.
+        #[kani::proof]
+        #[kani::unwind($unwind)]
+        fn $name() {
+            let a: $Bits = kani::any();
+            let b: $Bits = kani::any();
+            let (x, y) = ($T::from_bits(a), $T::from_bits(b));
+            let (ra, rb) = (a as $R, b as $R);
+
+            if a < 0 {
+                assert_eq!(x.sqrt(), $T::ZERO);
+                assert!(x.checked_sqrt().is_none());
+            } else {
+                let s = x.sqrt().to_bits() as $R;
+                assert!($r::is_sqrt_ratio(s, ra << $f, 1));
+                assert_eq!(x.checked_sqrt(), Some(x.sqrt()));
+            }
+
+            if a <= 0 {
+                assert_eq!(x.rsqrt(), $T::MAX);
+                assert!(x.checked_rsqrt().is_none());
+            } else {
+                let s = x.rsqrt().to_bits() as $R;
+                assert!($r::is_sqrt_ratio(s, 1 << (3 * $f), ra));
+                assert_eq!(x.checked_rsqrt(), Some(x.rsqrt()));
+            }
+
+            let n = ra * ra + rb * rb;
+            let max = <$Bits>::MAX as $R;
+            match x.checked_hypot(y) {
+                Some(h) => {
+                    assert!($r::is_sqrt_ratio(h.to_bits() as $R, n, 1));
+                    assert_eq!(x.hypot(y), h);
+                }
+                None => {
+                    assert!(4 * n >= (2 * max + 1) * (2 * max + 1));
+                    assert_eq!(x.hypot(y), $T::MAX);
+                }
+            }
+        }
+    };
+}
+
+roots_spec!(roots_spec_8, FixedFloat8, i8, i32, r32, 8, 4, 4);
