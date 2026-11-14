@@ -1,0 +1,107 @@
+minimum_pre_commit_version: "3.2.0"
+default_install_hook_types: [pre-commit, pre-push]
+default_stages: [pre-commit]
+exclude: ^(bench/results/|fuzz/corpus/|fuzz/artifacts/|verify/lean/\.lake/)
+
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: check-yaml
+      - id: check-toml
+      - id: check-json
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-added-large-files
+        args: [--maxkb=512]
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+      - id: detect-private-key
+
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: v8.30.1
+    hooks:
+      - id: gitleaks
+
+  - repo: https://github.com/crate-ci/typos
+    rev: v1.52.2
+    hooks:
+      - id: typos
+        args: [--force-exclude]
+
+  - repo: https://github.com/rhysd/actionlint
+    rev: v1.7.12
+    hooks:
+      - id: actionlint
+
+  - repo: https://github.com/zizmorcore/zizmor-pre-commit
+    rev: v1.32.0
+    hooks:
+      - id: zizmor
+
+  - repo: local
+    hooks:
+      - id: fmt-check
+        name: just fmt-check
+        language: system
+        entry: just fmt-check
+        types: [rust]
+        pass_filenames: false
+
+      - id: rules
+        name: just rules
+        language: system
+        entry: just rules
+        pass_filenames: false
+        always_run: true
+
+      - id: clippy
+        name: just clippy
+        language: system
+        entry: just clippy
+        files: ^(src/|tests/|Cargo\.toml$|clippy\.toml$)
+        pass_filenames: false
+
+      - id: tables
+        name: just tables
+        language: system
+        entry: just tables
+        files: ^(src/|tools/gen-tables/)
+        pass_filenames: false
+
+      - id: test
+        name: just test
+        language: system
+        entry: just test
+        stages: [pre-push]
+        types_or: [rust, toml]
+        pass_filenames: false
+
+      - id: clippy-all
+        name: just clippy-all
+        language: system
+        entry: just clippy-all
+        stages: [pre-push]
+        types_or: [rust, toml]
+        pass_filenames: false
+
+      - id: msrv
+        name: just msrv
+        language: system
+        entry: just msrv
+        stages: [pre-push]
+        files: ^(src/|Cargo\.toml$)
+        pass_filenames: false
+
+      - id: deny
+        name: just deny
+        language: system
+        entry: just deny
+        stages: [pre-push]
+        files: (Cargo\.toml|Cargo\.lock|deny\.toml)$
+        pass_filenames: false

@@ -1,0 +1,5 @@
+[files]
+extend-exclude = ["bench/results/", "fuzz/corpus/", "fuzz/artifacts/"]
+
+[default.extend-words]
+numer = "numer"
