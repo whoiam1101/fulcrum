@@ -95,6 +95,39 @@ macro_rules! oracle_suite {
                 }
 
                 #[test]
+                fn mul_add(x in edge($bits, $frac), a in edge($bits, $frac), b in edge($bits, $frac)) {
+                    let (expected, fits) = FMT.mul_add(x, a, b);
+                    prop_assert_eq!(v(x).mul_add(v(a), v(b)).to_bits() as i128, expected);
+                    prop_assert_eq!(v(x).checked_mul_add(v(a), v(b)).is_some(), fits);
+                }
+
+                #[test]
+                fn mul_div(x in edge($bits, $frac), a in edge($bits, $frac), b in edge($bits, $frac)) {
+                    let (expected, fits) = FMT.mul_div(x, a, b);
+                    prop_assert_eq!(v(x).mul_div(v(a), v(b)).to_bits() as i128, expected);
+                    prop_assert_eq!(v(x).checked_mul_div(v(a), v(b)).is_some(), fits);
+                }
+
+                #[test]
+                fn lerp(x in edge($bits, $frac), y in edge($bits, $frac), t in edge($bits, $frac)) {
+                    let (expected, fits) = FMT.lerp(x, y, t);
+                    prop_assert_eq!(v(x).lerp(v(y), v(t)).to_bits() as i128, expected);
+                    prop_assert_eq!(v(x).checked_lerp(v(y), v(t)).is_some(), fits);
+                }
+
+                #[test]
+                fn dot(pairs in proptest::collection::vec((edge($bits, $frac), edge($bits, $frac)), 0..40)) {
+                    let (a, b): (Vec<i128>, Vec<i128>) = pairs.into_iter().unzip();
+                    let (expected, fits) = FMT.dot(&a, &b);
+                    let mut acc = $T::accumulator();
+                    for (&x, &y) in a.iter().zip(&b) {
+                        acc.add_product(v(x), v(y));
+                    }
+                    prop_assert_eq!(acc.finish().to_bits() as i128, expected);
+                    prop_assert_eq!(acc.checked_finish().is_some(), fits);
+                }
+
+                #[test]
                 fn ratio(num in edge($bits, $frac), den in edge($bits, $frac)) {
                     prop_assert_eq!($T::checked_from_ratio(num as $Bits, den as $Bits).map(|x| x.to_bits() as i128), FMT.ratio(num, den));
                 }

@@ -43,6 +43,12 @@ impl Format {
         *raw >= self.min() && *raw <= self.max()
     }
 
+    /// A rounded raw value saturated to the range, and whether it was in range.
+    pub fn settle(self, raw: BigInt) -> (i128, bool) {
+        let fits = self.fits(&raw);
+        (self.saturate(raw), fits)
+    }
+
     /// Saturates a raw value to the representable range.
     pub fn saturate(self, raw: BigInt) -> i128 {
         let v = if raw > self.max() {
@@ -58,8 +64,7 @@ impl Format {
     /// `spec_mul`: saturating rounded product.
     pub fn mul(self, a: i128, b: i128) -> (i128, bool) {
         let r = self.round(&(self.exact(a) * self.exact(b)));
-        let fits = self.fits(&r);
-        (self.saturate(r), fits)
+        self.settle(r)
     }
 
     /// `spec_div`: saturating rounded quotient; `x / 0` by the sign of `x`.
@@ -73,8 +78,44 @@ impl Format {
             return (v.to_i128().unwrap(), false);
         }
         let r = self.round(&(self.exact(a) / self.exact(b)));
-        let fits = self.fits(&r);
-        (self.saturate(r), fits)
+        self.settle(r)
+    }
+
+    /// `self · a + b` rounded once and saturated; the flag is whether the
+    /// rounded result is in range.
+    pub fn mul_add(self, x: i128, a: i128, b: i128) -> (i128, bool) {
+        let r = self.round(&(self.exact(x) * self.exact(a) + self.exact(b)));
+        self.settle(r)
+    }
+
+    /// `self · a / b` rounded once and saturated; `b = 0` gives `MAX`, `MIN`
+    /// or `0` by the sign of `self · a`, with the flag `false`.
+    pub fn mul_div(self, x: i128, a: i128, b: i128) -> (i128, bool) {
+        if b == 0 {
+            let v = match x.signum() * a.signum() {
+                1 => self.max(),
+                -1 => self.min(),
+                _ => BigInt::zero(),
+            };
+            return (v.to_i128().unwrap(), false);
+        }
+        let r = self.round(&(self.exact(x) * self.exact(a) / self.exact(b)));
+        self.settle(r)
+    }
+
+    /// `x + (y - x) · t` rounded once and saturated.
+    pub fn lerp(self, x: i128, y: i128, t: i128) -> (i128, bool) {
+        let r = self.round(&(self.exact(x) + (self.exact(y) - self.exact(x)) * self.exact(t)));
+        self.settle(r)
+    }
+
+    /// `Σ a·b` rounded once and saturated.
+    pub fn dot(self, a: &[i128], b: &[i128]) -> (i128, bool) {
+        let sum = a.iter().zip(b).fold(BigRational::zero(), |s, (&x, &y)| {
+            s + self.exact(x) * self.exact(y)
+        });
+        let r = self.round(&sum);
+        self.settle(r)
     }
 
     /// Rounded `num / den` as a raw value, `None` when out of range or `den = 0`.

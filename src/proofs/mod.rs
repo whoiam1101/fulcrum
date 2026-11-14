@@ -4,64 +4,32 @@
 //! every arithmetic operation for overflow, so each harness proves "never
 //! panics" in addition to its assertions.
 //!
-//! The reference rounding below is written independently of the kernels:
-//! exact quotient and remainder instead of a shifted sum.
+//! The reference is `tests/common/reference.rs`, the same file the tests
+//! use, over `i32` and `i64` where the solver is faster and over `i128`.
 
 use core::convert::TryFrom;
 
 use crate::{Accumulator8, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
 
-macro_rules! reference {
-    ($R:ty, $round_div:ident, $round_shift:ident) => {
-        #[allow(dead_code)]
-        fn $round_div(n: $R, d: $R) -> $R {
-            let (n, d) = if d < 0 { (-n, -d) } else { (n, d) };
-            let q = n.div_euclid(d);
-            let r = n.rem_euclid(d);
-            if 2 * r >= d {
-                q + 1
-            } else {
-                q
-            }
-        }
+#[macro_use]
+#[path = "../../tests/common/reference.rs"]
+mod reference;
 
-        #[allow(dead_code)]
-        fn $round_shift(n: $R, f: u32) -> $R {
-            let q = n >> f;
-            let r = n & ((1 << f) - 1);
-            if r >= 1 << (f - 1) {
-                q + 1
-            } else {
-                q
-            }
-        }
-    };
-}
+reference!(r32, i32);
+reference!(r64, i64);
+reference!(r128, i128);
 
-reference!(i32, ref_round_div_32, ref_round_shift_32);
-reference!(i64, ref_round_div_64, ref_round_shift_64);
-
-fn saturate(v: i128, bits: u32) -> i128 {
-    let min = -(1i128 << (bits - 1));
-    let max = (1i128 << (bits - 1)) - 1;
-    if v > max {
-        max
-    } else if v < min {
-        min
-    } else {
-        v
-    }
-}
+use r128::saturate;
 
 macro_rules! mul_spec {
-    ($name:ident, $T:ident, $Bits:ty, $R:ty, $shift:ident, $bits:expr, $f:expr) => {
+    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr) => {
         #[kani::proof]
         fn $name() {
             let a: $Bits = kani::any();
             let b: $Bits = kani::any();
             let x = $T::from_bits(a);
             let y = $T::from_bits(b);
-            let exact = $shift(a as $R * b as $R, $f) as i128;
+            let exact = $r::mul(a as $R, b as $R, $f) as i128;
             let expected = saturate(exact, $bits);
             assert_eq!(x.saturating_mul(y).to_bits() as i128, expected);
             assert_eq!(x.checked_mul(y).is_some(), expected == exact);
@@ -71,7 +39,7 @@ macro_rules! mul_spec {
 }
 
 macro_rules! div_spec {
-    ($name:ident, $T:ident, $Bits:ty, $R:ty, $div:ident, $bits:expr, $f:expr) => {
+    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr) => {
         #[kani::proof]
         fn $name() {
             let a: $Bits = kani::any();
@@ -90,7 +58,7 @@ macro_rules! div_spec {
                 assert!(x.checked_div(y).is_none());
                 assert_eq!(x.saturating_rem(y), $T::ZERO);
             } else {
-                let exact = $div((a as $R) << $f, b as $R) as i128;
+                let exact = $r::div(a as $R, b as $R, $f) as i128;
                 let expected = saturate(exact, $bits);
                 assert_eq!(x.saturating_div(y).to_bits() as i128, expected);
                 assert_eq!(x.checked_div(y).is_some(), expected == exact);
@@ -134,32 +102,11 @@ macro_rules! add_round_spec {
     };
 }
 
-mul_spec!(mul_spec_8, FixedFloat8, i8, i32, ref_round_shift_32, 8, 4);
-mul_spec!(
-    mul_spec_16,
-    FixedFloat16,
-    i16,
-    i32,
-    ref_round_shift_32,
-    16,
-    8
-);
-mul_spec!(
-    mul_spec_32,
-    FixedFloat32,
-    i32,
-    i64,
-    ref_round_shift_64,
-    32,
-    16
-);
+mul_spec!(mul_spec_8, FixedFloat8, i8, i32, r32, 8, 4);
+mul_spec!(mul_spec_16, FixedFloat16, i16, i32, r32, 16, 8);
+mul_spec!(mul_spec_32, FixedFloat32, i32, i64, r64, 32, 16);
 
-div_spec!(div_spec_8, FixedFloat8, i8, i32, ref_round_div_32, 8, 4);
-
-/// `round(n / 2^s)`, ties toward `+∞`, as `⌊(2n + 2^s) / 2^(s+1)⌋`.
-fn ref_shr_round(n: i128, s: u32) -> i128 {
-    (2 * n + (1i128 << s)).div_euclid(1i128 << (s + 1))
-}
+div_spec!(div_spec_8, FixedFloat8, i8, i32, r32, 8, 4);
 
 macro_rules! rounding_spec {
     ($name:ident, $T:ident, $Bits:ty, $bits:expr, $f:expr) => {
@@ -214,7 +161,7 @@ macro_rules! shift_spec {
                 );
                 assert_eq!(x.checked_shl(n).is_some(), saturate(exact, $bits) == exact);
                 assert_eq!(x.wrapping_shl(n).to_bits(), exact as $Bits);
-                assert_eq!(x.shr_round(n).to_bits() as i128, ref_shr_round(ra, n));
+                assert_eq!(x.shr_round(n).to_bits() as i128, r128::round_shift(ra, n));
             } else {
                 assert_eq!(
                     x.saturating_shl(n).to_bits() as i128,
@@ -252,7 +199,7 @@ macro_rules! narrow_spec {
         fn $name() {
             let a: $BigBits = kani::any();
             let x = $Big::from_bits(a);
-            let exact = ref_shr_round(a as i128, $big_f - $f);
+            let exact = r128::round_shift(a as i128, $big_f - $f);
             let expected = saturate(exact, $bits);
             assert_eq!($Small::saturating_from(x).to_bits() as i128, expected);
             assert_eq!($Small::wrapping_from(x).to_bits(), exact as $SmallBits);
@@ -315,7 +262,7 @@ fn ratio_and_div_int_spec_8() {
         assert!(FixedFloat8::checked_from_ratio(a, b).is_none());
         assert!(x.checked_div_int(b).is_none());
     } else {
-        let ratio = ref_round_div_32((a as i32) << 4, b as i32) as i128;
+        let ratio = r32::round_div((a as i32) << 4, b as i32) as i128;
         assert_eq!(
             FixedFloat8::saturating_from_ratio(a, b).to_bits() as i128,
             saturate(ratio, 8)
@@ -324,7 +271,7 @@ fn ratio_and_div_int_spec_8() {
             FixedFloat8::checked_from_ratio(a, b).is_some(),
             saturate(ratio, 8) == ratio
         );
-        let quotient = ref_round_div_32(a as i32, b as i32) as i128;
+        let quotient = r32::round_div(a as i32, b as i32) as i128;
         assert_eq!(x.div_int(b).to_bits() as i128, saturate(quotient, 8));
         assert_eq!(
             x.checked_div_int(b).is_some(),
@@ -579,6 +526,138 @@ fn accumulator_order_independent_8() {
     let mut d = Accumulator8::new();
     d.add_product(x, y);
     d.add_product(y, z);
-    let dot = ref_round_shift_32(a as i32 * b as i32 + b as i32 * c as i32, 4) as i128;
+    let dot = r32::round_shift(a as i32 * b as i32 + b as i32 * c as i32, 4) as i128;
     assert_eq!(d.finish().to_bits() as i128, saturate(dot, 8));
+}
+
+macro_rules! combined_spec {
+    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr $(, div: $mul_div:ident)?) => {
+        #[kani::proof]
+        fn $name() {
+            let a: $Bits = kani::any();
+            let b: $Bits = kani::any();
+            let c: $Bits = kani::any();
+            let (x, y, z) = ($T::from_bits(a), $T::from_bits(b), $T::from_bits(c));
+            let (ra, rb, rc) = (a as $R, b as $R, c as $R);
+
+            let fma = $r::mul_add(ra, rb, rc, $f) as i128;
+            assert_eq!(x.mul_add(y, z).to_bits() as i128, saturate(fma, $bits));
+            assert_eq!(
+                x.checked_mul_add(y, z).is_some(),
+                saturate(fma, $bits) == fma
+            );
+
+            let lerp = $r::lerp(ra, rb, rc, $f) as i128;
+            assert_eq!(x.lerp(y, z).to_bits() as i128, saturate(lerp, $bits));
+            assert_eq!(
+                x.checked_lerp(y, z).is_some(),
+                saturate(lerp, $bits) == lerp
+            );
+
+            $(
+                if c != 0 {
+                    let q = $r::$mul_div(ra, rb, rc) as i128;
+                    assert_eq!(x.mul_div(y, z).to_bits() as i128, saturate(q, $bits));
+                    assert_eq!(x.checked_mul_div(y, z).is_some(), saturate(q, $bits) == q);
+                } else {
+                    let sign = (a as i128 * b as i128).signum();
+                    assert_eq!(
+                        x.mul_div(y, z).to_bits() as i128,
+                        r128::div_by_zero(sign, $bits)
+                    );
+                    assert!(x.checked_mul_div(y, z).is_none());
+                }
+            )?
+        }
+    };
+}
+
+combined_spec!(combined_spec_8, FixedFloat8, i8, i32, r32, 8, 4, div: mul_div);
+combined_spec!(combined_no_div_spec_16, FixedFloat16, i16, i64, r64, 16, 8);
+
+/// `I256` on full 256-bit operands: subtraction undoes addition, addition
+/// commutes, the shift moves the low bits of `hi` into the top of `lo` and
+/// composes; on values that fit `i128` everything agrees with `i128`.
+#[kani::proof]
+fn i256_spec() {
+    use crate::wide::I256;
+    let (lo1, hi1, lo2, hi2): (u128, i128, u128, i128) =
+        (kani::any(), kani::any(), kani::any(), kani::any());
+    let (u, v) = (I256::from_words(lo1, hi1), I256::from_words(lo2, hi2));
+    assert_eq!(u.wrapping_add(v).wrapping_sub(v), u);
+    assert_eq!(u.wrapping_add(v), v.wrapping_add(u));
+    assert_eq!(u.is_negative(), hi1 < 0);
+
+    let s: u32 = kani::any();
+    kani::assume(s > 0 && s < 128);
+    let (lo, hi) = u.shr(s).words();
+    assert_eq!(hi, hi1 >> s);
+    assert_eq!(lo << s >> s, lo1 >> s);
+    assert_eq!((lo >> (128 - s)) as i128, hi1 & ((1u128 << s) - 1) as i128);
+    let t: u32 = kani::any();
+    kani::assume(t > 0 && t < 128 - s);
+    assert_eq!(u.shr(s).shr(t), u.shr(s + t));
+
+    let a: i128 = kani::any();
+    let b: i128 = kani::any();
+    let (wa, wb) = (I256::from_i128(a), I256::from_i128(b));
+    assert_eq!(wa.wrapping_add(wb).to_i128(), a.checked_add(b));
+    assert_eq!(wa.wrapping_sub(wb).to_i128(), a.checked_sub(b));
+    assert_eq!(wa.shr(s).to_i128(), Some(a >> s));
+    assert_eq!(wa.saturating_to_i128(), a);
+    assert_eq!(
+        u.saturating_to_i128() == i128::MAX,
+        u.to_i128().map_or(hi1 >= 0, |w| w == i128::MAX)
+    );
+}
+
+/// One `Accumulator64::add_product` against the independent rounding of the
+/// exact product.
+#[kani::proof]
+fn accumulator64_product_spec() {
+    let a: i64 = kani::any();
+    let b: i64 = kani::any();
+    let mut acc = crate::Accumulator64::new();
+    acc.add_product(FixedFloat64::from_bits(a), FixedFloat64::from_bits(b));
+    let expected = saturate(r128::round_shift(a as i128 * b as i128, 32), 64);
+    assert_eq!(acc.finish().to_bits() as i128, expected);
+    assert_eq!(
+        acc.checked_finish().is_some(),
+        expected == r128::round_shift(a as i128 * b as i128, 32)
+    );
+}
+
+/// `*`, `mul_add` and `lerp` of `FixedFloat64` never panic.
+#[kani::proof]
+fn mul_no_panic_64() {
+    let x = FixedFloat64::from_bits(kani::any());
+    let y = FixedFloat64::from_bits(kani::any());
+    let z = FixedFloat64::from_bits(kani::any());
+    let _ = (
+        x.saturating_mul(y),
+        x.checked_mul(y),
+        x.wrapping_mul(y),
+        x.overflowing_mul(y),
+        x.mul_add(y, z),
+        x.checked_mul_add(y, z),
+        x.lerp(y, z),
+        x.checked_lerp(y, z),
+    );
+}
+
+/// `/`, `div_int` and `mul_div` of `FixedFloat64` never panic.
+#[kani::proof]
+fn div_no_panic_64() {
+    let x = FixedFloat64::from_bits(kani::any());
+    let y = FixedFloat64::from_bits(kani::any());
+    let z = FixedFloat64::from_bits(kani::any());
+    let _ = (
+        x.saturating_div(y),
+        x.checked_div(y),
+        x.wrapping_div(y),
+        x.overflowing_div(y),
+        x.div_int(y.to_bits()),
+        x.mul_div(y, z),
+        x.checked_mul_div(y, z),
+    );
 }

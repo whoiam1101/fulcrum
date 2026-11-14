@@ -13,7 +13,7 @@ use common::{Fnv, Pcg32};
 use fulcrum::*;
 
 const ROUNDS: usize = 250_000;
-const GOLDEN: u64 = 0x474e_b3e1_3cc2_cfd0;
+const GOLDEN: u64 = 0xf591_0583_d96b_51bd;
 
 macro_rules! mix {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
@@ -33,6 +33,9 @@ macro_rules! mix {
             a.round_ties_even(),
             a.ceil(),
             a.recip(),
+            a.mul_add(b, a),
+            a.mul_div(b, a),
+            a.lerp(b, a),
         ] {
             $h.write(&v.to_le_bytes());
         }
@@ -40,6 +43,7 @@ macro_rules! mix {
         acc.add(a);
         acc.add(b);
         acc.sub(a.wrapping_mul(b));
+        acc.add_product(a, b);
         $h.write(&acc.finish().to_le_bytes());
         $h.write(&[a, b, a].iter().sum::<$T>().to_le_bytes());
         let text = a.to_string();
