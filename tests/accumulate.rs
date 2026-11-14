@@ -6,7 +6,7 @@
 #[macro_use]
 mod common;
 
-use common::{ref_round_div, Pcg32};
+use common::{spec, Pcg32};
 use fulcrum::*;
 
 fn shuffle<T>(rng: &mut Pcg32, v: &mut [T]) {
@@ -21,11 +21,6 @@ macro_rules! order_suite {
         mod $module {
             use super::*;
 
-            fn clamp(v: i128) -> i128 {
-                v.max(-(1i128 << ($bits - 1)))
-                    .min((1i128 << ($bits - 1)) - 1)
-            }
-
             #[test]
             fn sum_is_order_and_partition_independent() {
                 let mut rng = Pcg32::new(11, $bits);
@@ -35,7 +30,7 @@ macro_rules! order_suite {
                         .map(|_| $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS) as _))
                         .collect();
                     let exact: i128 = v.iter().map(|x| x.to_bits() as i128).sum();
-                    let expected = $T::from_bits(clamp(exact) as _);
+                    let expected = $T::from_bits(spec::saturate(exact, $bits) as _);
 
                     let sequential: $Acc =
                         v.iter().collect::<Vec<_>>().into_iter().copied().collect();
@@ -95,9 +90,6 @@ macro_rules! order_suite {
 
             #[test]
             fn dot_product_rounds_once() {
-                if !<$Acc as DotAdd<$T>>::SUPPORTED {
-                    return;
-                }
                 let mut rng = Pcg32::new(12, $bits);
                 for _ in 0..2000 {
                     let n = 1 + rng.below(64) as usize;
@@ -107,17 +99,13 @@ macro_rules! order_suite {
                     let b: Vec<$T> = (0..n)
                         .map(|_| $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS) as _))
                         .collect();
-                    let exact: i128 = a
-                        .iter()
-                        .zip(&b)
-                        .map(|(x, y)| x.to_bits() as i128 * y.to_bits() as i128)
-                        .sum();
-                    let expected = clamp(ref_round_div(exact, 1i128 << $T::FRAC_BITS));
+                    let expected =
+                        spec::saturate(exact_dot(&a, &b, |x| x.to_bits() as i128, $f), $bits);
                     let mut forward = $Acc::new();
                     let mut backward = $Acc::new();
                     for i in 0..n {
-                        dot_add(&mut forward, a[i], b[i]);
-                        dot_add(&mut backward, b[n - 1 - i], a[n - 1 - i]);
+                        forward.add_product(a[i], b[i]);
+                        backward.add_product(b[n - 1 - i], a[n - 1 - i]);
                     }
                     assert_eq!(forward.finish().to_bits() as i128, expected);
                     assert_eq!(forward, backward);
@@ -127,37 +115,44 @@ macro_rules! order_suite {
     };
 }
 
-trait DotAdd<T> {
-    const SUPPORTED: bool = true;
-    fn dot(&mut self, a: T, b: T);
-}
-
-macro_rules! dot_impl {
-    ($Acc:ident, $T:ident) => {
-        impl DotAdd<$T> for $Acc {
-            fn dot(&mut self, a: $T, b: $T) {
-                self.add_product(a, b);
-            }
-        }
-    };
-}
-
-dot_impl!(Accumulator8, FixedFloat8);
-dot_impl!(Accumulator16, FixedFloat16);
-dot_impl!(Accumulator32, FixedFloat32);
-
-impl DotAdd<FixedFloat64> for Accumulator64 {
-    const SUPPORTED: bool = false;
-    fn dot(&mut self, _: FixedFloat64, _: FixedFloat64) {
-        unreachable!("add_product for FixedFloat64 needs U256 (stage 2)");
+/// `round(Σ a·b / 2^f)` for raw values of at most 64 bits and at most 2^62
+/// terms, without overflowing `i128`: every product `p` is split into
+/// `p = h·2^64 + l` with `0 ≤ l < 2^64`, and the two halves are summed
+/// separately. `h·2^(64 - f)` is an integer, so only the low sum is rounded.
+fn exact_dot<T: Copy>(a: &[T], b: &[T], raw: impl Fn(T) -> i128, f: u32) -> i128 {
+    let (mut hi, mut lo) = (0i128, 0i128);
+    for (&x, &y) in a.iter().zip(b) {
+        let p = raw(x) * raw(y);
+        hi += p >> 64;
+        lo += p & ((1i128 << 64) - 1);
     }
-}
-
-fn dot_add<T, A: DotAdd<T>>(acc: &mut A, a: T, b: T) {
-    acc.dot(a, b);
+    (hi << (64 - f)) + spec::round_div(lo, 1i128 << f)
 }
 
 for_each_i128_width!(order_suite!());
+
+#[test]
+fn accumulator64_holds_more_than_i128() {
+    type F = FixedFloat64;
+    let mut acc = F::accumulator();
+    for _ in 0..4 {
+        acc.add_product(F::MAX, F::MAX);
+    }
+    assert_eq!(acc.checked_finish(), None);
+    assert_eq!(acc.finish(), F::MAX);
+    for _ in 0..4 {
+        acc.add_product(F::MAX, -F::MAX);
+    }
+    acc.add_product(F::HALF, F::DELTA);
+    assert_eq!(acc.checked_finish(), Some(F::DELTA));
+    let mut neg = F::accumulator();
+    for _ in 0..8 {
+        neg.add_product(F::MIN, F::MAX);
+    }
+    assert_eq!(neg.finish(), F::MIN);
+    neg.add(F::MAX);
+    assert_eq!(neg.merge(neg).finish(), F::MIN);
+}
 
 #[test]
 fn multiplication_is_commutative_but_not_associative() {
@@ -185,4 +180,34 @@ fn assert_traits<T: Send + Sync + Unpin + Copy + 'static>() {}
 #[test]
 fn types_are_thread_safe_values() {
     for_each_width!(thread_safe!());
+}
+
+#[test]
+fn accumulator8_product_plus_value_on_every_triple() {
+    for a in i8::MIN..=i8::MAX {
+        for b in i8::MIN..=i8::MAX {
+            for c in i8::MIN..=i8::MAX {
+                let (x, y, z) = (
+                    FixedFloat8::from_bits(a),
+                    FixedFloat8::from_bits(b),
+                    FixedFloat8::from_bits(c),
+                );
+                let mut acc = FixedFloat8::accumulator();
+                acc.add_product(x, y);
+                acc.add(z);
+                let exact = spec::mul_add(a as i128, b as i128, c as i128, 4);
+                let expected = spec::saturate(exact, 8);
+                assert_eq!(
+                    acc.finish().to_bits() as i128,
+                    expected,
+                    "{} {} {}",
+                    a,
+                    b,
+                    c
+                );
+                assert_eq!(acc.checked_finish().is_some(), expected == exact);
+                assert_eq!(acc.finish(), x.mul_add(y, z));
+            }
+        }
+    }
 }

@@ -218,6 +218,44 @@ macro_rules! kernel {
                 }
             }
 
+            /// `round((a · b + c · 2^F) / 2^F)`: the product plus a raw value,
+            /// rounded once. `c · 2^F` is a multiple of `2^F` and leaves the
+            /// dropped bits of the product unchanged, so this is `mul(a, b) + c`
+            /// on the wide type. The sum fits: `|mul(a, b)| ≤ 2^(3N - 2)` and
+            /// `|c| ≤ 2^(2N - 1)` for `N` fractional bits and `4N`-bit `Wide`.
+            #[inline]
+            pub(crate) const fn mul_add(a: $Bits, b: $Bits, c: $Bits) -> $Wide {
+                mul(a, b) + c as $Wide
+            }
+
+            /// `round(a · b / c)` for raw operands: the exact product divided
+            /// once; `c` must be non-zero. The magnitudes are taken on the
+            /// storage type and multiplied unsigned, then divided as in the
+            /// `magnitude` form of `div`: `⌊(2|a·b| + |c| − negative) / 2|c|⌋`.
+            /// `2·|a · b| + |c| ≤ 2^(4N - 1) + 2^(2N - 1)` fits the unsigned
+            /// wide type.
+            #[inline]
+            pub(crate) const fn mul_div(a: $Bits, b: $Bits, c: $Bits) -> $Wide {
+                let un = (a.unsigned_abs() as $UWide) * (b.unsigned_abs() as $UWide);
+                let ud = c.unsigned_abs() as $UWide;
+                let negative = ((a < 0) != (b < 0)) != (c < 0);
+                let m = ((un << 1) + (ud - negative as $UWide)) / (ud << 1);
+                if negative {
+                    -(m as $Wide)
+                } else {
+                    m as $Wide
+                }
+            }
+
+            /// `a + round((b - a) · t / 2^F)`: linear interpolation rounded
+            /// once. `|b - a| < 2^(2N)` and `|t| ≤ 2^(2N - 1)`, so the product
+            /// fits the wide type.
+            #[inline]
+            pub(crate) const fn lerp(a: $Bits, b: $Bits, t: $Bits) -> $Wide {
+                let p = ((b as $Wide) - (a as $Wide)) * (t as $Wide);
+                (a as $Wide) + (p >> $F) + ((p >> ($F - 1)) & 1)
+            }
+
             div_kernel!($div, $Bits, $Wide, $UWide, $F);
 
             /// `div(a, b)` for a non-zero `b`, and an unspecified value for

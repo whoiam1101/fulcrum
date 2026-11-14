@@ -535,6 +535,59 @@ macro_rules! define_fixed {
             pub const fn midpoint(self, other: Self) -> Self {
                 Self { raw: crate::kernel::$k::midpoint(self.raw, other.raw) }
             }
+
+            /// `self · a + b`, rounded once to nearest (ties toward `+∞`) and
+            /// saturated once: the product is neither rounded nor saturated
+            /// before the addition.
+            #[inline]
+            pub const fn mul_add(self, a: Self, b: Self) -> Self {
+                Self::saturate(crate::kernel::$k::mul_add(self.raw, a.raw, b.raw))
+            }
+
+            /// `self · a + b`, rounded once, or `None` when the result is out
+            /// of range. An out of range product does not fail by itself.
+            #[inline]
+            pub const fn checked_mul_add(self, a: Self, b: Self) -> Option<Self> {
+                Self::checked(crate::kernel::$k::mul_add(self.raw, a.raw, b.raw))
+            }
+
+            /// `self · a / b`, rounded once to nearest (ties toward `+∞`) and
+            /// saturated: the product is exact, so it neither overflows nor
+            /// loses bits before the division. `b = 0` gives `MAX`, `MIN` or `0`
+            /// by the sign of `self · a`.
+            #[inline]
+            pub const fn mul_div(self, a: Self, b: Self) -> Self {
+                if b.raw == 0 {
+                    return Self { raw: self.raw.signum() * a.raw.signum() }.div_by_zero();
+                }
+                Self::saturate(crate::kernel::$k::mul_div(self.raw, a.raw, b.raw))
+            }
+
+            /// `self · a / b`, rounded once, or `None` when the result is out
+            /// of range or `b = 0`.
+            #[inline]
+            pub const fn checked_mul_div(self, a: Self, b: Self) -> Option<Self> {
+                if b.raw == 0 {
+                    return None;
+                }
+                Self::checked(crate::kernel::$k::mul_div(self.raw, a.raw, b.raw))
+            }
+
+            /// Linear interpolation `self + (other - self) · t`, rounded once to
+            /// nearest (ties toward `+∞`) and saturated. `t = 0` gives `self`
+            /// and `t = 1` gives `other` exactly; `t` outside `[0, 1]`
+            /// extrapolates. The difference is exact, so it never overflows.
+            #[inline]
+            pub const fn lerp(self, other: Self, t: Self) -> Self {
+                Self::saturate(crate::kernel::$k::lerp(self.raw, other.raw, t.raw))
+            }
+
+            /// Linear interpolation `self + (other - self) · t`, rounded once,
+            /// or `None` when the result is out of range.
+            #[inline]
+            pub const fn checked_lerp(self, other: Self, t: Self) -> Option<Self> {
+                Self::checked(crate::kernel::$k::lerp(self.raw, other.raw, t.raw))
+            }
         }
 
         impl crate::sealed::Sealed for $Name {}
@@ -705,10 +758,10 @@ define_fixed! {
     }
 }
 
-impl_accumulator!(Accumulator8, FixedFloat8, 4, scale: 8, product: [accumulator_product!(FixedFloat8);]);
-impl_accumulator!(Accumulator16, FixedFloat16, 8, scale: 16, product: [accumulator_product!(FixedFloat16);]);
-impl_accumulator!(Accumulator32, FixedFloat32, 16, scale: 32, product: [accumulator_product!(FixedFloat32);]);
-impl_accumulator!(Accumulator64, FixedFloat64, 32, scale: 32, product: []);
+impl_accumulator!(Accumulator8, FixedFloat8, 4, state: state128);
+impl_accumulator!(Accumulator16, FixedFloat16, 8, state: state128);
+impl_accumulator!(Accumulator32, FixedFloat32, 16, state: state128);
+impl_accumulator!(Accumulator64, FixedFloat64, 32, state: state256);
 
 impl_widen!(FixedFloat8 => FixedFloat16, FixedFloat32, FixedFloat64);
 impl_widen!(FixedFloat16 => FixedFloat32, FixedFloat64);

@@ -51,6 +51,7 @@ extern crate alloc;
 extern crate std;
 
 mod kernel;
+mod wide;
 
 #[macro_use]
 mod bytes;
