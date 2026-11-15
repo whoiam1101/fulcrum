@@ -39,8 +39,8 @@ const fn sin_quarter(p: u64, bits: u32) -> u64 {
     let theta = mul(b << (FRAC - bits), FRAC_PI_2);
     let z = mul(theta, theta);
     let sin_b = mul(theta, ONE - mul(z / 6, ONE - z / 20));
-    let versin_b = mul(z / 2, ONE - mul(z / 12, ONE - z / 30));
-    s - mul(s, versin_b) + mul(c, sin_b)
+    let one_minus_cos_b = mul(z / 2, ONE - mul(z / 12, ONE - z / 30));
+    s - mul(s, one_minus_cos_b) + mul(c, sin_b)
 }
 
 /// `sin(2π · raw / 2^f)`, rounded to `f` fractional bits. `2 ≤ f ≤ 32`.
