@@ -222,7 +222,67 @@ assert_eq!(FixedFloat64::FRAC_PI_2.checked_tan(), None);
 assert_eq!(ff64!(1000000000).sin(), ff64!(0.545843449421226978302001953125));
 ```
 
-`sin_cos` есть и в трейте `FixedFloat`. Угол, который только поворачивается и складывается, как в игре, точнее хранить в оборотах (`sin_turns`): там приведение — маска, и `π` в него не входит. Обратные функции (`atan2`, …) и тип `Angle` появятся дальше на этапе 4 ([план](ROADMAP.md)).
+`sin_cos` есть и в трейте `FixedFloat`. Угол, который только поворачивается и складывается, как в игре, точнее хранить в оборотах (`sin_turns`): там приведение — маска, и `π` в него не входит. Для углов, которые всё время поворачиваются, — типы углов ниже.
+
+### Обратные функции: `atan`, `atan2`, `asin`, `acos`
+
+Результат в радианах и отличается от точного значения меньше чем на 1 ulp; у `FixedFloat8`, `FixedFloat16` и `FixedFloat32` перебором проверено, что каждый результат (и каждая пара `atan2` у `FixedFloat8`) правильно округлён. Переполнений нет: модуль результата не больше `π`, а он помещается в любой тип, и `atan2` берёт точное отношение аргументов, какого бы размера они ни были.
+
+| Метод | Значение | Диапазон | Симметрии, бит в бит |
+|---|---|---|---|
+| `x.atan()` | `atan x` | `[-π/2, π/2]` | `atan(-x) = -atan(x)` при `x > MIN` |
+| `y.atan2(x)` | угол точки `(x, y)`, как `f64::atan2` | `(-π, π]`, после округления `[-π, π]` | `atan2(-y, x) = -atan2(y, x)` при `y ≠ 0` |
+| `x.asin()` | `asin x`; `x` вне `[-1, 1]` прижимается к нему | `[-π/2, π/2]` | `asin(-x) = -asin(x)` |
+| `x.acos()` | `acos x`; `x` вне `[-1, 1]` прижимается к нему | `[0, π]` | |
+| `x.checked_asin()`, `x.checked_acos()` | `None` вне `[-1, 1]` | | |
+
+`atan2(0, 0) = 0` и `atan2(0, x) = π` при `x < 0`: `-0` нет, поэтому разрез по отрицательной полуоси уходит в `+π`.
+
+```rust
+use fulcrum::{ff32, ff64, FixedFloat32, FixedFloat64};
+
+assert_eq!(ff32!(1).atan(), FixedFloat32::FRAC_PI_4);
+assert_eq!(ff32!(0).atan2(ff32!(-1)), FixedFloat32::PI);
+assert_eq!(ff32!(-1).atan2(ff32!(0)), -FixedFloat32::FRAC_PI_2);
+assert_eq!(ff64!(0.5).asin(), FixedFloat64::FRAC_PI_6);
+assert_eq!(ff32!(-1).acos(), FixedFloat32::PI);
+assert_eq!(ff32!(2).asin(), FixedFloat32::FRAC_PI_2);
+assert_eq!(ff32!(2).checked_asin(), None);
+```
+
+`atan2` есть и в трейте `FixedFloat`.
+
+### Углы: `Angle8` … `Angle64`
+
+Угол хранится всеми битами беззнакового целого как доля оборота `raw / 2^BITS`: у `Angle8` 256 шагов на оборот, у `Angle16` 65 536, у `Angle32` и `Angle64` шаг `1.46·10⁻⁹` и `3.4·10⁻¹⁹` радиана. `+`, `-` и унарный `-` заворачиваются по модулю оборота, поэтому угол, который всё время поворачивается, не нуждается в приведении, никогда не насыщается, а сумма поворотов не зависит от порядка. Каждый `AngleN` идёт в паре с `FixedFloatN`: синус и косинус — `FixedFloatN`, в пределах 1 ulp (у `Angle8`, `Angle16` и `Angle32` перебором проверено, что каждый результат правильно округлён и равен `sin_turns` того же угла).
+
+| Метод | Значение |
+|---|---|
+| `ZERO`, `DELTA`, `QUARTER_TURN`, `HALF_TURN`, `BITS` | константы |
+| `from_bits(u)`, `to_bits()` | сырая доля оборота |
+| `from_turns(x)` | `x` оборотов, точно: важна только дробь `x` |
+| `to_turns()` | угол в оборотах, в `[0, 1)`, к ближайшему |
+| `from_radians(x)` | `x / 2π` по модулю оборота, к ближайшему; точное приведение через 192 бита `2/π`; `from_radians(-x) = -from_radians(x)` |
+| `to_radians()` | угол в радианах, к ближайшему: точное значение в `[-π, π)`, округлённое — в `[-PI, PI]` (чуть ниже `HALF_TURN` оно округляется вверх до `PI`); `HALF_TURN` даёт `-PI` |
+| `sin()`, `cos()`, `sin_cos()` | в пределах 1 ulp; `sin` нечётный, `cos` чётный, `cos(a) = sin(a + QUARTER_TURN)` бит в бит |
+| `a + b`, `a - b`, `-a`, `+=`, `-=`, `wrapping_*` | по модулю оборота |
+| `a.scale(x)`, `a * x`, `a *= x` | `a · x` по модулю оборота, к ближайшему (середина к `+∞`), `a` берётся в `[-½, ½)` оборота: скорость поворота × шаг времени |
+
+```rust
+use fulcrum::{ff32, Angle16, Angle32, FixedFloat32};
+
+let mut heading = Angle32::from_radians(FixedFloat32::FRAC_PI_2);
+let rate = Angle32::from_turns(ff32!(0.25));
+heading += rate * ff32!(0.5);
+heading += Angle32::HALF_TURN + Angle32::HALF_TURN;
+let (s, c) = heading.sin_cos();
+assert_eq!(Angle16::QUARTER_TURN.sin_cos().0, fulcrum::FixedFloat16::ONE);
+assert_eq!(Angle32::HALF_TURN.to_radians(), -FixedFloat32::PI);
+assert_eq!(Angle32::from_turns(ff32!(1.25)), Angle32::QUARTER_TURN);
+assert!(s > c);
+```
+
+`Ord` нет: у углов на круге нет порядка. Трейт `FixedAngle` (все методы и константы выше, сырой тип `Bits` и парный тип `Fixed`) и ассоциированный тип `FixedFloat::Angle` позволяют обобщённому коду перейти от типа с фиксированной точкой к его типу угла.
 
 ## 5. Округление и целые
 
@@ -347,7 +407,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 Состав трейта:
 - `type Bits`;
 - константы `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`.
+- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`, `atan2` и ассоциированный тип `Angle` (тип угла той же ширины с трейтом `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, константы, заворачивающиеся `+ - neg` и `* x`).
 
 ```rust
 use fulcrum::FixedFloat;
@@ -357,7 +417,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошёл `sin_cos`.
+Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошли `sin_cos` и `atan2`.
 
 ## 12. `strict-overflow`
 
@@ -392,7 +452,7 @@ fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.3.0", featu
 
 - **Одинаковые биты везде.** Результат каждой операции зависит только от входных битов: не от платформы, компилятора, оптимизаций и числа потоков. Проверяется golden hash на x86-64, ARM64 и i686 в debug и release. Ошибка детерминизма считается уязвимостью ([SECURITY.md](SECURITY.md)).
 - **Нет паник** без `strict-overflow`: ни на переполнении, ни на делении на ноль, ни на какой входной строке.
-- **Точность.** `+ - %`, сравнения, сдвиг влево и расширение точны. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, сужение, разбор, литералы и аккумуляторы правильно округлены (ошибка ≤ ½ ulp, середина к `+∞`). Константы правильно округлены. `sin_turns`, `cos_turns`, `sin`, `cos` и `tan` — в пределах 1 ulp.
+- **Точность.** `+ - %`, сравнения, сдвиг влево и расширение точны. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, сужение, разбор, литералы и аккумуляторы правильно округлены (ошибка ≤ ½ ulp, середина к `+∞`). Константы правильно округлены. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin` и `acos` — в пределах 1 ulp.
 - **`const fn`** почти везде: все методы типов, кроме `saturating_from`, `wrapping_from` и `f64`-конверсий; у аккумуляторов `const` только `new`, `merge`, `finish`, `checked_finish`. Операторы — нет: трейты `core::ops` в стабильном Rust не `const`.
 - **Стабильность.** До 1.0 API может меняться. Биты результатов существующих операций не меняются: ускорения обязаны давать те же биты.
 

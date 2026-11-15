@@ -222,7 +222,67 @@ assert_eq!(FixedFloat64::FRAC_PI_2.checked_tan(), None);
 assert_eq!(ff64!(1000000000).sin(), ff64!(0.545843449421226978302001953125));
 ```
 
-`sin_cos` is also in the `FixedFloat` trait. An angle that only turns and is added up, as in a game, keeps more in turns (`sin_turns`): there the reduction is a mask and `π` never enters. Inverse functions (`atan2`, …) and the `Angle` type come later in stage 4 ([roadmap](ROADMAP.md)).
+`sin_cos` is also in the `FixedFloat` trait. An angle that only turns and is added up, as in a game, keeps more in turns (`sin_turns`): there the reduction is a mask and `π` never enters. For angles that keep turning see the angle types below.
+
+### Inverse functions: `atan`, `atan2`, `asin`, `acos`
+
+The result is in radians and within 1 ulp of the exact value; on `FixedFloat8`, `FixedFloat16` and `FixedFloat32` every result (and every pair of `atan2` on `FixedFloat8`) is checked to be correctly rounded. Nothing overflows: the result is at most `π` in magnitude, which every type holds, and `atan2` takes the exact ratio of its two arguments, whatever their size.
+
+| Method | Value | Range | Symmetries, bit for bit |
+|---|---|---|---|
+| `x.atan()` | `atan x` | `[-π/2, π/2]` | `atan(-x) = -atan(x)` for `x > MIN` |
+| `y.atan2(x)` | the angle of the point `(x, y)`, like `f64::atan2` | `(-π, π]`, rounded: `[-π, π]` | `atan2(-y, x) = -atan2(y, x)` for `y ≠ 0` |
+| `x.asin()` | `asin x`; `x` outside `[-1, 1]` is clamped to it | `[-π/2, π/2]` | `asin(-x) = -asin(x)` |
+| `x.acos()` | `acos x`; `x` outside `[-1, 1]` is clamped to it | `[0, π]` | |
+| `x.checked_asin()`, `x.checked_acos()` | `None` outside `[-1, 1]` | | |
+
+`atan2(0, 0) = 0` and `atan2(0, x) = π` for `x < 0`: there is no `-0`, so the cut along the negative axis goes to `+π`.
+
+```rust
+use fulcrum::{ff32, ff64, FixedFloat32, FixedFloat64};
+
+assert_eq!(ff32!(1).atan(), FixedFloat32::FRAC_PI_4);
+assert_eq!(ff32!(0).atan2(ff32!(-1)), FixedFloat32::PI);
+assert_eq!(ff32!(-1).atan2(ff32!(0)), -FixedFloat32::FRAC_PI_2);
+assert_eq!(ff64!(0.5).asin(), FixedFloat64::FRAC_PI_6);
+assert_eq!(ff32!(-1).acos(), FixedFloat32::PI);
+assert_eq!(ff32!(2).asin(), FixedFloat32::FRAC_PI_2);
+assert_eq!(ff32!(2).checked_asin(), None);
+```
+
+`atan2` is also in the `FixedFloat` trait.
+
+### Angles: `Angle8` … `Angle64`
+
+An angle kept as every bit of an unsigned integer, the fraction `raw / 2^BITS` of a turn: `Angle8` has 256 steps per turn, `Angle16` 65 536, `Angle32` and `Angle64` steps of `1.46·10⁻⁹` and `3.4·10⁻¹⁹` radians. `+`, `-` and unary `-` wrap modulo a turn, so an angle that keeps turning never needs a range reduction, never saturates, and a sum of rotations does not depend on the order. Each `AngleN` goes with `FixedFloatN`: its sine and cosine are `FixedFloatN`, within 1 ulp (on `Angle8`, `Angle16` and `Angle32` every result is checked to be correctly rounded and equal to `sin_turns` of the same angle).
+
+| Method | Value |
+|---|---|
+| `ZERO`, `DELTA`, `QUARTER_TURN`, `HALF_TURN`, `BITS` | constants |
+| `from_bits(u)`, `to_bits()` | the raw fraction of a turn |
+| `from_turns(x)` | `x` turns, exactly: only the fraction of `x` matters |
+| `to_turns()` | the angle in turns, in `[0, 1)`, rounded to nearest |
+| `from_radians(x)` | `x / 2π` modulo a turn, rounded to nearest; exact range reduction by 192 bits of `2/π`; `from_radians(-x) = -from_radians(x)` |
+| `to_radians()` | the angle in radians, rounded to nearest: the exact value is in `[-π, π)`, the rounded one in `[-PI, PI]` (just below `HALF_TURN` it rounds up to `PI`); `HALF_TURN` gives `-PI` |
+| `sin()`, `cos()`, `sin_cos()` | within 1 ulp; `sin` odd, `cos` even, `cos(a) = sin(a + QUARTER_TURN)` bit for bit |
+| `a + b`, `a - b`, `-a`, `+=`, `-=`, `wrapping_*` | modulo a turn |
+| `a.scale(x)`, `a * x`, `a *= x` | `a · x` modulo a turn, rounded to nearest (ties toward `+∞`), `a` taken in `[-½, ½)` of a turn: a turn rate times a time step |
+
+```rust
+use fulcrum::{ff32, Angle16, Angle32, FixedFloat32};
+
+let mut heading = Angle32::from_radians(FixedFloat32::FRAC_PI_2);
+let rate = Angle32::from_turns(ff32!(0.25));
+heading += rate * ff32!(0.5);
+heading += Angle32::HALF_TURN + Angle32::HALF_TURN;
+let (s, c) = heading.sin_cos();
+assert_eq!(Angle16::QUARTER_TURN.sin_cos().0, fulcrum::FixedFloat16::ONE);
+assert_eq!(Angle32::HALF_TURN.to_radians(), -FixedFloat32::PI);
+assert_eq!(Angle32::from_turns(ff32!(1.25)), Angle32::QUARTER_TURN);
+assert!(s > c);
+```
+
+There is no `Ord`: angles on a circle have no order. The trait `FixedAngle` (every method and constant above, the raw type `Bits` and the paired fixed-point type `Fixed`) and the associated type `FixedFloat::Angle` let generic code go from a fixed-point type to its angle type.
 
 ## 5. Rounding and integers
 
@@ -347,7 +407,7 @@ Sealed: only fulcrum's types implement it. It requires `Copy + Default + Ord + H
 Contents:
 - `type Bits`;
 - constants `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`.
+- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`, `atan2`, and the associated type `Angle` (the angle type of the same width, with the trait `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, the constants, wrapping `+ - neg` and `* x`).
 
 ```rust
 use fulcrum::FixedFloat;
@@ -357,7 +417,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` joined in stage 4.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` and `atan2` joined in stage 4.
 
 ## 12. `strict-overflow`
 
@@ -392,7 +452,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos` and `tan` are within 1 ulp.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin` and `acos` are within 1 ulp.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 

@@ -9,7 +9,7 @@ Deterministic fixed-point math for Rust: bit-identical results on every platform
 
 Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32).
 
-> **Status:** stages 1–3 of the [roadmap](ROADMAP.md) are done: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, and correctly rounded `sqrt`, `rsqrt`, `hypot`; optional `serde`, `bytemuck` and `num-traits` support. Stage 4 has started: `sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, all within 1 ulp. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
+> **Status:** stages 1–3 of the [roadmap](ROADMAP.md) are done: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, and correctly rounded `sqrt`, `rsqrt`, `hypot`; optional `serde`, `bytemuck` and `num-traits` support. Stage 4 is in progress: `sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, all within 1 ulp, and the wrapping angle types `Angle8` … `Angle64`. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
 
 ```toml
 [dependencies]
