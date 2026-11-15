@@ -1,5 +1,5 @@
 //! `serde`: exact decimal strings in human-readable formats (JSON), the raw
-//! integer in binary formats (bincode); integers are accepted exactly,
+//! integer in binary formats (postcard); integers are accepted exactly,
 //! floating-point numbers only with `float-convert`.
 
 #![cfg(feature = "serde")]
@@ -73,15 +73,14 @@ fn json_float_numbers_round_like_from_f64() {
 #[test]
 fn binary_is_the_raw_integer() {
     let x = ff64!(-1.25);
-    let bytes = bincode::serialize(&x).unwrap();
-    assert_eq!(bytes, bincode::serialize(&x.to_bits()).unwrap());
-    assert_eq!(bytes, x.to_le_bytes());
-    assert_eq!(bincode::deserialize::<FixedFloat64>(&bytes).unwrap(), x);
+    let bytes = postcard::to_stdvec(&x).unwrap();
+    assert_eq!(bytes, postcard::to_stdvec(&x.to_bits()).unwrap());
+    assert_eq!(postcard::from_bytes::<FixedFloat64>(&bytes).unwrap(), x);
     for raw in i8::MIN..=i8::MAX {
         let x = FixedFloat8::from_bits(raw);
-        let bytes = bincode::serialize(&x).unwrap();
+        let bytes = postcard::to_stdvec(&x).unwrap();
         assert_eq!(bytes, [raw as u8]);
-        assert_eq!(bincode::deserialize::<FixedFloat8>(&bytes).unwrap(), x);
+        assert_eq!(postcard::from_bytes::<FixedFloat8>(&bytes).unwrap(), x);
     }
 }
 
@@ -98,7 +97,8 @@ fn inside_a_struct() {
     };
     let json = serde_json::to_string(&u).unwrap();
     assert_eq!(serde_json::from_str::<Unit>(&json).unwrap(), u);
-    let bin = bincode::serialize(&u).unwrap();
-    assert_eq!(bin.len(), 12);
-    assert_eq!(bincode::deserialize::<Unit>(&bin).unwrap(), u);
+    let bin = postcard::to_stdvec(&u).unwrap();
+    let raws = postcard::to_stdvec(&(u.x.to_bits(), u.speed.to_bits())).unwrap();
+    assert_eq!(bin, raws);
+    assert_eq!(postcard::from_bytes::<Unit>(&bin).unwrap(), u);
 }
