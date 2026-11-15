@@ -199,7 +199,30 @@ assert_eq!(ff32!(1000.125).sin_turns(), ff32!(0.125).sin_turns());
 assert_eq!(ff64!(0.125).sin_turns(), ff64!(0.125).cos_turns());
 ```
 
-Radians (`sin`, `cos`, `atan2`, …) and the `Angle` type come later in stage 4 ([roadmap](ROADMAP.md)).
+### Sine, cosine and tangent in radians: `sin`, `cos`, `sin_cos`, `tan`
+
+The angle is in radians. The range reduction multiplies the value exactly by 192 bits of `2/π`, so it is accurate on every input, `FixedFloat64::MAX` included. `sin` and `cos` are in `[-1, 1]` and within 1 ulp of the exact value; `tan` is within 1 ulp of the exact value clamped to the range. On `FixedFloat8`, `FixedFloat16` and `FixedFloat32` every result is checked to be correctly rounded.
+
+| Method | Value | Symmetries, bit for bit (`-x` for `x > MIN`) |
+|---|---|---|
+| `x.sin()` | `sin x` | `sin(-x) = -sin(x)` |
+| `x.cos()` | `cos x` | `cos(-x) = cos(x)` |
+| `x.sin_cos()` | `(x.sin(), x.cos())`, one range reduction | |
+| `x.tan()` | `tan x`, saturated near the poles | `tan(-x) = -tan(x)` where it does not saturate (`MIN` and `-MAX` differ) |
+| `x.checked_tan()` | `tan x`, `None` when the rounded value is out of range | |
+
+```rust
+use fulcrum::{ff32, ff64, FixedFloat32, FixedFloat64};
+
+assert_eq!(FixedFloat32::ZERO.sin_cos(), (FixedFloat32::ZERO, FixedFloat32::ONE));
+assert_eq!(FixedFloat32::PI.cos(), -FixedFloat32::ONE);
+assert_eq!(ff32!(-0.5).sin(), -ff32!(0.5).sin());
+assert_eq!(FixedFloat64::FRAC_PI_2.tan(), FixedFloat64::MAX);
+assert_eq!(FixedFloat64::FRAC_PI_2.checked_tan(), None);
+assert_eq!(ff64!(1000000000).sin(), ff64!(0.545843449421226978302001953125));
+```
+
+`sin_cos` is also in the `FixedFloat` trait. An angle that only turns and is added up, as in a game, keeps more in turns (`sin_turns`): there the reduction is a mask and `π` never enters. Inverse functions (`atan2`, …) and the `Angle` type come later in stage 4 ([roadmap](ROADMAP.md)).
 
 ## 5. Rounding and integers
 
@@ -324,7 +347,7 @@ Sealed: only fulcrum's types implement it. It requires `Copy + Default + Ord + H
 Contents:
 - `type Bits`;
 - constants `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`.
+- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`.
 
 ```rust
 use fulcrum::FixedFloat;
@@ -334,7 +357,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` joins in stage 4.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` joined in stage 4.
 
 ## 12. `strict-overflow`
 
@@ -369,7 +392,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns` and `cos_turns` are within 1 ulp.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos` and `tan` are within 1 ulp.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 

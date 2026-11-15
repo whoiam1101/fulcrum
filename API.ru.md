@@ -199,7 +199,30 @@ assert_eq!(ff32!(1000.125).sin_turns(), ff32!(0.125).sin_turns());
 assert_eq!(ff64!(0.125).sin_turns(), ff64!(0.125).cos_turns());
 ```
 
-Радианы (`sin`, `cos`, `atan2`, …) и тип `Angle` появятся дальше на этапе 4 ([план](ROADMAP.md)).
+### Синус, косинус и тангенс в радианах: `sin`, `cos`, `sin_cos`, `tan`
+
+Угол в радианах. Приведение диапазона точно умножает значение на 192 бита `2/π`, поэтому оно аккуратно на любом входе, включая `FixedFloat64::MAX`. `sin` и `cos` лежат в `[-1, 1]` и отличаются от точного значения меньше чем на 1 ulp; `tan` — меньше чем на 1 ulp от точного значения, ограниченного диапазоном. У `FixedFloat8`, `FixedFloat16` и `FixedFloat32` перебором проверено, что каждый результат правильно округлён.
+
+| Метод | Значение | Симметрии, бит в бит (`-x` при `x > MIN`) |
+|---|---|---|
+| `x.sin()` | `sin x` | `sin(-x) = -sin(x)` |
+| `x.cos()` | `cos x` | `cos(-x) = cos(x)` |
+| `x.sin_cos()` | `(x.sin(), x.cos())`, одно приведение | |
+| `x.tan()` | `tan x`, насыщается у полюсов | `tan(-x) = -tan(x)`, где нет насыщения (`MIN` и `-MAX` различаются) |
+| `x.checked_tan()` | `tan x`, `None`, если округлённое значение вне диапазона | |
+
+```rust
+use fulcrum::{ff32, ff64, FixedFloat32, FixedFloat64};
+
+assert_eq!(FixedFloat32::ZERO.sin_cos(), (FixedFloat32::ZERO, FixedFloat32::ONE));
+assert_eq!(FixedFloat32::PI.cos(), -FixedFloat32::ONE);
+assert_eq!(ff32!(-0.5).sin(), -ff32!(0.5).sin());
+assert_eq!(FixedFloat64::FRAC_PI_2.tan(), FixedFloat64::MAX);
+assert_eq!(FixedFloat64::FRAC_PI_2.checked_tan(), None);
+assert_eq!(ff64!(1000000000).sin(), ff64!(0.545843449421226978302001953125));
+```
+
+`sin_cos` есть и в трейте `FixedFloat`. Угол, который только поворачивается и складывается, как в игре, точнее хранить в оборотах (`sin_turns`): там приведение — маска, и `π` в него не входит. Обратные функции (`atan2`, …) и тип `Angle` появятся дальше на этапе 4 ([план](ROADMAP.md)).
 
 ## 5. Округление и целые
 
@@ -324,7 +347,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 Состав трейта:
 - `type Bits`;
 - константы `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`.
+- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`.
 
 ```rust
 use fulcrum::FixedFloat;
@@ -334,7 +357,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: в него войдёт `sin_cos` (этап 4).
+Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошёл `sin_cos`.
 
 ## 12. `strict-overflow`
 
@@ -369,7 +392,7 @@ fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.3.0", featu
 
 - **Одинаковые биты везде.** Результат каждой операции зависит только от входных битов: не от платформы, компилятора, оптимизаций и числа потоков. Проверяется golden hash на x86-64, ARM64 и i686 в debug и release. Ошибка детерминизма считается уязвимостью ([SECURITY.md](SECURITY.md)).
 - **Нет паник** без `strict-overflow`: ни на переполнении, ни на делении на ноль, ни на какой входной строке.
-- **Точность.** `+ - %`, сравнения, сдвиг влево и расширение точны. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, сужение, разбор, литералы и аккумуляторы правильно округлены (ошибка ≤ ½ ulp, середина к `+∞`). Константы правильно округлены. `sin_turns` и `cos_turns` — в пределах 1 ulp.
+- **Точность.** `+ - %`, сравнения, сдвиг влево и расширение точны. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, сужение, разбор, литералы и аккумуляторы правильно округлены (ошибка ≤ ½ ulp, середина к `+∞`). Константы правильно округлены. `sin_turns`, `cos_turns`, `sin`, `cos` и `tan` — в пределах 1 ulp.
 - **`const fn`** почти везде: все методы типов, кроме `saturating_from`, `wrapping_from` и `f64`-конверсий; у аккумуляторов `const` только `new`, `merge`, `finish`, `checked_finish`. Операторы — нет: трейты `core::ops` в стабильном Rust не `const`.
 - **Стабильность.** До 1.0 API может меняться. Биты результатов существующих операций не меняются: ускорения обязаны давать те же биты.
 
