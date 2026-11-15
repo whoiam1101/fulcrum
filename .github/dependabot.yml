@@ -14,7 +14,10 @@ updates:
       cargo:
         patterns:
           - "*"
-    open-pull-requests-limit: 2
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5
   - package-ecosystem: cargo
     directories:
       - "/oracle"
@@ -27,11 +30,14 @@ updates:
       oracle:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
     ignore:
       - dependency-name: num-bigint
         versions:
           - ">=0.5"
-    open-pull-requests-limit: 2
+    open-pull-requests-limit: 5
   - package-ecosystem: github-actions
     directory: "/"
     schedule:
@@ -42,4 +48,7 @@ updates:
       actions:
         patterns:
           - "*"
-    open-pull-requests-limit: 2
+        update-types:
+          - minor
+          - patch
+    open-pull-requests-limit: 5
