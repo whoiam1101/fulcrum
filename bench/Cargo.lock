@@ -137,6 +137,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1c133bc6a41be0d194c306b5506d15e6feeea7b1d6604bd3f8310dfb2ca96486"
 
 [[package]]
+name = "cordic"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0ed0a176c0b8c5c95fa0523177530364c5b68a8895d9745730dbfa692a7412d0"
+dependencies = [
+ "fixed",
+]
+
+[[package]]
 name = "criterion"
 version = "0.8.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -238,19 +247,33 @@ dependencies = [
 
 [[package]]
 name = "fulcrum"
-version = "0.3.0"
+version = "0.4.0"
 
 [[package]]
 name = "fulcrum-bench"
 version = "0.0.0"
 dependencies = [
+ "cordic",
  "criterion",
  "fixed",
  "fulcrum",
+ "fulcrum-oracle",
  "gungraun",
  "libm",
  "num-bigint",
+ "num-traits",
  "serde_json",
+]
+
+[[package]]
+name = "fulcrum-oracle"
+version = "0.0.0"
+dependencies = [
+ "fulcrum",
+ "num-bigint",
+ "num-integer",
+ "num-rational",
+ "num-traits",
 ]
 
 [[package]]
@@ -374,6 +397,17 @@ version = "0.1.47"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7ce2d95d4b3734dc35aa2f45e1aa22cd416814592a4f9d9205e11affd5b8e10b"
 dependencies = [
+ "num-traits",
+]
+
+[[package]]
+name = "num-rational"
+version = "0.4.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f83d14da390562dca69fc84082e73e548e1ad308d24accdedd2720017cb37824"
+dependencies = [
+ "num-bigint",
+ "num-integer",
  "num-traits",
 ]
 

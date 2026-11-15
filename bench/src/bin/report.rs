@@ -17,6 +17,7 @@ use std::process::Command;
 use std::{env, fs};
 
 const HEADING: &str = "## Benchmarks";
+const DETERMINISM_HEADING: &str = "### Determinism across platforms\n\n";
 const MIN_EFFECT: f64 = 1.05;
 
 const CASES: [(&str, &str, &str); 5] = [
@@ -56,6 +57,29 @@ const ROOTS: [(&str, &str); 3] = [
 
 /// fulcrum type, its float, and the column labels of the float.
 const ROOT_GROUPS: [(&str, &str); 2] = [("FixedFloat32", "f32"), ("FixedFloat64", "f64")];
+
+/// Trigonometric functions: id, label, and whether `cordic` has it.
+const TRIG: [(&str, &str, bool); 9] = [
+    ("sin_turns", "`sin_turns`", false),
+    ("cos_turns", "`cos_turns`", false),
+    ("sin", "`sin`", true),
+    ("cos", "`cos`", true),
+    ("tan", "`tan`", true),
+    ("atan", "`atan`", true),
+    ("atan2", "`atan2`", true),
+    ("asin", "`asin`", true),
+    ("acos", "`acos`", true),
+];
+
+/// fulcrum type, its float, its `fixed` type for `cordic`, and the format.
+const TRIG_GROUPS: [(&str, &str, &str, &str); 2] = [
+    ("FixedFloat32", "f32", "I16F16", "Q16.16"),
+    ("FixedFloat64", "f64", "I32F32", "Q32.32"),
+];
+
+/// Operands per function and implementation in the trigonometry accuracy
+/// table; each needs the 256-bit oracle.
+const TRIG_ACCURACY_SAMPLES: usize = 20_000;
 
 /// Operands per function and implementation in the accuracy table.
 const ACCURACY_SAMPLES: usize = 100_000;
@@ -99,6 +123,16 @@ fn expected() -> Vec<String> {
             ids.push(id("throughput", op, "fulcrum", ours));
             ids.push(id("throughput", op, "libm", float));
             ids.push(id("throughput", op, "native", float));
+        }
+    }
+    for (op, _, cordic) in TRIG {
+        for (ours, float, fixed, _) in TRIG_GROUPS {
+            ids.push(id("throughput", op, "fulcrum", ours));
+            ids.push(id("throughput", op, "libm", float));
+            ids.push(id("throughput", op, "native", float));
+            if cordic {
+                ids.push(id("throughput", op, "cordic", fixed));
+            }
         }
     }
     ids
@@ -376,6 +410,38 @@ impl Report {
         }
     }
 
+    fn trig_table(&self, s: &mut String, group: (&str, &str, &str, &str)) {
+        let (ours, float, fixed, format) = group;
+        let _ = writeln!(
+            s,
+            "| {} | `{}` | `libm` `{}` | `std` `{}` | `cordic` `{}` | `{}` vs `libm` | `{}` vs `cordic` |\n|---|---:|---:|---:|---:|---|---|",
+            format, ours, float, float, fixed, ours, ours
+        );
+        for (op, label, cordic) in TRIG {
+            let theirs = if cordic {
+                ns(self.get("throughput", op, "cordic", fixed).ns)
+            } else {
+                "—".to_string()
+            };
+            let vs_cordic = if cordic {
+                verdict_text(self.vs_float(op, ours, "cordic", fixed))
+            } else {
+                "—".to_string()
+            };
+            let _ = writeln!(
+                s,
+                "| {} | {} | {} | {} | {} | {} | {} |",
+                label,
+                ns(self.get("throughput", op, "fulcrum", ours).ns),
+                ns(self.get("throughput", op, "libm", float).ns),
+                ns(self.get("throughput", op, "native", float).ns),
+                theirs,
+                verdict_text(self.vs_float(op, ours, "libm", float)),
+                vs_cordic
+            );
+        }
+    }
+
     fn verdict_table(&self, s: &mut String) {
         s.push('|');
         for (ours, theirs) in PAIRS {
@@ -549,6 +615,34 @@ impl Report {
             );
         }
 
+        for (ours, float, fixed, _) in TRIG_GROUPS {
+            let count = |imp: &str, ty: &str| {
+                let v: Vec<Verdict> = TRIG
+                    .iter()
+                    .filter(|&&(_, _, cordic)| imp != "cordic" || cordic)
+                    .map(|&(op, _, _)| self.vs_float(op, ours, imp, ty))
+                    .collect();
+                let faster = v.iter().filter(|v| matches!(v, Verdict::Faster(_))).count();
+                let slower = v.iter().filter(|v| matches!(v, Verdict::Slower(_))).count();
+                format!(
+                    "faster in {} of {}, on par in {}, slower in {}",
+                    faster,
+                    v.len(),
+                    v.len() - faster - slower,
+                    slower
+                )
+            };
+            let _ = writeln!(
+                s,
+                "- **Trigonometry**, `{}`: against `libm` `{}` {}; against `cordic` `{}` {} (fulcrum within 1 ulp, see the accuracy table).",
+                ours,
+                float,
+                count("libm", float),
+                fixed,
+                count("cordic", fixed)
+            );
+        }
+
         for (ours, native) in NATIVE {
             let parts: Vec<String> = CASES
                 .iter()
@@ -570,7 +664,7 @@ impl Report {
         }
     }
 
-    fn section(&self, env_line: &str) -> String {
+    fn section(&self, env_line: &str, determinism: Option<&str>) -> String {
         let mut s = String::new();
         let _ = writeln!(s, "{}\n", HEADING);
         let _ = writeln!(s, "{}\n", env_line);
@@ -603,8 +697,26 @@ impl Report {
              `libm` is the software float library, `std` the hardware square root; `rsqrt` of a float is `1 / x.sqrt()`.\n\n",
         );
         self.roots_table(&mut s);
-        s.push_str("\n### Accuracy of square roots\n\n");
+        s.push_str("\n### Trigonometry, ns per operation (throughput)\n\n");
+        s.push_str(
+            "Angles in `[-2, 2)`: radians, or turns for `sin_turns` and `cos_turns`, where the floats compute `sin(τ·x)`; \
+             `asin` and `acos` on `[-1, 1)`, `atan2` on two such operands. \
+             fulcrum is within 1 ulp everywhere; `cordic` is the CORDIC crate on the `fixed` types of the same format.\n\n",
+        );
+        for group in TRIG_GROUPS {
+            self.trig_table(&mut s, group);
+            s.push('\n');
+        }
+        s.push_str("### Accuracy of square roots\n\n");
         accuracy_table(&mut s);
+        s.push_str("\n### Accuracy of trigonometry\n\n");
+        trig_accuracy_table(&mut s);
+        if let Some(table) = determinism {
+            s.push('\n');
+            s.push_str(DETERMINISM_HEADING);
+            s.push_str(table.trim_end());
+            s.push('\n');
+        }
         s.push_str(
             "\n### How to read this\n\n\
              - A difference is reported only when the 95% confidence intervals of the two medians do not overlap and the medians differ by at least 5%; everything else is *on par*. \
@@ -661,6 +773,43 @@ fn accuracy_table(s: &mut String) {
             100.0 * a.correct
         );
     }
+}
+
+/// The accuracy table of `fulcrum_bench::trig_accuracy`.
+fn trig_accuracy_table(s: &mut String) {
+    use fulcrum_bench::trig_accuracy::{table, IMPS};
+    let _ = writeln!(
+        s,
+        "Error in ulps of the fixed-point format against the 256-bit interval oracle, clamped to the range, over {} operands per row; \
+         each cell is the largest error and the share of correctly rounded results. \
+         Floats (`f32` for Q16.16, `f64` for Q32.32) get the operand exactly and their result rounded to nearest into the format; \
+         for `sin_turns` and `cos_turns` they compute `sin(τ·x)` and `cos(τ·x)`. `cordic` is the CORDIC crate on `I16F16` and `I32F32`; \
+         its `tan` divides `sin` by `cos` in `fixed`, which wraps on overflow near the poles, hence the huge errors there. \
+         Generated by [`bench/src/trig_accuracy.rs`](bench/src/trig_accuracy.rs).\n",
+        TRIG_ACCURACY_SAMPLES
+    );
+    s.push_str("| Function | Format | fulcrum | `std` | `libm` | `cordic` |\n|---|---|---:|---:|---:|---:|\n");
+    for row in table(TRIG_ACCURACY_SAMPLES) {
+        let _ = write!(s, "| `{}` | {}", row.op, row.format);
+        for (k, _) in IMPS.iter().enumerate() {
+            match row.cells[k] {
+                Some(a) => {
+                    let _ = write!(s, " | {:.3}, {:.2}%", a.max, 100.0 * a.correct);
+                }
+                None => s.push_str(" | —"),
+            }
+        }
+        s.push_str(" |\n");
+    }
+}
+
+/// The determinism table of the current README section, so that a run
+/// without `--determinism` keeps the one measured on the CI runners.
+fn kept_determinism(readme: &str) -> Option<String> {
+    let start = readme.find(DETERMINISM_HEADING)? + DETERMINISM_HEADING.len();
+    let rest = &readme[start..];
+    let end = rest.find("\n### ").map_or(rest.len(), |i| i + 1);
+    Some(rest[..end].trim().to_string())
 }
 
 fn bold_ns(e: Est, bold: bool) -> String {
@@ -720,6 +869,7 @@ fn main() {
     let mut criterion = PathBuf::from("target/criterion");
     let mut readme: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
+    let mut determinism: Option<String> = None;
     let mut args = env::args().skip(1);
     while let Some(a) = args.next() {
         let v = args.next().unwrap_or_else(|| {
@@ -730,8 +880,11 @@ fn main() {
             "--criterion" => criterion = v.into(),
             "--readme" => readme = Some(v.into()),
             "--out" => out = Some(v.into()),
+            "--determinism" => {
+                determinism = Some(fs::read_to_string(&v).expect("read the determinism table"))
+            }
             _ => {
-                eprintln!("usage: report [--criterion DIR] [--readme FILE] [--out FILE]");
+                eprintln!("usage: report [--criterion DIR] [--readme FILE] [--out FILE] [--determinism FILE]");
                 std::process::exit(2)
             }
         }
@@ -796,7 +949,13 @@ fn main() {
         env::consts::OS,
         rustc
     );
-    let section = report.section(&env_line);
+    let kept = match (&determinism, &readme) {
+        (None, Some(path)) => fs::read_to_string(path)
+            .ok()
+            .and_then(|old| kept_determinism(&old)),
+        _ => None,
+    };
+    let section = report.section(&env_line, determinism.as_deref().or(kept.as_deref()));
 
     if readme.is_none() && out.is_none() {
         print!("{}", section);

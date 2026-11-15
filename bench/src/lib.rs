@@ -1,7 +1,8 @@
 //! Shared inputs for the benchmarks: deterministic pseudo-random operands,
-//! and the accuracy table of the square roots.
+//! and the accuracy tables of the square roots and of trigonometry.
 
 pub mod accuracy;
+pub mod trig_accuracy;
 
 /// `n` pseudo-random `u64` values from a fixed seed (SplitMix64).
 pub fn inputs(n: usize, seed: u64) -> Vec<u64> {
