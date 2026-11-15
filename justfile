@@ -113,10 +113,10 @@ miri toolchain="nightly":
 cov min=min_coverage:
     cargo llvm-cov --features {{ test_features }} --summary-only --fail-under-lines {{ min }}
 
-[doc("Mutation testing, hours; extra arguments go to cargo mutants, e.g. --jobs 4")]
+[doc("Mutation testing, hours; extra arguments go to cargo mutants, e.g. --jobs 4. A mutant that times out counts as caught: only exit code 3 (timeouts, nothing missed) passes")]
 [group("test")]
 mutants *args:
-    cargo mutants --no-shuffle --timeout-multiplier 3 --features {{ test_features }} {{ args }}
+    cargo mutants --no-shuffle --timeout-multiplier 3 --features {{ test_features }} {{ args }} || test $? -eq 3
 
 [doc("cargo deny: advisories, bans, licenses, sources of every manifest")]
 [group("security")]
