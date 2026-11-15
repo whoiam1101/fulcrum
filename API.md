@@ -359,7 +359,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 ## 14. `serde`, `bytemuck`, `num-traits`
 
-`serde`: human-readable formats (JSON, YAML, TOML) get the exact decimal string of `Display`, so `parse` gives the same bits back: `ff64!(12.5)` is `"12.5"`, `ff64!(0.1)` is `"0.1000000000931322574615478515625"`. They also accept an integer number, converted exactly, and only together with `float-convert` a floating-point number such as `12.6` without quotes, rounded like `checked_from_f64`; without `float-convert` it is an error, so a float never sneaks into the logic. Binary formats (bincode, postcard) get the raw integer: `FixedFloat64` takes 8 bytes, in the format's own byte order.
+`serde`: human-readable formats (JSON, YAML, TOML) get the exact decimal string of `Display`, so `parse` gives the same bits back: `ff64!(12.5)` is `"12.5"`, `ff64!(0.1)` is `"0.1000000000931322574615478515625"`. They also accept an integer number, converted exactly, and only together with `float-convert` a floating-point number such as `12.6` without quotes, rounded like `checked_from_f64`; without `float-convert` it is an error, so a float never sneaks into the logic. Binary formats (postcard, bincode, CBOR, MessagePack) get the raw integer, encoded as the format encodes the storage integer (`i64` for `FixedFloat64`): 8 fixed bytes in bincode, a varint in postcard.
 
 `bytemuck`: `Pod` and `Zeroable`, so `bytemuck::cast_slice` turns `&[FixedFloat64]` into `&[i64]` or `&[u8]` and back without copying (structure-of-arrays data, buffers for a renderer). The bytes are in native order, like `to_bits().to_ne_bytes()`; for files and the network use `to_le_bytes` (§8).
 
