@@ -18,6 +18,8 @@
 //! - `*` and `/` round to nearest, ties toward `+∞`; `+`, `-` and `%` are exact;
 //! - `sqrt`, `rsqrt` and `hypot` are correctly rounded; `hypot` squares
 //!   exactly and never overflows before the root;
+//! - `sin_turns` and `cos_turns` take the angle in turns (1.0 = 360°), reduce
+//!   it exactly with a bit mask and are within 1 ulp;
 //! - division by zero gives `MAX`, `MIN` or `0` by the sign of the dividend,
 //!   `x % 0` gives `0`, and the `checked_*` variants return `None`;
 //! - nothing panics, unless the `strict-overflow` feature below is enabled;
@@ -90,6 +92,7 @@ mod define;
 
 mod error;
 mod tables;
+mod trig;
 
 #[cfg(kani)]
 mod proofs;

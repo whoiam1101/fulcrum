@@ -517,6 +517,24 @@ macro_rules! define_fixed {
                 Self::checked(crate::kernel::$k::hypot(self.raw, other.raw))
             }
 
+            /// `sin(2π · self)`: the sine of an angle of `self` turns
+            /// (1 turn = 360°), within 1 ulp. Only the fraction of a turn
+            /// matters, so the range reduction is exact and never overflows;
+            /// the result is in `[-1, 1]`, and `sin_turns(-x) = -sin_turns(x)`
+            /// bit for bit for every `x > MIN` (`-MIN` saturates to `MAX`).
+            #[inline]
+            pub const fn sin_turns(self) -> Self {
+                Self { raw: crate::trig::sin_turns(self.raw as u64, $F) as $Bits }
+            }
+
+            /// `cos(2π · self)`: the cosine of an angle of `self` turns,
+            /// within 1 ulp; `cos_turns(x) = sin_turns(x + ¼)` and
+            /// `cos_turns(-x) = cos_turns(x)` bit for bit for every `x > MIN`.
+            #[inline]
+            pub const fn cos_turns(self) -> Self {
+                Self { raw: crate::trig::cos_turns(self.raw as u64, $F) as $Bits }
+            }
+
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
             pub const fn signum(self) -> Self {
