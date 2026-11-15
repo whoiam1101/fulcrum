@@ -12,6 +12,8 @@ mod reference;
 
 reference!(spec, i128);
 
+pub mod trig;
+
 /// PCG-XSH-RR 64/32 (O'Neill, 2014).
 pub struct Pcg32 {
     state: u64,

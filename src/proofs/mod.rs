@@ -730,3 +730,53 @@ macro_rules! roots_spec {
 }
 
 roots_spec!(roots_spec_8, FixedFloat8, i8, i32, r32, 8, 4, 4);
+
+macro_rules! trig_no_panic {
+    ($name:ident, $T:ident) => {
+        /// `sin_turns` and `cos_turns` never panic. The range `[-1, 1]` of
+        /// 64 bits does not finish in 10 minutes; the oracle checks it.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let _ = (x.sin_turns(), x.cos_turns());
+        }
+    };
+    ($name:ident, $T:ident, range) => {
+        /// `sin_turns` and `cos_turns` never panic and stay in `[-1, 1]`.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let (s, c) = (x.sin_turns(), x.cos_turns());
+            assert!($T::NEG_ONE <= s && s <= $T::ONE);
+            assert!($T::NEG_ONE <= c && c <= $T::ONE);
+        }
+    };
+}
+
+trig_no_panic!(trig_no_panic_8, FixedFloat8, range);
+trig_no_panic!(trig_no_panic_16, FixedFloat16, range);
+trig_no_panic!(trig_no_panic_32, FixedFloat32, range);
+trig_no_panic!(trig_no_panic_64, FixedFloat64);
+
+macro_rules! trig_symmetry {
+    ($name:ident, $T:ident) => {
+        /// `sin(-x) = -sin(x)`, `cos(-x) = cos(x)` and `cos(x) = sin(x + ¼)`
+        /// bit for bit. On 32 and 64 bits the solver does not finish with two
+        /// symbolic series to compare; there the exhaustive test of
+        /// `FixedFloat32` and the random tests check the symmetries.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let (s, c) = (x.sin_turns(), x.cos_turns());
+            if x != $T::MIN {
+                assert_eq!((-x).sin_turns(), -s);
+                assert_eq!((-x).cos_turns(), c);
+            }
+            let quarter = $T::from_bits(1 << ($T::FRAC_BITS - 2));
+            assert_eq!(x.wrapping_add(quarter).sin_turns(), c);
+        }
+    };
+}
+
+trig_symmetry!(trig_symmetry_8, FixedFloat8);
+trig_symmetry!(trig_symmetry_16, FixedFloat16);

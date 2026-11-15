@@ -225,3 +225,65 @@ impl Format {
         self.display_error_doubled(raw, text, precision) <= BigRational::from_integer(BigInt::one())
     }
 }
+
+/// Bits of the intervals of [`sin_turns`].
+pub const TRIG_SCALE: u32 = 256;
+
+/// π as an interval `[lo, hi] · 2^-TRIG_SCALE`: Machin's formula
+/// `π = 16·atan(1/5) - 4·atan(1/239)` with floored terms.
+fn pi_interval() -> (BigInt, BigInt) {
+    let atan_inv = |x: u64| {
+        let one = BigInt::one() << (TRIG_SCALE + 8);
+        let x = BigInt::from(x);
+        let mut sum = BigInt::zero();
+        let mut k = 0u64;
+        loop {
+            let term = &one / (BigInt::from(2 * k + 1) * x.pow(2 * k as u32 + 1));
+            if term.is_zero() {
+                return (sum, k + 1);
+            }
+            if k % 2 == 0 {
+                sum += term;
+            } else {
+                sum -= term;
+            }
+            k += 1;
+        }
+    };
+    let (a, na) = atan_inv(5);
+    let (b, nb) = atan_inv(239);
+    let mid = a * 16 - b * 4;
+    let err = BigInt::from(16 * na + 4 * nb);
+    ((&mid - &err) >> 8, ((&mid + &err) >> 8) + 1)
+}
+
+/// `sin(2π · raw / 2^frac)` as an interval `[lo, hi] · 2^-TRIG_SCALE`: the
+/// Taylor series of `sin x` on the whole `x ∈ [0, 2π)`, without symmetry,
+/// each term `⌊X^n / (n! · 2^(TRIG_SCALE·(n-1)))⌋` computed from the exact
+/// power. Shares no code with fulcrum or `tests/common/trig.rs`.
+pub fn sin_turns(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    let t = BigInt::from(raw).mod_floor(&(BigInt::one() << frac));
+    let (plo, phi) = pi_interval();
+    let x: BigInt = (&t * &plo * BigInt::from(2)) >> frac;
+    let width: BigInt = (((&t * &phi * BigInt::from(2)) >> frac) + 1) - &x;
+    let mut sum = BigInt::zero();
+    let mut fact = BigInt::one();
+    let mut n = 1u32;
+    let mut terms = 0u64;
+    loop {
+        let term = x.pow(n) / (&fact << (TRIG_SCALE * (n - 1)));
+        terms += 1;
+        if term.is_zero() && BigInt::from(n) > &x >> (TRIG_SCALE - 2) {
+            break;
+        }
+        if n % 4 == 1 {
+            sum += term;
+        } else {
+            sum -= term;
+        }
+        fact *= BigInt::from((n + 1) * (n + 2));
+        n += 2;
+    }
+    let err = width + terms + 3;
+    (&sum - &err, sum + err)
+}
