@@ -9,11 +9,11 @@ Deterministic fixed-point math for Rust: bit-identical results on every platform
 
 Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32).
 
-> **Status:** stages 1–3 of the [roadmap](ROADMAP.md) are done: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, and correctly rounded `sqrt`, `rsqrt`, `hypot`; optional `serde`, `bytemuck` and `num-traits` support. Stage 4 is in progress: `sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, all within 1 ulp, and the wrapping angle types `Angle8` … `Angle64`. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
+> **Status:** stages 1–4 of the [roadmap](ROADMAP.md) are done: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, correctly rounded `sqrt`, `rsqrt`, `hypot`; trigonometry within 1 ulp (`sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, `atan`, `atan2`, `asin`, `acos`) and the wrapping angle types `Angle8` … `Angle64`; optional `serde`, `bytemuck` and `num-traits` support. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.3.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.4.0" }
 ```
 
 ## Example
