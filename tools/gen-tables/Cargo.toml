@@ -5,7 +5,7 @@ edition = "2021"
 authors = ["Samvel Safaryan <samvelsafaryan1313@gmail.com>"]
 license = "Apache-2.0"
 publish = false
-description = "Generates src/tables/*.rs and verify/gappa/*.g from one description (docs/ARCHITECTURE.md §4.4)."
+description = "Generates src/tables/*.rs with exact interval arithmetic (docs/ARCHITECTURE.md §4.4)."
 
 [workspace]
 
