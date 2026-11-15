@@ -204,6 +204,8 @@ pub trait FixedFloat:
     fn round(self) -> Self;
     /// `√self`, correctly rounded; a negative `self` gives `0`.
     fn sqrt(self) -> Self;
+    /// Sine and cosine of an angle in radians, each within 1 ulp.
+    fn sin_cos(self) -> (Self, Self);
 }
 
 macro_rules! literal_macro {

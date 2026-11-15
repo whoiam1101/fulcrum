@@ -535,6 +535,44 @@ macro_rules! define_fixed {
                 Self { raw: crate::trig::cos_turns(self.raw as u64, $F) as $Bits }
             }
 
+            /// `sin(self)` of an angle of `self` radians, within 1 ulp. The
+            /// range reduction multiplies by 192 bits of `2/π` exactly, so it
+            /// loses nothing on any input; the result is in `[-1, 1]`, and
+            /// `sin(-x) = -sin(x)` bit for bit for every `x > MIN`.
+            #[inline]
+            pub const fn sin(self) -> Self {
+                Self { raw: crate::trig::sin(self.raw as i64, $F) as $Bits }
+            }
+
+            /// `cos(self)` of an angle of `self` radians, within 1 ulp;
+            /// `cos(-x) = cos(x)` bit for bit for every `x > MIN`.
+            #[inline]
+            pub const fn cos(self) -> Self {
+                Self { raw: crate::trig::cos(self.raw as i64, $F) as $Bits }
+            }
+
+            /// `(self.sin(), self.cos())` with one range reduction.
+            #[inline]
+            pub const fn sin_cos(self) -> (Self, Self) {
+                let (s, c) = crate::trig::sin_cos(self.raw as i64, $F);
+                (Self { raw: s as $Bits }, Self { raw: c as $Bits })
+            }
+
+            /// `tan(self)` of an angle of `self` radians, within 1 ulp and
+            /// saturated near the poles; `tan(-x) = -tan(x)` bit for bit for
+            /// every `x > MIN`.
+            #[inline]
+            pub const fn tan(self) -> Self {
+                Self::saturate(crate::trig::tan(self.raw as i64, $F) as crate::kernel::$k::Wide)
+            }
+
+            /// `tan(self)` within 1 ulp, or `None` when the rounded result
+            /// is out of range.
+            #[inline]
+            pub const fn checked_tan(self) -> Option<Self> {
+                Self::checked(crate::trig::tan(self.raw as i64, $F) as crate::kernel::$k::Wide)
+            }
+
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
             pub const fn signum(self) -> Self {
@@ -751,6 +789,10 @@ macro_rules! define_fixed {
             #[inline]
             fn sqrt(self) -> Self {
                 Self::sqrt(self)
+            }
+            #[inline]
+            fn sin_cos(self) -> (Self, Self) {
+                Self::sin_cos(self)
             }
         }
 
