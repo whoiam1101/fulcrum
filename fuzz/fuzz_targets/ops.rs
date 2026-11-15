@@ -1,8 +1,9 @@
 //! Arbitrary operands: no operation panics; `*`, `/`, `mul_add`, `mul_div`,
 //! `lerp`, `sqrt`, `rsqrt`, `hypot` and their `checked_*` equal the exact
-//! rational oracle; `sin`, `cos` and `tan` (clamped to the range) are within
-//! 1 ulp of the interval oracle; `+`, `-`
-//! saturate exactly; `%` is exact.
+//! rational oracle; `sin`, `cos`, `tan` (clamped to the range), `atan`,
+//! `atan2`, `asin`, `acos` and `sin`, `cos` of the angle type are within 1
+//! ulp of the interval oracle, its `to_radians` and `from_radians` equal it
+//! where it decides the rounding; `+`, `-` saturate exactly; `%` is exact.
 
 #![no_main]
 
@@ -75,6 +76,39 @@ macro_rules! check {
                 ));
             }
             assert_eq!(x.checked_tan().unwrap_or(x.tan()), x.tan());
+            let unit = (a as i128).rem_euclid((1 << ($frac + 1)) + 1) - (1 << $frac);
+            let u = $T::from_bits(unit as $Bits);
+            let inverse = [
+                (fulcrum_oracle::atan(a as i128, $frac), x.atan()),
+                (fulcrum_oracle::atan2(a as i128, b as i128), x.atan2(y)),
+                (fulcrum_oracle::asin(unit, $frac), u.asin()),
+                (fulcrum_oracle::acos(unit, $frac), u.acos()),
+            ];
+            for (exact, got) in inverse {
+                assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+            }
+            let g = <<$T as FixedFloat>::Angle>::from_bits(a as _);
+            let t = g.to_bits() as u64;
+            let (s, c) = g.sin_cos();
+            let turns = [
+                (fulcrum_oracle::sin_turns(t as i128, $bits), s),
+                (
+                    fulcrum_oracle::sin_turns(t as i128 + (1 << ($bits - 2)), $bits),
+                    c,
+                ),
+            ];
+            for (exact, got) in turns {
+                assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+            }
+            if let Some(r) = fulcrum_oracle::angle_to_radians(t, $bits, $frac) {
+                assert_eq!(BigInt::from(g.to_radians().to_bits()), r);
+            }
+            if let Some(r) = fulcrum_oracle::angle_from_radians(b as i128, $frac, $bits) {
+                assert_eq!(
+                    <<$T as FixedFloat>::Angle>::from_radians(y).to_bits() as u64,
+                    r
+                );
+            }
             assert_eq!((x + y).to_bits(), a.saturating_add(b));
             assert_eq!((x - y).to_bits(), a.saturating_sub(b));
             if b != 0 {

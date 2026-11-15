@@ -13,7 +13,7 @@ use common::{Fnv, Pcg32};
 use fulcrum::*;
 
 const ROUNDS: usize = 250_000;
-const GOLDEN: u64 = 0x847c_cf23_4b3b_1c81;
+const GOLDEN: u64 = 0x268a_4fee_8564_c727;
 
 macro_rules! mix {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
@@ -44,6 +44,12 @@ macro_rules! mix {
             a.sin(),
             a.cos(),
             a.tan(),
+            a.atan(),
+            a.atan2(b),
+            a.asin(),
+            a.acos(),
+            (a % $T::ONE).asin(),
+            (a % $T::ONE).acos(),
         ] {
             $h.write(&v.to_le_bytes());
         }
@@ -54,6 +60,12 @@ macro_rules! mix {
         acc.add_product(a, b);
         $h.write(&acc.finish().to_le_bytes());
         $h.write(&[a, b, a].iter().sum::<$T>().to_le_bytes());
+        let g =
+            <$T as FixedFloat>::Angle::from_radians(a) + <$T as FixedFloat>::Angle::from_turns(b);
+        let (s, c) = g.sin_cos();
+        for v in [s, c, g.to_turns(), g.to_radians(), g.scale(b).to_turns()] {
+            $h.write(&v.to_le_bytes());
+        }
         let text = a.to_string();
         $h.write(text.as_bytes());
         $h.write(&text.parse::<$T>().unwrap().to_le_bytes());

@@ -343,3 +343,137 @@ pub fn tan(raw: i128, frac: u32) -> Option<(BigInt, BigInt)> {
     let hi = corners.iter().max().unwrap() + 1;
     Some((lo, hi))
 }
+
+/// `atan(n/d)` for `0 ≤ n ≤ d`, `d > 0`, as an interval
+/// `[lo, hi] · 2^-TRIG_SCALE`: Euler's series
+/// `Σ 4^k (k!)² / (2k+1)! · n^(2k+1) d / (n² + d²)^(k+1)`, whose ratio is at
+/// most `½`, each term floored for `lo` and ceiled for `hi`, and the tail
+/// bounded by twice the first term left out. Shares no code with fulcrum or
+/// `tests/common/trig.rs`.
+fn atan_euler(n: &BigInt, d: &BigInt) -> (BigInt, BigInt) {
+    let r = n * n + d * d;
+    let n2 = n * n;
+    let first = (n * d) << TRIG_SCALE;
+    let (mut lo, mut hi) = (first.div_floor(&r), div_ceil(&first, &r));
+    let (mut sum_lo, mut sum_hi) = (BigInt::zero(), BigInt::zero());
+    let mut k = 0u64;
+    loop {
+        sum_lo += &lo;
+        sum_hi += &hi;
+        let num = BigInt::from(2 * k + 2) * &n2;
+        let den = BigInt::from(2 * k + 3) * &r;
+        lo = (lo * &num).div_floor(&den);
+        hi = div_ceil(&(hi * &num), &den);
+        k += 1;
+        if hi <= BigInt::one() {
+            return (sum_lo, sum_hi + 2);
+        }
+    }
+}
+
+fn div_ceil(a: &BigInt, b: &BigInt) -> BigInt {
+    -((-a).div_floor(b))
+}
+
+/// `atan2(y, x)` of two integers of the same scale as an interval
+/// `[lo, hi] · 2^-TRIG_SCALE` in `[-π, π]`; `atan2(0, x ≥ 0) = 0`.
+pub fn atan2_int(y: &BigInt, x: &BigInt) -> (BigInt, BigInt) {
+    if y.is_zero() && !x.is_negative() {
+        return (BigInt::zero(), BigInt::zero());
+    }
+    let (plo, phi) = pi_interval();
+    let (n, d) = (y.abs(), x.abs());
+    let (lo, hi) = if n <= d {
+        atan_euler(&n, &d)
+    } else {
+        let (lo, hi) = atan_euler(&d, &n);
+        ((&plo >> 1u32) - hi - 1, (&phi >> 1u32) + 1 - lo)
+    };
+    let (lo, hi) = if x.is_negative() {
+        (plo - hi, phi - lo)
+    } else {
+        (lo, hi)
+    };
+    if y.is_negative() {
+        (-hi, -lo)
+    } else {
+        (lo, hi)
+    }
+}
+
+/// `atan2(y, x)` of two raw values as an interval `[lo, hi] · 2^-TRIG_SCALE`.
+pub fn atan2(y: i128, x: i128) -> (BigInt, BigInt) {
+    atan2_int(&BigInt::from(y), &BigInt::from(x))
+}
+
+/// `atan(raw / 2^frac)` as an interval `[lo, hi] · 2^-TRIG_SCALE`.
+pub fn atan(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    atan2(raw, 1 << frac)
+}
+
+/// `asin(raw / 2^frac) = atan2(x, √(1 - x²))` for `|raw| ≤ 2^frac` as an
+/// interval `[lo, hi] · 2^-TRIG_SCALE`, from the interval `[s, s + 1]` of the
+/// root at `2^-TRIG_SCALE`: the angle falls as the root grows.
+pub fn asin(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    let m = BigInt::from(raw).abs();
+    let one = BigInt::one() << frac;
+    let s: BigInt = ((&one * &one - &m * &m) << (2 * (TRIG_SCALE - frac))).sqrt();
+    let x = m << (TRIG_SCALE - frac);
+    let (lo, _) = atan2_int(&x, &(&s + 1));
+    let (_, hi) = atan2_int(&x, &s);
+    if raw < 0 {
+        (-hi, -lo)
+    } else {
+        (lo, hi)
+    }
+}
+
+/// `acos(raw / 2^frac) = π/2 - asin(raw / 2^frac)` for `|raw| ≤ 2^frac` as
+/// an interval `[lo, hi] · 2^-TRIG_SCALE`.
+pub fn acos(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    let (plo, phi) = pi_interval();
+    let (lo, hi) = asin(raw, frac);
+    ((plo >> 1u32) - hi - 1, (phi >> 1u32) + 1 - lo)
+}
+
+/// The angle `t / 2^n` of a turn in radians, `2π · s / 2^n` for the signed
+/// `s ≡ t (mod 2^n)` in `[-2^(n-1), 2^(n-1))`, rounded to `frac` fractional
+/// bits, or `None` when the interval of `π` cannot decide the rounding.
+pub fn angle_to_radians(t: u64, n: u32, frac: u32) -> Option<BigInt> {
+    let s = BigInt::from(((t as u128) << (128 - n)) as i128 >> (128 - n));
+    let (plo, phi) = pi_interval();
+    let scale = TRIG_SCALE + n - frac;
+    let (a, b) = if s.is_negative() {
+        (&s * &phi * 2, &s * &plo * 2)
+    } else {
+        (&s * &plo * 2, &s * &phi * 2)
+    };
+    let half = BigInt::one() << (scale - 1);
+    let (ra, rb) = ((a + &half) >> scale, (b + &half) >> scale);
+    if ra == rb {
+        Some(ra)
+    } else {
+        None
+    }
+}
+
+/// The angle `raw / 2^frac` radians as `n` bits of a turn,
+/// `round(raw / 2^frac / 2π · 2^n) mod 2^n`, or `None` when the interval of
+/// `π` cannot decide the rounding.
+pub fn angle_from_radians(raw: i128, frac: u32, n: u32) -> Option<u64> {
+    let (plo, phi) = pi_interval();
+    let extra = 64u32;
+    let num = BigInt::from(raw) << (TRIG_SCALE + n - frac + extra);
+    let (a, b) = if raw < 0 {
+        (num.div_floor(&(&plo * 2)), div_ceil(&num, &(&phi * 2)))
+    } else {
+        (num.div_floor(&(&phi * 2)), div_ceil(&num, &(&plo * 2)))
+    };
+    let half = BigInt::one() << (extra - 1);
+    let (ra, rb) = ((a + &half) >> extra, (b + &half) >> extra);
+    if ra != rb {
+        return None;
+    }
+    let modulus = BigInt::one() << n;
+    ra.mod_floor(&modulus).to_u64()
+}

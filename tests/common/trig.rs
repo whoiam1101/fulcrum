@@ -11,6 +11,10 @@
 //! with `π/2` at `127 - f` fractional bits (not the multiplication by `2/π`
 //! of `src/trig.rs`) and take the same series of the remainder; [`tan`] is
 //! the interval of their quotient.
+//!
+//! The inverse functions halve the argument of `atan` three times instead
+//! of the table of `src/trig.rs`, and [`asin`] is `2·atan(x / (1 + √(1 - x²)))`
+//! instead of `atan2(x, √(1 - x²))`.
 
 /// Fractional bits of the reference values.
 pub const SCALE: u32 = 64;
@@ -144,6 +148,109 @@ pub fn cos(raw: i128, f: u32) -> i128 {
     let (k, phi, negative) = reduce(raw, f);
     let (s, c) = sin_cos_rest(phi, negative);
     [c, -s, -c, s][k as usize]
+}
+
+/// `⌊√n⌋`, bit by bit.
+fn isqrt(n: u128) -> u128 {
+    let mut root = 0u128;
+    let mut bit = 1u128 << 126;
+    let mut n = n;
+    while bit > n {
+        bit >>= 2;
+    }
+    while bit != 0 {
+        if n >= root + bit {
+            n -= root + bit;
+            root = (root >> 1) + bit;
+        } else {
+            root >>= 1;
+        }
+        bit >>= 2;
+    }
+    root
+}
+
+/// `π/2 · 2^64`, rounded to nearest.
+fn frac_pi_2() -> i128 {
+    ((FRAC_PI_2_126 + 2) >> 62) as i128
+}
+
+/// `atan t · 2^64` for `t = w / 2^64 ∈ [0, 1]`: three halvings
+/// `t → t / (1 + √(1 + t²))` to `t ≤ tan(π/32)`, the full Taylor series,
+/// times 8. No table.
+fn atan_unit(w: u128) -> u128 {
+    let mut t = w;
+    for _ in 0..3 {
+        let half = t >> 1;
+        let s = isqrt((1 << 126) + half * half) << 1;
+        t = (t << 63) / ((ONE + s) >> 1);
+    }
+    let t2 = mul(t, t);
+    let mut power = t;
+    let mut sum = t as i128;
+    let mut k = 1u128;
+    loop {
+        power = mul(power, t2);
+        let term = power / (2 * k + 1);
+        if term == 0 {
+            return (sum << 3) as u128;
+        }
+        sum += if k % 2 == 1 {
+            -(term as i128)
+        } else {
+            term as i128
+        };
+        k += 1;
+    }
+}
+
+/// `atan(n / d) · 2^64 ∈ [0, π/2]` for `n, d < 2^64`, not both `0`:
+/// `π/2 - atan(d / n)` when `n > d`.
+fn atan_ratio(n: u128, d: u128) -> i128 {
+    if n <= d {
+        atan_unit((n << 64) / d) as i128
+    } else {
+        frac_pi_2() - atan_unit((d << 64) / n) as i128
+    }
+}
+
+/// `atan2(y, x) · 2^64` of two raw values of the same scale, in `(-π, π]`;
+/// `atan2(0, 0) = 0`.
+pub fn atan2(y: i128, x: i128) -> i128 {
+    if y == 0 && x >= 0 {
+        return 0;
+    }
+    let a = atan_ratio(y.unsigned_abs(), x.unsigned_abs());
+    let a = if x < 0 { 2 * frac_pi_2() - a } else { a };
+    if y < 0 {
+        -a
+    } else {
+        a
+    }
+}
+
+/// `atan(raw / 2^f) · 2^64`, within [`ERROR`]. `f ≤ 63`, `|raw| ≤ 2^64`.
+pub fn atan(raw: i128, f: u32) -> i128 {
+    atan2(raw, 1 << f)
+}
+
+/// `asin(raw / 2^f) · 2^64 = 2·atan(x / (1 + √(1 - x²)))`, within
+/// [`ERROR`]. `|raw| ≤ 2^f`, `f ≤ 32`.
+pub fn asin(raw: i128, f: u32) -> i128 {
+    let m = raw.unsigned_abs();
+    let s = isqrt(((1u128 << (2 * f)) - m * m) << (126 - 2 * f));
+    let a = 2 * atan_ratio(m << (63 - f), (1 << 63) + s);
+    if raw < 0 {
+        -a
+    } else {
+        a
+    }
+}
+
+/// `acos(raw / 2^f) · 2^64 = π/2 - asin(raw / 2^f)`, within [`ERROR`].
+/// `|raw| ≤ 2^f`, `f ≤ 32`.
+pub fn acos(raw: i128, f: u32) -> i128 {
+    frac_pi_2() - asin(raw, f)
 }
 
 /// `[lo, hi] · 2^-64` containing `tan(raw / 2^f)`, or `None` when the
