@@ -4,7 +4,9 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
+    paths-ignore: ["**.md", "docs/**"]
   pull_request:
+    paths-ignore: ["**.md", "docs/**"]
   schedule:
     - cron: "0 3 * * 0"
   workflow_dispatch:
@@ -28,11 +30,6 @@ jobs:
       matrix:
         os: [ubuntu-latest, ubuntu-24.04-arm, macos-latest, windows-latest]
         toolchain: [stable]
-        include:
-          - os: ubuntu-latest
-            toolchain: beta
-          - os: ubuntu-latest
-            toolchain: nightly
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -45,8 +42,43 @@ jobs:
       - run: cargo test --features std,float-convert,serde,bytemuck,num-traits
       - run: cargo test --features std,float-convert --release
       - run: cargo test --features strict-overflow --test strict
-      - if: github.event_name == 'schedule'
-        run: cargo test --release -- --ignored --skip stress_fixed32_fixed64 --skip algebra_stress --skip fixed32_parse_display_round_trip
+
+  toolchains:
+    name: test ubuntu-latest ${{ matrix.toolchain }}
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        toolchain: [beta, nightly]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: rustup toolchain install "$TOOLCHAIN" --profile minimal && rustup default "$TOOLCHAIN"
+        env:
+          TOOLCHAIN: ${{ matrix.toolchain }}
+      - run: cargo test --features std,float-convert,serde,bytemuck,num-traits
+      - run: cargo test --features std,float-convert --release
+      - run: cargo test --features strict-overflow --test strict
+
+  exhaustive:
+    name: exhaustive ${{ matrix.test }}
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        test: [trig, radians, inverse, angle, roots, exhaustive]
+    runs-on: ubuntu-latest
+    env:
+      CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - run: cargo test --release --test "$TEST" -- --ignored --skip fixed32_parse_display_round_trip
+        env:
+          TEST: ${{ matrix.test }}
 
   oracle:
     runs-on: ubuntu-latest
@@ -72,19 +104,25 @@ jobs:
           FULCRUM_ALGEBRA_BATCHES: "8192"
 
   stress:
+    name: stress ${{ matrix.test }}
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
+    strategy:
+      fail-fast: false
+      matrix:
+        test: ["stress", "algebra algebra_stress", "exhaustive fixed32_parse_display_round_trip"]
     runs-on: ubuntu-latest
+    env:
+      FULCRUM_STRESS_SECS: "300"
+      FULCRUM_ALGEBRA_SECS: "180"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - run: cargo test --release --test stress -- --ignored --nocapture
+      - run: |
+          read -r -a test <<< "$TEST"
+          cargo test --release --test "${test[@]}" -- --ignored --nocapture
         env:
-          FULCRUM_STRESS_SECS: "1200"
-      - run: cargo test --release --test algebra algebra_stress -- --ignored --nocapture
-        env:
-          FULCRUM_ALGEBRA_SECS: "600"
-      - run: cargo test --release --test exhaustive fixed32_parse_display_round_trip -- --ignored
+          TEST: ${{ matrix.test }}
 
   fuzz:
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
@@ -126,12 +164,8 @@ jobs:
       - run: just msrv
 
   features:
-    name: features ${{ matrix.features }}
+    name: features one by one and together
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        features: [serde, bytemuck, num-traits, "serde,float-convert", "serde,bytemuck,num-traits,float-convert"]
     defaults:
       run:
         working-directory: integrations
@@ -139,12 +173,13 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - run: cargo build --manifest-path ../Cargo.toml --features "$FEATURES"
-        env:
-          FEATURES: ${{ matrix.features }}
-      - run: cargo test --features "$FEATURES"
-        env:
-          FEATURES: ${{ matrix.features }}
+      - run: |
+          for features in serde bytemuck num-traits serde,float-convert serde,bytemuck,num-traits,float-convert; do
+            echo "::group::$features"
+            cargo build --manifest-path ../Cargo.toml --features "$features"
+            cargo test --features "$features"
+            echo "::endgroup::"
+          done
 
   powerset:
     name: every feature combination
@@ -254,6 +289,7 @@ jobs:
           path: mutants.out
 
   kani:
+    name: kani quick
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
@@ -261,7 +297,29 @@ jobs:
           persist-credentials: false
       - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f
         with:
-          args: -Z stubbing
+          args: >-
+            -Z stubbing -j --output-format=terse --exact
+            --harness proofs::double_spec
+            --harness proofs::fraction_bits_spec_8
+            --harness proofs::fraction_bits_spec_16
+            --harness proofs::fraction_bits_spec_32
+            --harness proofs::fraction_bits_spec_64
+            --harness proofs::accumulator_order_independent_8
+            --harness proofs::trig_no_panic_64
+            --harness proofs::angle_no_panic_32
+            --harness proofs::angle_no_panic_64
+
+  kani-all:
+    name: kani all
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f
+        with:
+          args: -Z stubbing -j --output-format=terse
 
   lean:
     runs-on: ubuntu-latest

@@ -95,13 +95,26 @@ fn fixed16_all_values_correctly_rounded() {
     assert_eq!(rounded, 2 * 65536);
 }
 
+/// Every value of `FixedFloat32`, on every available thread.
 #[test]
 #[ignore]
 fn fixed32_all_values_correctly_rounded() {
-    let mut rounded = 0u64;
-    for a in i32::MIN..=i32::MAX {
-        rounded += check_trig!(FixedFloat32, 16, a) as u64;
-    }
+    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()) as i64;
+    let span = (1i64 << 32) / threads + 1;
+    let workers: Vec<_> = (0..threads)
+        .map(|k| {
+            std::thread::spawn(move || {
+                let start = i32::MIN as i64 + k * span;
+                let end = (start + span).min(i32::MAX as i64 + 1);
+                let mut rounded = 0u64;
+                for a in start..end {
+                    rounded += check_trig!(FixedFloat32, 16, a as i32) as u64;
+                }
+                rounded
+            })
+        })
+        .collect();
+    let rounded: u64 = workers.into_iter().map(|w| w.join().unwrap()).sum();
     assert_eq!(rounded, 2 << 32);
 }
 

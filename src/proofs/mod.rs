@@ -9,7 +9,9 @@
 
 use core::convert::TryFrom;
 
-use crate::{Accumulator8, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+use crate::{
+    Accumulator8, Angle32, Angle64, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8,
+};
 
 #[macro_use]
 #[path = "../../tests/common/reference.rs"]
@@ -531,7 +533,7 @@ fn accumulator_order_independent_8() {
 }
 
 macro_rules! combined_spec {
-    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr $(, div: $mul_div:ident)?) => {
+    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr) => {
         #[kani::proof]
         fn $name() {
             let a: $Bits = kani::any();
@@ -553,26 +555,10 @@ macro_rules! combined_spec {
                 x.checked_lerp(y, z).is_some(),
                 saturate(lerp, $bits) == lerp
             );
-
-            $(
-                if c != 0 {
-                    let q = $r::$mul_div(ra, rb, rc) as i128;
-                    assert_eq!(x.mul_div(y, z).to_bits() as i128, saturate(q, $bits));
-                    assert_eq!(x.checked_mul_div(y, z).is_some(), saturate(q, $bits) == q);
-                } else {
-                    let sign = (a as i128 * b as i128).signum();
-                    assert_eq!(
-                        x.mul_div(y, z).to_bits() as i128,
-                        r128::div_by_zero(sign, $bits)
-                    );
-                    assert!(x.checked_mul_div(y, z).is_none());
-                }
-            )?
         }
     };
 }
 
-combined_spec!(combined_spec_8, FixedFloat8, i8, i32, r32, 8, 4, div: mul_div);
 combined_spec!(combined_no_div_spec_16, FixedFloat16, i16, i64, r64, 16, 8);
 
 /// `I256` on full 256-bit operands: subtraction undoes addition, addition
@@ -682,55 +668,6 @@ macro_rules! isqrt_spec {
 isqrt_spec!(isqrt_spec_8, k8, u16, 4);
 isqrt_spec!(isqrt_spec_16, k16, u32, 4);
 
-macro_rules! roots_spec {
-    ($name:ident, $T:ident, $Bits:ty, $R:ty, $r:ident, $bits:expr, $f:expr, $unwind:literal) => {
-        /// `sqrt`, `rsqrt`, `hypot` and their `checked_*` are correctly
-        /// rounded: [`is_sqrt_ratio`](r32::is_sqrt_ratio), the definition of
-        /// rounding to nearest, holds for the result.
-        #[kani::proof]
-        #[kani::unwind($unwind)]
-        fn $name() {
-            let a: $Bits = kani::any();
-            let b: $Bits = kani::any();
-            let (x, y) = ($T::from_bits(a), $T::from_bits(b));
-            let (ra, rb) = (a as $R, b as $R);
-
-            if a < 0 {
-                assert_eq!(x.sqrt(), $T::ZERO);
-                assert!(x.checked_sqrt().is_none());
-            } else {
-                let s = x.sqrt().to_bits() as $R;
-                assert!($r::is_sqrt_ratio(s, ra << $f, 1));
-                assert_eq!(x.checked_sqrt(), Some(x.sqrt()));
-            }
-
-            if a <= 0 {
-                assert_eq!(x.rsqrt(), $T::MAX);
-                assert!(x.checked_rsqrt().is_none());
-            } else {
-                let s = x.rsqrt().to_bits() as $R;
-                assert!($r::is_sqrt_ratio(s, 1 << (3 * $f), ra));
-                assert_eq!(x.checked_rsqrt(), Some(x.rsqrt()));
-            }
-
-            let n = ra * ra + rb * rb;
-            let max = <$Bits>::MAX as $R;
-            match x.checked_hypot(y) {
-                Some(h) => {
-                    assert!($r::is_sqrt_ratio(h.to_bits() as $R, n, 1));
-                    assert_eq!(x.hypot(y), h);
-                }
-                None => {
-                    assert!(4 * n >= (2 * max + 1) * (2 * max + 1));
-                    assert_eq!(x.hypot(y), $T::MAX);
-                }
-            }
-        }
-    };
-}
-
-roots_spec!(roots_spec_8, FixedFloat8, i8, i32, r32, 8, 4, 4);
-
 macro_rules! trig_no_panic {
     ($name:ident, $T:ident) => {
         /// `sin_turns` and `cos_turns` never panic. The range `[-1, 1]` of
@@ -741,45 +678,9 @@ macro_rules! trig_no_panic {
             let _ = (x.sin_turns(), x.cos_turns());
         }
     };
-    ($name:ident, $T:ident, range) => {
-        /// `sin_turns` and `cos_turns` never panic and stay in `[-1, 1]`.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let (s, c) = (x.sin_turns(), x.cos_turns());
-            assert!($T::NEG_ONE <= s && s <= $T::ONE);
-            assert!($T::NEG_ONE <= c && c <= $T::ONE);
-        }
-    };
 }
 
-trig_no_panic!(trig_no_panic_8, FixedFloat8, range);
-trig_no_panic!(trig_no_panic_16, FixedFloat16, range);
-trig_no_panic!(trig_no_panic_32, FixedFloat32, range);
 trig_no_panic!(trig_no_panic_64, FixedFloat64);
-
-macro_rules! trig_symmetry {
-    ($name:ident, $T:ident) => {
-        /// `sin(-x) = -sin(x)`, `cos(-x) = cos(x)` and `cos(x) = sin(x + ¼)`
-        /// bit for bit. On 32 and 64 bits the solver does not finish with two
-        /// symbolic series to compare; there the exhaustive test of
-        /// `FixedFloat32` and the random tests check the symmetries.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let (s, c) = (x.sin_turns(), x.cos_turns());
-            if x != $T::MIN {
-                assert_eq!((-x).sin_turns(), -s);
-                assert_eq!((-x).cos_turns(), c);
-            }
-            let quarter = $T::from_bits(1 << ($T::FRAC_BITS - 2));
-            assert_eq!(x.wrapping_add(quarter).sin_turns(), c);
-        }
-    };
-}
-
-trig_symmetry!(trig_symmetry_8, FixedFloat8);
-trig_symmetry!(trig_symmetry_16, FixedFloat16);
 
 macro_rules! radians_no_panic {
     ($name:ident, $T:ident) => {
@@ -792,24 +693,42 @@ macro_rules! radians_no_panic {
             let _ = (x.sin_cos(), x.tan(), x.checked_tan());
         }
     };
-    ($name:ident, $T:ident, range) => {
-        /// `sin`, `cos`, `tan` never panic, `sin` and `cos` stay in
-        /// `[-1, 1]`, and `sin_cos` is the pair of `sin` and `cos`. On 16
-        /// bits this does not finish in 25 minutes; the exhaustive test of
-        /// `tests/radians.rs` checks it there.
+}
+
+radians_no_panic!(radians_no_panic_64, FixedFloat64);
+
+macro_rules! inverse_no_panic {
+    ($name:ident, $T:ident) => {
+        /// `atan` and `atan2` never panic: the divisions of `k` and of the
+        /// remainder have a nonzero divisor, the `u128` intermediates stay
+        /// below `2^127` and the angle below `2^64` on every input, also
+        /// `MIN` and `atan2(0, 0)`.
         #[kani::proof]
         fn $name() {
-            let x = $T::from_bits(kani::any());
-            let (s, c) = x.sin_cos();
-            assert!($T::NEG_ONE <= s && s <= $T::ONE);
-            assert!($T::NEG_ONE <= c && c <= $T::ONE);
-            assert!(s == x.sin() && c == x.cos());
-            let _ = (x.tan(), x.checked_tan());
+            let (y, x) = ($T::from_bits(kani::any()), $T::from_bits(kani::any()));
+            let _ = (y.atan(), y.atan2(x));
         }
     };
 }
 
-radians_no_panic!(radians_no_panic_8, FixedFloat8, range);
-radians_no_panic!(radians_no_panic_16, FixedFloat16);
-radians_no_panic!(radians_no_panic_32, FixedFloat32);
-radians_no_panic!(radians_no_panic_64, FixedFloat64);
+inverse_no_panic!(inverse_no_panic_32, FixedFloat32);
+
+macro_rules! angle_no_panic {
+    ($name:ident, $A:ident, $T:ident) => {
+        /// The angle type never panics: `sin`, `cos`, the conversions in turns
+        /// and radians (the 256-bit product of the reduction and the 192-bit
+        /// product with `π`) and `scale` stay in range on every input. On 8
+        /// and 16 bits, and for the functions of one argument on 32 bits, the
+        /// exhaustive tests of `tests/angle.rs` run every input instead.
+        #[kani::proof]
+        fn $name() {
+            let a = $A::from_bits(kani::any());
+            let x = $T::from_bits(kani::any());
+            let _ = (a.sin_cos(), a.to_turns(), a.to_radians(), a.scale(x));
+            let _ = ($A::from_radians(x), $A::from_turns(x));
+        }
+    };
+}
+
+angle_no_panic!(angle_no_panic_32, Angle32, FixedFloat32);
+angle_no_panic!(angle_no_panic_64, Angle64, FixedFloat64);

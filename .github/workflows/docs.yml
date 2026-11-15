@@ -1,0 +1,32 @@
+name: docs
+
+on:
+  push:
+    branches: [main]
+    paths: ["**.md", "docs/**"]
+  pull_request:
+    paths: ["**.md", "docs/**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: docs-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  docs:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: typos@1.52.2
+      - run: typos
+      - run: cargo test --test source_rules
+      - run: cargo test --doc --all-features
