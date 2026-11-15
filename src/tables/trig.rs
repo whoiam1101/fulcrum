@@ -12,6 +12,14 @@ pub(crate) const STEPS: u32 = 8;
 /// π/2, correctly rounded.
 pub(crate) const FRAC_PI_2: u64 = 7244019458077122842;
 
+/// `2/π · 2^192`, correctly rounded, most significant word first: the
+/// range reduction of the functions in radians.
+pub(crate) const FRAC_2_PI: [u64; 3] = [
+    11743562013128004905,
+    18169587780923219392,
+    15808362127397457986,
+];
+
 /// `sin(k/2^STEPS · π/2)` for `k = 0 ..= 2^STEPS`, correctly rounded.
 pub(crate) const SIN_QUARTER: [u64; 257] = [
     0,

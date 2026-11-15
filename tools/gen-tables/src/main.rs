@@ -297,6 +297,9 @@ fn render() -> String {
 /// `src/trig.rs`.
 const TRIG_FRAC: u32 = 62;
 
+/// Bits of `2/π` for the range reduction in radians.
+const TRIG_REDUCTION_BITS: u32 = 192;
+
 /// Points of the quarter-circle table: `sin(k/2^TRIG_STEPS · π/2)` for
 /// `k = 0 ..= 2^TRIG_STEPS`.
 const TRIG_STEPS: u32 = 8;
@@ -353,6 +356,23 @@ fn render_trig() -> String {
         pi.div_int(2).round_to(TRIG_FRAC)
     )
     .unwrap();
+    let two_over_pi = pi.recip().mul_int(2).round_to(TRIG_REDUCTION_BITS);
+    let mask = (BigInt::one() << 64u32) - 1;
+    let words: Vec<String> = (0..3u32)
+        .rev()
+        .map(|i| ((&two_over_pi >> (64 * i)) & &mask).to_string())
+        .collect();
+    writeln!(
+        out,
+        "/// `2/π · 2^{}`, correctly rounded, most significant word first: the\n/// range reduction of the functions in radians.",
+        TRIG_REDUCTION_BITS
+    )
+    .unwrap();
+    out.push_str("pub(crate) const FRAC_2_PI: [u64; 3] = [\n");
+    for w in &words {
+        writeln!(out, "    {},", w).unwrap();
+    }
+    out.push_str("];\n\n");
     writeln!(
         out,
         "/// `sin(k/2^STEPS · π/2)` for `k = 0 ..= 2^STEPS`, correctly rounded."
