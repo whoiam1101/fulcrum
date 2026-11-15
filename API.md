@@ -181,6 +181,26 @@ assert_eq!(FixedFloat32::MAX.hypot(FixedFloat32::MAX), FixedFloat32::MAX);
 
 `rsqrt` is one rounding of `1 / √x`, more accurate than `x.sqrt().recip()`, which rounds twice.
 
+### Sine and cosine in turns: `sin_turns`, `cos_turns`
+
+The angle is in turns: `1.0` is 360°, `0.25` is 90°. Only the fraction of a turn matters, so the range reduction is a bit mask: exact on every input, it never overflows, and a game angle stored in turns loses nothing to `π`. The result is in `[-1, 1]` and within 1 ulp of the exact value; on `FixedFloat8`, `FixedFloat16` and `FixedFloat32` every result is checked to be correctly rounded.
+
+| Method | Value | Symmetries, bit for bit (`-x` for `x > MIN`: `-MIN` saturates) |
+|---|---|---|
+| `x.sin_turns()` | `sin(2π·x)` | `sin_turns(-x) = -sin_turns(x)`, `sin_turns(x + 1) = sin_turns(x)` |
+| `x.cos_turns()` | `cos(2π·x)` | `cos_turns(x) = sin_turns(x + ¼)`, `cos_turns(-x) = cos_turns(x)` |
+
+```rust
+use fulcrum::{ff32, ff64, FixedFloat32};
+
+assert_eq!(ff32!(0.25).sin_turns(), FixedFloat32::ONE);
+assert_eq!(ff32!(0.5).cos_turns(), -FixedFloat32::ONE);
+assert_eq!(ff32!(1000.125).sin_turns(), ff32!(0.125).sin_turns());
+assert_eq!(ff64!(0.125).sin_turns(), ff64!(0.125).cos_turns());
+```
+
+Radians (`sin`, `cos`, `atan2`, …) and the `Angle` type come later in stage 4 ([roadmap](ROADMAP.md)).
+
 ## 5. Rounding and integers
 
 | Method | Rule | Overflow |
@@ -349,7 +369,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns` and `cos_turns` are within 1 ulp.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 
