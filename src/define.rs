@@ -13,6 +13,7 @@ macro_rules! define_fixed {
             frac_bits: $F:literal,
             bytes: $NB:literal,
             kernel: $k:ident,
+            angle: $Angle:ident,
             from_ints: [$($FromInt:ty),*],
             try_from_ints: [$($TryFromInt:ty),*],
         }
@@ -573,6 +574,74 @@ macro_rules! define_fixed {
                 Self::checked(crate::trig::tan(self.raw as i64, $F) as crate::kernel::$k::Wide)
             }
 
+            /// `atan(self)` in radians, in `[-π/2, π/2]`, within 1 ulp;
+            /// never overflows, and `atan(-x) = -atan(x)` bit for bit for every
+            /// `x > MIN`.
+            #[inline]
+            pub const fn atan(self) -> Self {
+                Self { raw: crate::trig::atan(self.raw as i64, $F) as $Bits }
+            }
+
+            /// The angle of the point `(other, self)` in radians, within 1 ulp;
+            /// `self` is `y`, as in the `atan2` of floats. The exact angle is
+            /// in `(-π, π]`, the rounded one in `[-π, π]`: just below the cut
+            /// along the negative axis it rounds to `-π`. `atan2(0, 0) = 0`,
+            /// `atan2(0, x < 0) = π`. Odd in `self ≠ 0` bit for bit; nothing
+            /// overflows, whatever the magnitudes.
+            #[inline]
+            pub const fn atan2(self, other: Self) -> Self {
+                Self { raw: crate::trig::atan2(self.raw as i64, other.raw as i64, $F) as $Bits }
+            }
+
+            /// `asin(self)` in radians, in `[-π/2, π/2]`, within 1 ulp;
+            /// `self` outside `[-1, 1]` is clamped to it, so it gives `±π/2`.
+            /// `asin(-x) = -asin(x)` bit for bit.
+            #[inline]
+            pub const fn asin(self) -> Self {
+                Self { raw: crate::trig::asin(self.clamp_unit(), $F) as $Bits }
+            }
+
+            /// `asin(self)` within 1 ulp, or `None` when `self` is outside
+            /// `[-1, 1]`.
+            #[inline]
+            pub const fn checked_asin(self) -> Option<Self> {
+                if self.clamp_unit() != self.raw as i64 {
+                    return None;
+                }
+                Some(Self { raw: crate::trig::asin(self.raw as i64, $F) as $Bits })
+            }
+
+            /// `acos(self)` in radians, in `[0, π]`, within 1 ulp; `self`
+            /// outside `[-1, 1]` is clamped to it, so it gives `0` or `π`.
+            #[inline]
+            pub const fn acos(self) -> Self {
+                Self { raw: crate::trig::acos(self.clamp_unit(), $F) as $Bits }
+            }
+
+            /// `acos(self)` within 1 ulp, or `None` when `self` is outside
+            /// `[-1, 1]`.
+            #[inline]
+            pub const fn checked_acos(self) -> Option<Self> {
+                if self.clamp_unit() != self.raw as i64 {
+                    return None;
+                }
+                Some(Self { raw: crate::trig::acos(self.raw as i64, $F) as $Bits })
+            }
+
+            /// The raw value of `self` clamped to `[-1, 1]`.
+            #[inline]
+            const fn clamp_unit(self) -> i64 {
+                let one = 1i64 << $F;
+                let raw = self.raw as i64;
+                if raw > one {
+                    one
+                } else if raw < -one {
+                    -one
+                } else {
+                    raw
+                }
+            }
+
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
             pub const fn signum(self) -> Self {
@@ -702,6 +771,7 @@ macro_rules! define_fixed {
         impl crate::sealed::Sealed for $Name {}
 
         impl crate::FixedFloat for $Name {
+            type Angle = crate::$Angle;
             type Bits = $Bits;
             const FRAC_BITS: u32 = $F;
             const INT_BITS: u32 = <$Bits>::BITS - $F;
@@ -794,6 +864,10 @@ macro_rules! define_fixed {
             fn sin_cos(self) -> (Self, Self) {
                 Self::sin_cos(self)
             }
+            #[inline]
+            fn atan2(self, other: Self) -> Self {
+                Self::atan2(self, other)
+            }
         }
 
         impl_ops!($Name);
@@ -825,6 +899,7 @@ define_fixed! {
         frac_bits: 4,
         bytes: 1,
         kernel: k8,
+        angle: Angle8,
         from_ints: [],
         try_from_ints: [i8, i16, i32, i64, i128, u8, u16, u32, u64, u128],
     }
@@ -842,6 +917,7 @@ define_fixed! {
         frac_bits: 8,
         bytes: 2,
         kernel: k16,
+        angle: Angle16,
         from_ints: [i8],
         try_from_ints: [i16, i32, i64, i128, u8, u16, u32, u64, u128],
     }
@@ -859,6 +935,7 @@ define_fixed! {
         frac_bits: 16,
         bytes: 4,
         kernel: k32,
+        angle: Angle32,
         from_ints: [i8, u8, i16],
         try_from_ints: [i32, i64, i128, u16, u32, u64, u128],
     }
@@ -876,6 +953,7 @@ define_fixed! {
         frac_bits: 32,
         bytes: 8,
         kernel: k64,
+        angle: Angle64,
         from_ints: [i8, u8, i16, u16, i32],
         try_from_ints: [i64, i128, u32, u64, u128],
     }

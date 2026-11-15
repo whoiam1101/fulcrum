@@ -90,6 +90,7 @@ mod num;
 #[macro_use]
 mod define;
 
+mod angle;
 mod error;
 mod tables;
 mod trig;
@@ -102,6 +103,7 @@ mod proofs;
 #[doc = include_str!("../README.md")]
 struct ReadmeDoctest;
 
+pub use angle::{Angle16, Angle32, Angle64, Angle8};
 pub use define::{
     Accumulator16, Accumulator32, Accumulator64, Accumulator8, FixedFloat16, FixedFloat32,
     FixedFloat64, FixedFloat8,
@@ -137,6 +139,8 @@ pub trait FixedFloat:
     + core::ops::RemAssign
     + sealed::Sealed
 {
+    /// The angle type of the same width.
+    type Angle: FixedAngle<Fixed = Self>;
     /// The raw storage integer.
     type Bits: Copy;
     /// Number of fractional bits.
@@ -206,6 +210,67 @@ pub trait FixedFloat:
     fn sqrt(self) -> Self;
     /// Sine and cosine of an angle in radians, each within 1 ulp.
     fn sin_cos(self) -> (Self, Self);
+    /// The angle of the point `(other, self)` in radians, within 1 ulp.
+    fn atan2(self, other: Self) -> Self;
+}
+
+/// Interface shared by the angle types [`Angle8`] … [`Angle64`], for generic
+/// code: an angle as every bit of an unsigned integer, the fraction of a turn,
+/// with wrapping arithmetic. Each angle type has the fixed-point type of its
+/// width as [`FixedAngle::Fixed`], and that type names it back as
+/// [`FixedFloat::Angle`].
+///
+/// Sealed: implemented only by the types of this crate. Every method is also
+/// available as an inherent `const fn` on each type.
+pub trait FixedAngle:
+    Copy
+    + Default
+    + Eq
+    + core::hash::Hash
+    + core::fmt::Debug
+    + core::ops::Add<Output = Self>
+    + core::ops::Sub<Output = Self>
+    + core::ops::Neg<Output = Self>
+    + core::ops::AddAssign
+    + core::ops::SubAssign
+    + core::ops::Mul<<Self as FixedAngle>::Fixed, Output = Self>
+    + core::ops::MulAssign<<Self as FixedAngle>::Fixed>
+    + sealed::Sealed
+{
+    /// The fixed-point type of the same width.
+    type Fixed: FixedFloat;
+    /// The raw storage integer, unsigned.
+    type Bits: Copy;
+    /// Number of bits per turn.
+    const BITS: u32;
+    /// No rotation.
+    const ZERO: Self;
+    /// The smallest rotation, `2^-BITS` of a turn.
+    const DELTA: Self;
+    /// A quarter turn.
+    const QUARTER_TURN: Self;
+    /// Half a turn.
+    const HALF_TURN: Self;
+    /// The angle of `raw / 2^BITS` of a turn.
+    fn from_bits(raw: Self::Bits) -> Self;
+    /// The raw fraction of a turn.
+    fn to_bits(self) -> Self::Bits;
+    /// Sine, within 1 ulp.
+    fn sin(self) -> Self::Fixed;
+    /// Cosine, within 1 ulp.
+    fn cos(self) -> Self::Fixed;
+    /// The angle of `turns` turns, exactly.
+    fn from_turns(turns: Self::Fixed) -> Self;
+    /// The angle in turns, in `[0, 1)`, rounded to nearest.
+    fn to_turns(self) -> Self::Fixed;
+    /// The angle of `radians` radians modulo a turn, rounded to nearest.
+    fn from_radians(radians: Self::Fixed) -> Self;
+    /// The angle in radians, rounded to nearest, in `[-PI, PI]`.
+    fn to_radians(self) -> Self::Fixed;
+    /// Sine and cosine, each within 1 ulp.
+    fn sin_cos(self) -> (Self::Fixed, Self::Fixed);
+    /// `self · x` modulo a turn, rounded to nearest.
+    fn scale(self, x: Self::Fixed) -> Self;
 }
 
 macro_rules! literal_macro {

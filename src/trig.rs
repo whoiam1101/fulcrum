@@ -15,8 +15,18 @@
 //! In radians the magnitude is multiplied exactly by 192 bits of `2/π`, which
 //! gives the angle in quarter turns, and the same quarter does the rest;
 //! `tan` near a pole takes the cotangent of the distance to it instead.
+//!
+//! The inverse functions take `atan(n/d)` of two magnitudes, `n ≤ d`, from
+//! the table of `atan(k/2^STEPS)` and a short series of the exact remainder
+//! `(2^STEPS·n - k·d) / (2^STEPS·d + k·n)`, and set the octant, the quadrant
+//! and the sign after one rounding (INTERNALS §3.13).
+//!
+//! The angle types keep an angle as `n` bits of a turn, `n` the width of the
+//! storage; their sine is the same quarter with `n - 2` bits of position, and
+//! the conversions to and from radians use the same `2/π` and a `π` of 126
+//! bits (INTERNALS §3.14).
 
-use crate::tables::trig::{FRAC, FRAC_2_PI, FRAC_PI_2, SIN_QUARTER, STEPS};
+use crate::tables::trig::{ATAN, FRAC, FRAC_2_PI, FRAC_PI_2, PI, PI_126, SIN_QUARTER, STEPS};
 
 const ONE: u64 = 1 << FRAC;
 
@@ -214,4 +224,157 @@ pub(crate) const fn tan(raw: i64, f: u32) -> i128 {
     } else {
         m
     }
+}
+
+/// `atan(n/d) · 2^FRAC` for `n ≤ d`, `0 < d ≤ 2^64`, with an error below
+/// `3` units: `atan(k/2^STEPS)` of the table plus `atan δ` of the exact
+/// `δ = (2^STEPS·n - k·d) / (2^STEPS·d + k·n) < 2^-STEPS`, with
+/// `k = ⌊2^STEPS·n/d⌋` (INTERNALS §3.13).
+#[inline]
+const fn atan_unit(n: u128, d: u128) -> u64 {
+    let k = (n << STEPS) / d;
+    let rest = (n << STEPS) - k * d;
+    if rest == 0 {
+        return ATAN[k as usize];
+    }
+    let delta = ((rest << FRAC) / ((d << STEPS) + k * n)) as u64;
+    let z = mul(delta, delta);
+    let p = ONE / 3 - mul(z, ONE / 5 - z / 7);
+    ATAN[k as usize] + delta - mul(mul(delta, z), p)
+}
+
+/// `atan(n/d) · 2^FRAC ∈ [0, π/2]` for `n, d ≤ 2^64`, not both `0`.
+#[inline]
+const fn atan_ratio(n: u128, d: u128) -> u64 {
+    if n <= d {
+        atan_unit(n, d)
+    } else {
+        FRAC_PI_2 - atan_unit(d, n)
+    }
+}
+
+/// The angle `a · 2^-FRAC` of [`atan_ratio`], or `π` minus it when
+/// `x_negative`, rounded to `f` fractional bits, with the sign of `negative`.
+#[inline]
+const fn round_angle(a: u64, x_negative: bool, negative: bool, f: u32) -> i64 {
+    let a = if x_negative { PI - a } else { a };
+    let r = crate::kernel::shr_round(a as i128, FRAC - f) as i64;
+    if negative {
+        -r
+    } else {
+        r
+    }
+}
+
+/// `atan2(y, x)` of two raw values with `f` fractional bits, in `(-π, π]`,
+/// rounded to `f` fractional bits; `atan2(0, x) = 0` for `x ≥ 0`. Odd in `y`
+/// bit for bit. `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn atan2(y: i64, x: i64, f: u32) -> i64 {
+    if y == 0 && x >= 0 {
+        return 0;
+    }
+    let a = atan_ratio(y.unsigned_abs() as u128, x.unsigned_abs() as u128);
+    round_angle(a, x < 0, y < 0, f)
+}
+
+/// `atan(raw / 2^f) = atan2(raw, 2^f)`, rounded to `f` fractional bits. Odd
+/// bit for bit. `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn atan(raw: i64, f: u32) -> i64 {
+    atan2(raw, 1 << f, f)
+}
+
+/// `x = raw / 2^f` and `√(1 - x²)` at `FRAC` fractional bits, the root
+/// truncated, for `|raw| ≤ 2^f`.
+#[inline]
+const fn cathetus(raw: i64, f: u32) -> (u128, u128) {
+    let m = raw.unsigned_abs() as u128;
+    let rest = ((1u128 << (2 * f)) - m * m) << (2 * (FRAC - f));
+    (m << (FRAC - f), crate::kernel::k64::isqrt(rest))
+}
+
+/// `asin(raw / 2^f) = atan2(x, √(1 - x²))`, rounded to `f` fractional
+/// bits. Odd bit for bit. `|raw| ≤ 2^f`, `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn asin(raw: i64, f: u32) -> i64 {
+    let (x, s) = cathetus(raw, f);
+    round_angle(atan_ratio(x, s), false, raw < 0, f)
+}
+
+/// `acos(raw / 2^f) = atan2(√(1 - x²), x)`, rounded to `f` fractional
+/// bits. `|raw| ≤ 2^f`, `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn acos(raw: i64, f: u32) -> i64 {
+    let (x, s) = cathetus(raw, f);
+    round_angle(atan_ratio(s, x), raw < 0, false, f)
+}
+
+/// `2^n - 1`: the mask of an angle of `n ≤ 64` bits.
+#[inline]
+const fn angle_mask(n: u32) -> u64 {
+    if n == 64 {
+        u64::MAX
+    } else {
+        (1 << n) - 1
+    }
+}
+
+/// `sin(2π · t / 2^n)` of an angle of `n` bits, rounded to `f` fractional
+/// bits. `t < 2^n`, `4 ≤ n ≤ 64`, `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn angle_sin(t: u64, n: u32, f: u32) -> i64 {
+    sin_position(t, n - 2, f)
+}
+
+/// `cos(2π · t / 2^n) = sin(2π · (t / 2^n + ¼))`, rounded to `f` fractional
+/// bits. `t < 2^n`, `4 ≤ n ≤ 64`, `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn angle_cos(t: u64, n: u32, f: u32) -> i64 {
+    angle_sin(t.wrapping_add(1 << (n - 2)) & angle_mask(n), n, f)
+}
+
+/// The angle `raw / 2^f` radians as `n` bits of a turn, `x / 2π mod 1`
+/// rounded to nearest: the quarter turns of [`reduce`] at 128 bits, rounded to
+/// `n - 2` bits of position on the magnitude, then negated for `raw < 0`, so
+/// `from_radians(-x) = -from_radians(x)` bit for bit. `f ≤ 32`,
+/// `4 ≤ n ≤ 64`.
+#[inline]
+pub(crate) const fn angle_from_radians(raw: i64, f: u32, n: u32) -> u64 {
+    let (quadrant, frac) = reduce(raw.unsigned_abs(), f);
+    let position = (((frac >> (129 - n)) + 1) >> 1) as u64;
+    let t = (quadrant << (n - 2)).wrapping_add(position) & angle_mask(n);
+    if raw < 0 {
+        t.wrapping_neg() & angle_mask(n)
+    } else {
+        t
+    }
+}
+
+/// The angle `t / 2^n` of a turn in radians, `2π · s / 2^n` for the signed
+/// `s ≡ t (mod 2^n)` in `[-2^(n-1), 2^(n-1))`, so in `[-π, π)`, rounded to `f`
+/// fractional bits: `|s| · π · 2^126` exactly on 192 bits, one rounding on
+/// the magnitude, then the sign. `f ≤ 32`, `4 ≤ n ≤ 64`.
+#[inline]
+pub(crate) const fn angle_to_radians(t: u64, n: u32, f: u32) -> i64 {
+    let s = ((t << (64 - n)) as i64) >> (64 - n);
+    let m = s.unsigned_abs() as u128;
+    let high = m * (PI_126 >> 64) + ((m * (PI_126 as u64 as u128)) >> 64);
+    let k = 125 + n - f - 64;
+    let r = (((high >> (k - 1)) + 1) >> 1) as i64;
+    if s < 0 {
+        -r
+    } else {
+        r
+    }
+}
+
+/// `t · x mod 2^n` for an angle of `n` bits and `x = raw / 2^f`: the signed
+/// angle times `raw`, rounded to nearest by `kernel::shr_round`, wrapped to
+/// `n` bits. `f ≤ 32`, `4 ≤ n ≤ 64`, `|raw| ≤ 2^63`.
+#[inline]
+pub(crate) const fn angle_scale(t: u64, n: u32, raw: i64, f: u32) -> u64 {
+    let s = ((t << (64 - n)) as i64) >> (64 - n);
+    let r = crate::kernel::shr_round(s as i128 * raw as i128, f);
+    r as u64 & angle_mask(n)
 }
