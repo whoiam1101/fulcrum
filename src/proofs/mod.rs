@@ -780,3 +780,36 @@ macro_rules! trig_symmetry {
 
 trig_symmetry!(trig_symmetry_8, FixedFloat8);
 trig_symmetry!(trig_symmetry_16, FixedFloat16);
+
+macro_rules! radians_no_panic {
+    ($name:ident, $T:ident) => {
+        /// `sin`, `cos`, `sin_cos`, `tan` and `checked_tan` never panic: the
+        /// 256-bit product of the range reduction, the division of `tan` and
+        /// the long division near a pole stay in range on every input.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let _ = (x.sin_cos(), x.tan(), x.checked_tan());
+        }
+    };
+    ($name:ident, $T:ident, range) => {
+        /// `sin`, `cos`, `tan` never panic, `sin` and `cos` stay in
+        /// `[-1, 1]`, and `sin_cos` is the pair of `sin` and `cos`. On 16
+        /// bits this does not finish in 25 minutes; the exhaustive test of
+        /// `tests/radians.rs` checks it there.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let (s, c) = x.sin_cos();
+            assert!($T::NEG_ONE <= s && s <= $T::ONE);
+            assert!($T::NEG_ONE <= c && c <= $T::ONE);
+            assert!(s == x.sin() && c == x.cos());
+            let _ = (x.tan(), x.checked_tan());
+        }
+    };
+}
+
+radians_no_panic!(radians_no_panic_8, FixedFloat8, range);
+radians_no_panic!(radians_no_panic_16, FixedFloat16);
+radians_no_panic!(radians_no_panic_32, FixedFloat32);
+radians_no_panic!(radians_no_panic_64, FixedFloat64);

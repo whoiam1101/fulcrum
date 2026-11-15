@@ -1,6 +1,7 @@
 //! Arbitrary operands: no operation panics; `*`, `/`, `mul_add`, `mul_div`,
 //! `lerp`, `sqrt`, `rsqrt`, `hypot` and their `checked_*` equal the exact
-//! rational oracle; `+`, `-`
+//! rational oracle; `sin`, `cos` and `tan` (clamped to the range) are within
+//! 1 ulp of the interval oracle; `+`, `-`
 //! saturate exactly; `%` is exact.
 
 #![no_main]
@@ -10,8 +11,23 @@
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::Format;
+use fulcrum_oracle::{Format, TRIG_SCALE};
 use libfuzzer_sys::fuzz_target;
+use num_bigint::BigInt;
+
+/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`
+/// clamped to `[min, max] / 2^frac`.
+fn within_ulp((lo, hi): (BigInt, BigInt), got: i128, frac: u32, min: i128, max: i128) -> bool {
+    let shift = TRIG_SCALE - frac;
+    let clamp = |v: BigInt| {
+        v.max(BigInt::from(min) << shift)
+            .min(BigInt::from(max) << shift)
+    };
+    let (lo, hi) = (clamp(lo), clamp(hi));
+    let got = BigInt::from(got) << shift;
+    let ulp = BigInt::from(1) << shift;
+    &got - lo < ulp && hi - &got < ulp
+}
 
 macro_rules! check {
     ($data:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Bits:ty, $bits:tt, $frac:tt) => {{
@@ -40,6 +56,25 @@ macro_rules! check {
             let (hypot, hypot_fits) = fmt.hypot(a as i128, b as i128);
             assert_eq!(x.hypot(y).to_bits() as i128, hypot);
             assert_eq!(x.checked_hypot(y).is_some(), hypot_fits);
+            let (min, max) = (<$Bits>::MIN as i128, <$Bits>::MAX as i128);
+            let (s, c) = x.sin_cos();
+            let trig = [
+                (fulcrum_oracle::sin(a as i128, $frac), s),
+                (fulcrum_oracle::cos(a as i128, $frac), c),
+            ];
+            for (exact, got) in trig {
+                assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+            }
+            if let Some(exact) = fulcrum_oracle::tan(a as i128, $frac) {
+                assert!(within_ulp(
+                    exact,
+                    x.tan().to_bits() as i128,
+                    $frac,
+                    min,
+                    max
+                ));
+            }
+            assert_eq!(x.checked_tan().unwrap_or(x.tan()), x.tan());
             assert_eq!((x + y).to_bits(), a.saturating_add(b));
             assert_eq!((x - y).to_bits(), a.saturating_sub(b));
             if b != 0 {

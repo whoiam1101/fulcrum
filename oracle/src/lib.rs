@@ -231,7 +231,7 @@ pub const TRIG_SCALE: u32 = 256;
 
 /// π as an interval `[lo, hi] · 2^-TRIG_SCALE`: Machin's formula
 /// `π = 16·atan(1/5) - 4·atan(1/239)` with floored terms.
-fn pi_interval() -> (BigInt, BigInt) {
+pub fn pi_interval() -> (BigInt, BigInt) {
     let atan_inv = |x: u64| {
         let one = BigInt::one() << (TRIG_SCALE + 8);
         let x = BigInt::from(x);
@@ -266,6 +266,12 @@ pub fn sin_turns(raw: i128, frac: u32) -> (BigInt, BigInt) {
     let (plo, phi) = pi_interval();
     let x: BigInt = (&t * &plo * BigInt::from(2)) >> frac;
     let width: BigInt = (((&t * &phi * BigInt::from(2)) >> frac) + 1) - &x;
+    sin_series(&x, width)
+}
+
+/// `sin(x · 2^-TRIG_SCALE)` for `x ≥ 0` as an interval widened by `width`:
+/// `|sin a - sin b| ≤ |a - b|`.
+fn sin_series(x: &BigInt, width: BigInt) -> (BigInt, BigInt) {
     let mut sum = BigInt::zero();
     let mut fact = BigInt::one();
     let mut n = 1u32;
@@ -273,7 +279,7 @@ pub fn sin_turns(raw: i128, frac: u32) -> (BigInt, BigInt) {
     loop {
         let term = x.pow(n) / (&fact << (TRIG_SCALE * (n - 1)));
         terms += 1;
-        if term.is_zero() && BigInt::from(n) > &x >> (TRIG_SCALE - 2) {
+        if term.is_zero() && BigInt::from(n) > x >> (TRIG_SCALE - 2) {
             break;
         }
         if n % 4 == 1 {
@@ -286,4 +292,54 @@ pub fn sin_turns(raw: i128, frac: u32) -> (BigInt, BigInt) {
     }
     let err = width + terms + 3;
     (&sum - &err, sum + err)
+}
+
+/// `sin(raw / 2^frac + quarters · π/2)` as an interval
+/// `[lo, hi] · 2^-TRIG_SCALE`, `quarters ≥ 0`: the argument at
+/// `2^-(TRIG_SCALE+1)`, reduced to about `[0, 2π]` by the interval of `2π`
+/// (the floor of the quotient by its upper end), then the series of
+/// [`sin_turns`] at its lower end, widened by the width of the interval.
+fn sin_radians(raw: i128, frac: u32, quarters: i64) -> (BigInt, BigInt) {
+    let (plo, phi) = pi_interval();
+    let x: BigInt = BigInt::from(raw) << (TRIG_SCALE + 1 - frac);
+    let q = BigInt::from(quarters);
+    let (x_lo, x_hi) = (&x + &q * &plo, &x + &q * &phi);
+    let (tau_lo, tau_hi) = (&plo * 4, &phi * 4);
+    let k: BigInt = x_hi.div_floor(&tau_hi);
+    let (lo, hi) = if k.is_negative() {
+        (&x_lo - &k * &tau_lo, &x_hi - &k * &tau_hi)
+    } else {
+        (&x_lo - &k * &tau_hi, &x_hi - &k * &tau_lo)
+    };
+    let lo: BigInt = lo.max(BigInt::zero()) >> 1u32;
+    let hi: BigInt = (hi >> 1u32) + 1;
+    let width = &hi - &lo;
+    sin_series(&lo, width)
+}
+
+/// `sin(raw / 2^frac)` in radians as an interval `[lo, hi] · 2^-TRIG_SCALE`.
+pub fn sin(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    sin_radians(raw, frac, 0)
+}
+
+/// `cos(raw / 2^frac) = sin(raw / 2^frac + π/2)` as an interval
+/// `[lo, hi] · 2^-TRIG_SCALE`.
+pub fn cos(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    sin_radians(raw, frac, 1)
+}
+
+/// `tan(raw / 2^frac)` as an interval `[lo, hi] · 2^-TRIG_SCALE`: the
+/// quotient of the intervals of [`sin`] and [`cos`]; `None` if the cosine
+/// interval contains `0`.
+pub fn tan(raw: i128, frac: u32) -> Option<(BigInt, BigInt)> {
+    let (slo, shi) = sin(raw, frac);
+    let (clo, chi) = cos(raw, frac);
+    if !clo.is_positive() && !chi.is_negative() {
+        return None;
+    }
+    let q = |n: &BigInt, d: &BigInt| (n << TRIG_SCALE).div_floor(d);
+    let corners = [q(&slo, &clo), q(&slo, &chi), q(&shi, &clo), q(&shi, &chi)];
+    let lo = corners.iter().min().unwrap() - 1;
+    let hi = corners.iter().max().unwrap() + 1;
+    Some((lo, hi))
 }

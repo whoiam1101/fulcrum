@@ -13,7 +13,7 @@ use common::{Fnv, Pcg32};
 use fulcrum::*;
 
 const ROUNDS: usize = 250_000;
-const GOLDEN: u64 = 0x8011_9a0b_b7de_ab54;
+const GOLDEN: u64 = 0x847c_cf23_4b3b_1c81;
 
 macro_rules! mix {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
@@ -41,6 +41,9 @@ macro_rules! mix {
             a.hypot(b),
             a.sin_turns(),
             a.cos_turns(),
+            a.sin(),
+            a.cos(),
+            a.tan(),
         ] {
             $h.write(&v.to_le_bytes());
         }

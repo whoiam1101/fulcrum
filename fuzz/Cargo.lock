@@ -49,6 +49,7 @@ dependencies = [
  "fulcrum",
  "fulcrum-oracle",
  "libfuzzer-sys",
+ "num-bigint",
 ]
 
 [[package]]
