@@ -333,6 +333,33 @@ fn sin(x: &Interval) -> Interval {
     }
 }
 
+/// `atan(p/q)` for `0 ≤ p ≤ q`: the Taylor series of `atan` at `p/q ≤ ½`,
+/// and `π/4 - atan((q - p)/(q + p))` above, where the argument is at most
+/// `⅓`. Every power is floored, so its error stays below `4/3` (the
+/// ratio `p²/q²` is at most `¼`), each term adds one more, and the tail of the
+/// alternating series is below the first power that floors to zero.
+fn atan_ratio(p: u64, q: u64, pi: &Interval) -> Interval {
+    if 2 * p > q {
+        return pi.div_int(4).sub(&atan_ratio(q - p, q + p, pi));
+    }
+    let (p, q) = (BigInt::from(p), BigInt::from(q));
+    let (p2, q2) = (&p * &p, &q * &q);
+    let mut power = (one() * &p).div_floor(&q);
+    let mut sum = BigInt::zero();
+    let mut k = 0u64;
+    while !power.is_zero() {
+        let term = power.div_floor(&BigInt::from(2 * k + 1));
+        if k % 2 == 0 {
+            sum += term;
+        } else {
+            sum -= term;
+        }
+        power = (power * &p2).div_floor(&q2);
+        k += 1;
+    }
+    Interval::widen(sum, 3 * k + 3)
+}
+
 fn render_trig() -> String {
     let pi = pi();
     let steps = 1u64 << TRIG_STEPS;
@@ -345,10 +372,28 @@ fn render_trig() -> String {
     writeln!(out, "pub(crate) const FRAC: u32 = {};\n", TRIG_FRAC).unwrap();
     writeln!(
         out,
-        "/// `log₂` of the number of steps of [`SIN_QUARTER`] per quarter circle."
+        "/// `log₂` of the number of steps of [`SIN_QUARTER`] per quarter circle\n/// and of [`ATAN`] on `[0, 1]`."
     )
     .unwrap();
     writeln!(out, "pub(crate) const STEPS: u32 = {};\n", TRIG_STEPS).unwrap();
+    writeln!(out, "/// π, correctly rounded.").unwrap();
+    writeln!(
+        out,
+        "pub(crate) const PI: u64 = {};\n",
+        pi.round_to(TRIG_FRAC)
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "/// π · 2^126, correctly rounded: `to_radians` of the angle types."
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "pub(crate) const PI_126: u128 = {};\n",
+        pi.round_to(126)
+    )
+    .unwrap();
     writeln!(out, "/// π/2, correctly rounded.").unwrap();
     writeln!(
         out,
@@ -387,6 +432,21 @@ fn render_trig() -> String {
     for k in 0..=steps {
         let x = pi.mul_int(k).div_int(2 * steps);
         writeln!(out, "    {},", sin(&x).round_to(TRIG_FRAC)).unwrap();
+    }
+    out.push_str("];\n\n");
+    writeln!(
+        out,
+        "/// `atan(k/2^STEPS)` for `k = 0 ..= 2^STEPS`, correctly rounded."
+    )
+    .unwrap();
+    writeln!(out, "pub(crate) const ATAN: [u64; {}] = [", steps + 1).unwrap();
+    for k in 0..=steps {
+        writeln!(
+            out,
+            "    {},",
+            atan_ratio(k, steps, &pi).round_to(TRIG_FRAC)
+        )
+        .unwrap();
     }
     out.push_str("];\n");
     out
