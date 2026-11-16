@@ -64,29 +64,33 @@ fn is_root(got: i128, n: u128, bits: u32) -> bool {
 
 macro_rules! check_vectors {
     ($T:ident, $bits:expr, $f:expr, $a:expr, $b:expr, $s:expr) => {{
-        let ra: [i128; 3] = [$a[0] as i128, $a[1] as i128, $a[2] as i128];
-        let rb: [i128; 3] = [$b[0] as i128, $b[1] as i128, $b[2] as i128];
-        let rs = $s as i128;
+        let ra: [i128; 3] = [i128::from($a[0]), i128::from($a[1]), i128::from($a[2])];
+        let rb: [i128; 3] = [i128::from($b[0]), i128::from($b[1]), i128::from($b[2])];
+        let rs = i128::from($s);
         let v = |r: &[i128; 3]| {
             Vec3::new(
-                $T::from_bits(r[0] as _),
-                $T::from_bits(r[1] as _),
-                $T::from_bits(r[2] as _),
+                $T::from_bits(r[0] as <$T as fulcrum::FixedFloat>::Bits),
+                $T::from_bits(r[1] as <$T as fulcrum::FixedFloat>::Bits),
+                $T::from_bits(r[2] as <$T as fulcrum::FixedFloat>::Bits),
             )
         };
-        let (a3, b3, s) = (v(&ra), v(&rb), $T::from_bits(rs as _));
+        let (a3, b3, s) = (
+            v(&ra),
+            v(&rb),
+            $T::from_bits(rs as <$T as fulcrum::FixedFloat>::Bits),
+        );
         let (a2, b2) = (Vec2::new(a3.x, a3.y), Vec2::new(b3.x, b3.y));
         let ctx = || format!("{} {:?} {:?} {:?}", stringify!($T), a3, b3, s);
         let raw3 = |w: Vec3<$T>| {
             [
-                w.x.to_bits() as i128,
-                w.y.to_bits() as i128,
-                w.z.to_bits() as i128,
+                i128::from(w.x.to_bits()),
+                i128::from(w.y.to_bits()),
+                i128::from(w.z.to_bits()),
             ]
         };
-        let raw2 = |w: Vec2<$T>| [w.x.to_bits() as i128, w.y.to_bits() as i128];
+        let raw2 = |w: Vec2<$T>| [i128::from(w.x.to_bits()), i128::from(w.y.to_bits())];
         let sat = |x: i128| spec::saturate(x, $bits);
-        let bits_of = |x: $T| x.to_bits() as i128;
+        let bits_of = |x: $T| i128::from(x.to_bits());
 
         let each = |op: &dyn Fn(i128, i128) -> i128| {
             [op(ra[0], rb[0]), op(ra[1], rb[1]), op(ra[2], rb[2])]
@@ -133,7 +137,7 @@ macro_rules! check_vectors {
         m *= b3;
         assert_eq!(m, ((a3 + b3 - b3) * s / s) * b3, "assign {}", ctx());
 
-        let first2 = |w: Vec3<$T>| [w.x.to_bits() as i128, w.y.to_bits() as i128];
+        let first2 = |w: Vec3<$T>| [i128::from(w.x.to_bits()), i128::from(w.y.to_bits())];
         assert_eq!(raw2(a2 + b2), first2(a3 + b3), "+2 {}", ctx());
         assert_eq!(raw2(a2 - b2), first2(a3 - b3), "-2 {}", ctx());
         assert_eq!(raw2(-a2), first2(-a3), "neg2 {}", ctx());
@@ -245,22 +249,21 @@ fn fixed8_every_length() {
     let mut seen = 0u64;
     for x in i8::MIN..=i8::MAX {
         for y in i8::MIN..=i8::MAX {
-            let n2 = (x as i128).pow(2) + (y as i128).pow(2);
+            let n2 = i128::from(x).pow(2) + i128::from(y).pow(2);
             let v2 = Vec2::new(FixedFloat8::from_bits(x), FixedFloat8::from_bits(y));
             assert_eq!(
-                v2.length().to_bits() as i128,
+                i128::from(v2.length().to_bits()),
                 spec::saturate(spec::sqrt(n2), 8),
-                "{:?}",
-                v2
+                "{v2:?}"
             );
             for z in i8::MIN..=i8::MAX {
-                let n = n2 + (z as i128).pow(2);
+                let n = n2 + i128::from(z).pow(2);
                 let v = Vec3::new(v2.x, v2.y, FixedFloat8::from_bits(z));
-                let got = v.length().to_bits() as i128;
-                if got < i8::MAX as i128 {
-                    assert!(spec::is_sqrt_ratio(got, n, 1), "{:?}", v);
+                let got = i128::from(v.length().to_bits());
+                if got < i128::from(i8::MAX) {
+                    assert!(spec::is_sqrt_ratio(got, n, 1), "{v:?}");
                 } else {
-                    assert!(spec::sqrt(n) >= i8::MAX as i128, "{:?}", v);
+                    assert!(spec::sqrt(n) >= i128::from(i8::MAX), "{v:?}");
                 }
                 seen += 1;
             }
@@ -271,6 +274,9 @@ fn fixed8_every_length() {
 
 #[test]
 fn constants_and_generic_use() {
+    fn generic<T: FixedFloat>(a: Vec2<T>, b: Vec2<T>) -> T {
+        (a - b).length_sq()
+    }
     type F = FixedFloat32;
     assert_eq!(Vec2f32::ZERO, Vec2::new(F::ZERO, F::ZERO));
     assert_eq!(Vec2f32::X + Vec2f32::Y, Vec2f32::splat(F::ONE));
@@ -285,9 +291,6 @@ fn constants_and_generic_use() {
     assert_eq!(Vec3::new(ff32!(2), ff32!(3), ff32!(6)).length(), ff32!(7));
     assert_eq!(Vec2f32::default(), Vec2f32::ZERO);
     assert_eq!(Vec3f64::default(), Vec3f64::ZERO);
-    fn generic<T: FixedFloat>(a: Vec2<T>, b: Vec2<T>) -> T {
-        (a - b).length_sq()
-    }
     assert_eq!(generic(v, Vec2f32::ZERO), ff32!(25));
 }
 
@@ -322,9 +325,9 @@ fn fixed64_beyond_i128() {
     let big = FixedFloat64::from_bits(1 << 61);
     let v = Vec3f64::splat(big);
     assert_eq!(v.length_sq(), FixedFloat64::MAX);
-    let l = v.length().to_bits() as i128;
+    let l = i128::from(v.length().to_bits());
     assert!(is_root(l, 3 << 122, 64), "{}", l);
-    assert!(l < i64::MAX as i128);
+    assert!(l < i128::from(i64::MAX));
 }
 
 #[test]

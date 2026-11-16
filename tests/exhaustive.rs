@@ -43,55 +43,48 @@ fn fixed8_parse_rounding_below_ulp() {
     for extra in 1..=6u32 {
         let lim = 1i32 << (7 + extra);
         for raw in -lim - 64..lim + 64 {
-            let text = exact_decimal(raw as i128, 4 + extra);
-            let expected = spec::round_div(raw as i128, 1 << extra);
+            let text = exact_decimal(i128::from(raw), 4 + extra);
+            let expected = spec::round_div(i128::from(raw), 1 << extra);
             let parsed = text.parse::<FixedFloat8>();
             if spec::fits(expected, 8) {
                 assert_eq!(
-                    parsed.map(|v| v.to_bits() as i128),
+                    parsed.map(|v| i128::from(v.to_bits())),
                     Ok(expected),
-                    "parse {}",
-                    text
+                    "parse {text}"
                 );
             } else {
-                assert!(parsed.is_err(), "parse {} should overflow", text);
+                assert!(parsed.is_err(), "parse {text} should overflow");
             }
             let long = format!(
                 "{}{}",
                 if text.contains('.') {
                     text.clone()
                 } else {
-                    format!("{}.", text)
+                    format!("{text}.")
                 },
                 "0".repeat(40)
             );
-            assert_eq!(
-                long.parse::<FixedFloat8>(),
-                parsed,
-                "trailing zeros {}",
-                long
-            );
+            assert_eq!(long.parse::<FixedFloat8>(), parsed, "trailing zeros {long}");
             let sticky = format!(
                 "{}{}1",
                 if text.contains('.') {
                     text.clone()
                 } else {
-                    format!("{}.", text)
+                    format!("{text}.")
                 },
                 "0".repeat(40)
             );
             let nudged = if raw < 0 {
-                spec::round_div(raw as i128 * 2 - 1, 1 << (extra + 1))
+                spec::round_div(i128::from(raw) * 2 - 1, 1 << (extra + 1))
             } else {
-                spec::round_div(raw as i128 * 2 + 1, 1 << (extra + 1))
+                spec::round_div(i128::from(raw) * 2 + 1, 1 << (extra + 1))
             };
             let parsed_sticky = sticky.parse::<FixedFloat8>();
             if spec::fits(nudged, 8) {
                 assert_eq!(
-                    parsed_sticky.map(|v| v.to_bits() as i128),
+                    parsed_sticky.map(|v| i128::from(v.to_bits())),
                     Ok(nudged),
-                    "sticky {}",
-                    sticky
+                    "sticky {sticky}"
                 );
             }
         }
@@ -101,13 +94,13 @@ fn fixed8_parse_rounding_below_ulp() {
 #[test]
 #[ignore = "2^32 pairs: run with --ignored --release"]
 fn fixed16_all_pairs() {
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get());
+    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get);
     let chunk = (1usize << 16) / threads + 1;
     let handles: Vec<_> = (0..threads)
         .map(|t| {
             std::thread::spawn(move || {
-                let start = i16::MIN as i32 + (t * chunk) as i32;
-                let end = (start + chunk as i32).min(i16::MAX as i32 + 1);
+                let start = i32::from(i16::MIN) + (t * chunk) as i32;
+                let end = (start + chunk as i32).min(i32::from(i16::MAX) + 1);
                 for a in start..end {
                     let a = a as i16;
                     for b in i16::MIN..=i16::MAX {
@@ -140,13 +133,14 @@ impl core::fmt::Write for Buf {
 #[ignore = "2^32 values: run with --ignored --release"]
 fn fixed32_parse_display_round_trip() {
     use core::fmt::Write;
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()) as u64;
+    let threads =
+        std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get) as u64;
     let chunk = (1u64 << 32) / threads + 1;
     let handles: Vec<_> = (0..threads)
         .map(|t| {
             std::thread::spawn(move || {
-                let start = i32::MIN as i64 + (t * chunk) as i64;
-                let end = (start + chunk as i64).min(i32::MAX as i64 + 1);
+                let start = i64::from(i32::MIN) + (t * chunk) as i64;
+                let end = (start + chunk as i64).min(i64::from(i32::MAX) + 1);
                 let mut buf = Buf {
                     bytes: [0; 64],
                     len: 0,
@@ -154,9 +148,9 @@ fn fixed32_parse_display_round_trip() {
                 for raw in start..end {
                     let x = FixedFloat32::from_bits(raw as i32);
                     buf.len = 0;
-                    write!(buf, "{}", x).unwrap();
+                    write!(buf, "{x}").unwrap();
                     let text = core::str::from_utf8(&buf.bytes[..buf.len]).unwrap();
-                    assert_eq!(text.parse::<FixedFloat32>(), Ok(x), "{}", text);
+                    assert_eq!(text.parse::<FixedFloat32>(), Ok(x), "{text}");
                 }
             })
         })

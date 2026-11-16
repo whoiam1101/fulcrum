@@ -27,10 +27,10 @@ use fulcrum::*;
 macro_rules! check_radians {
     ($T:ident, $bits:expr, $f:expr, $a:expr) => {{
         let x = $T::from_bits($a);
-        let s = x.sin().to_bits() as i128;
-        let c = x.cos().to_bits() as i128;
-        let t = x.tan().to_bits() as i128;
-        let (rs, rc) = (trig::sin($a as i128, $f), trig::cos($a as i128, $f));
+        let s = i128::from(x.sin().to_bits());
+        let c = i128::from(x.cos().to_bits());
+        let t = i128::from(x.tan().to_bits());
+        let (rs, rc) = (trig::sin(i128::from($a), $f), trig::cos(i128::from($a), $f));
         let e = trig::ERROR;
         assert!(trig::within_ulp(s, rs, $f), "sin {:?} = {}", x, s);
         assert!(trig::within_ulp(c, rc, $f), "cos {:?} = {}", x, c);
@@ -48,17 +48,17 @@ macro_rules! check_radians {
                 assert_eq!((-x).tan(), -x.tan(), "tan odd {:?}", x);
             }
         }
-        let mut rounded = (trig::rounded_interval(rs - e, rs + e, $f) == Some(s)) as u32
-            + (trig::rounded_interval(rc - e, rc + e, $f) == Some(c)) as u32;
+        let mut rounded = u32::from(trig::rounded_interval(rs - e, rs + e, $f) == Some(s))
+            + u32::from(trig::rounded_interval(rc - e, rc + e, $f) == Some(c));
         let narrow = |lo: i128, hi: i128| hi - lo < 1 << (trig::SCALE - $f - 2);
-        let (min, max) = ($T::MIN.to_bits() as i128, $T::MAX.to_bits() as i128);
+        let (min, max) = (i128::from($T::MIN.to_bits()), i128::from($T::MAX.to_bits()));
         let bound =
-            trig::tan($a as i128, $f).map(|(lo, hi)| (lo, hi, trig::clamp(lo, hi, $bits, $f)));
+            trig::tan(i128::from($a), $f).map(|(lo, hi)| (lo, hi, trig::clamp(lo, hi, $bits, $f)));
         match bound {
             Some((lo, hi, (clo, chi))) if narrow(clo, chi) => {
                 assert!(trig::within_ulp_of(t, clo, chi, $f), "tan {:?} = {}", x, t);
                 let decided = trig::rounded_interval(clo, chi, $f);
-                rounded += (decided == Some(t)) as u32;
+                rounded += u32::from(decided == Some(t));
                 let fits = match trig::rounded_interval(lo, hi, $f) {
                     Some(r) if narrow(lo, hi) => Some(min <= r && r <= max),
                     _ if lo > max << (trig::SCALE - $f) || hi < min << (trig::SCALE - $f) => {
@@ -118,15 +118,16 @@ fn fixed16_all_values_correctly_rounded() {
 /// [`trig::TAN_NEAR_MIDPOINT_32`]; the oracle checks that they are
 /// correctly rounded (`oracle/tests/trig.rs`).
 #[test]
-#[ignore]
+#[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn fixed32_all_values_correctly_rounded() {
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()) as i64;
+    let threads =
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i64;
     let span = (1i64 << 32) / threads + 1;
     let workers: Vec<_> = (0..threads)
         .map(|k| {
             std::thread::spawn(move || {
-                let start = i32::MIN as i64 + k * span;
-                let end = (start + span).min(i32::MAX as i64 + 1);
+                let start = i64::from(i32::MIN) + k * span;
+                let end = (start + span).min(i64::from(i32::MAX) + 1);
                 let mut rounded = 0u64;
                 for a in start..end {
                     let a = a as i32;
@@ -134,11 +135,10 @@ fn fixed32_all_values_correctly_rounded() {
                     if undecided {
                         assert!(
                             trig::TAN_NEAR_MIDPOINT_32.binary_search(&a).is_ok(),
-                            "tan {:#x} near a midpoint",
-                            a
+                            "tan {a:#x} near a midpoint"
                         );
                     }
-                    rounded += (r + undecided as u32) as u64;
+                    rounded += u64::from(r + u32::from(undecided));
                 }
                 rounded
             })

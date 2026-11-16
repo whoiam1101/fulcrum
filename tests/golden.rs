@@ -18,8 +18,12 @@ const GOLDEN_VECTORS: u64 = 0x86e8_db5a_35e6_ed72;
 
 macro_rules! mix {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
-        let a = $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as _);
-        let b = $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as _);
+        let a = $T::from_bits(
+            $rng.edge_bits($bits, $T::FRAC_BITS) as <$T as fulcrum::FixedFloat>::Bits
+        );
+        let b = $T::from_bits(
+            $rng.edge_bits($bits, $T::FRAC_BITS) as <$T as fulcrum::FixedFloat>::Bits
+        );
         for v in [
             a + b,
             a - b,
@@ -87,14 +91,15 @@ fn golden_hash() {
     let hash = compute();
     assert_eq!(
         hash, GOLDEN,
-        "determinism hash changed: got {:#018x}, expected {:#018x}",
-        hash, GOLDEN
+        "determinism hash changed: got {hash:#018x}, expected {GOLDEN:#018x}"
     );
 }
 
 macro_rules! mix_vectors {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
-        let mut g = || $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as _);
+        let mut g = || {
+            $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as <$T as fulcrum::FixedFloat>::Bits)
+        };
         let a = Vec3::new(g(), g(), g());
         let b = Vec3::new(g(), g(), g());
         let s = g();
@@ -154,7 +159,6 @@ fn golden_hash_vectors() {
     let hash = compute_vectors();
     assert_eq!(
         hash, GOLDEN_VECTORS,
-        "determinism hash of the vectors changed: got {:#018x}, expected {:#018x}",
-        hash, GOLDEN_VECTORS
+        "determinism hash of the vectors changed: got {hash:#018x}, expected {GOLDEN_VECTORS:#018x}"
     );
 }

@@ -26,12 +26,15 @@ impl ParseError {
     }
 
     /// The reason of the failure.
+    #[inline]
+    #[must_use]
     pub const fn kind(&self) -> ParseErrorKind {
         self.kind
     }
 }
 
 impl fmt::Display for ParseError {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(match self.kind {
             ParseErrorKind::Empty => "cannot parse fixed-point number from empty string",
@@ -46,6 +49,7 @@ impl fmt::Display for ParseError {
 pub struct OverflowError;
 
 impl fmt::Display for OverflowError {
+    #[inline]
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("value out of range of the target fixed-point type")
     }

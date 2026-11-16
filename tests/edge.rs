@@ -33,10 +33,16 @@ macro_rules! edge_suite {
             fn parts_of_negative_numbers() {
                 let x = $lit!(-1.25);
                 assert_eq!(x.int_part(), -2);
-                assert_eq!(x.frac_part() as i128, 3i128 << ($T::FRAC_BITS - 2));
+                assert_eq!(i128::from(x.frac_part()), 3i128 << ($T::FRAC_BITS - 2));
                 assert_eq!($T::from_parts(-2, x.frac_part()), x);
-                assert_eq!($T::MIN.int_part() as i128, -(1i128 << ($T::INT_BITS - 1)));
-                assert_eq!($T::MAX.frac_part() as i128, (1i128 << $T::FRAC_BITS) - 1);
+                assert_eq!(
+                    i128::from($T::MIN.int_part()),
+                    -(1i128 << ($T::INT_BITS - 1))
+                );
+                assert_eq!(
+                    i128::from($T::MAX.frac_part()),
+                    (1i128 << $T::FRAC_BITS) - 1
+                );
             }
 
             #[test]
@@ -108,7 +114,10 @@ macro_rules! edge_suite {
                 assert_eq!($lit!(-1.25).fract(), $lit!(-0.25));
                 assert_eq!($lit!(-1.25).to_int_floor(), -2);
                 assert_eq!($lit!(-1.25).to_int_trunc(), -1);
-                assert_eq!($T::MAX.to_int_ceil() as i128, 1i128 << ($T::INT_BITS - 1));
+                assert_eq!(
+                    i128::from($T::MAX.to_int_ceil()),
+                    1i128 << ($T::INT_BITS - 1)
+                );
             }
 
             #[test]
@@ -260,31 +269,29 @@ fn narrowing_rounds_and_checks_range() {
 #[test]
 fn narrowing_matches_reference_on_every_fixed16() {
     for raw in i16::MIN..=i16::MAX {
-        let expected = common::spec::round_div(raw as i128, 1 << 4);
+        let expected = common::spec::round_div(i128::from(raw), 1 << 4);
         assert_eq!(
-            FixedFloat8::try_from(FixedFloat16::from_bits(raw)).map(|v| v.to_bits() as i128),
+            FixedFloat8::try_from(FixedFloat16::from_bits(raw)).map(|v| i128::from(v.to_bits())),
             if common::spec::fits(expected, 8) {
                 Ok(expected)
             } else {
                 Err(OverflowError)
             },
-            "{}",
-            raw
+            "{raw}"
         );
     }
     let mut rng = common::Pcg32::new(3, 5);
     for _ in 0..100_000 {
         let raw = rng.edge_bits(64, 32);
         for &(frac, bits) in &[(4u32, 8u32), (8, 16), (16, 32)] {
-            let expected = common::spec::round_div(raw as i128, 1 << (32 - frac));
+            let expected = common::spec::round_div(i128::from(raw), 1 << (32 - frac));
             let got = match bits {
-                8 => {
-                    FixedFloat8::try_from(FixedFloat64::from_bits(raw)).map(|v| v.to_bits() as i128)
-                }
+                8 => FixedFloat8::try_from(FixedFloat64::from_bits(raw))
+                    .map(|v| i128::from(v.to_bits())),
                 16 => FixedFloat16::try_from(FixedFloat64::from_bits(raw))
-                    .map(|v| v.to_bits() as i128),
+                    .map(|v| i128::from(v.to_bits())),
                 _ => FixedFloat32::try_from(FixedFloat64::from_bits(raw))
-                    .map(|v| v.to_bits() as i128),
+                    .map(|v| i128::from(v.to_bits())),
             };
             assert_eq!(
                 got,
@@ -293,9 +300,7 @@ fn narrowing_matches_reference_on_every_fixed16() {
                 } else {
                     Err(OverflowError)
                 },
-                "{} to {} bits",
-                raw,
-                bits
+                "{raw} to {bits} bits"
             );
         }
     }
@@ -306,16 +311,14 @@ fn integers_convert_exactly_or_saturate_by_sign() {
     for n in -10_000i128..=10_000 {
         let raw = n << 4;
         assert_eq!(
-            FixedFloat8::checked_from_int(n).map(|v| v.to_bits() as i128),
+            FixedFloat8::checked_from_int(n).map(|v| i128::from(v.to_bits())),
             Some(raw).filter(|&v| common::spec::fits(v, 8)),
-            "{}",
-            n
+            "{n}"
         );
         assert_eq!(
-            FixedFloat8::saturating_from_int(n).to_bits() as i128,
+            i128::from(FixedFloat8::saturating_from_int(n).to_bits()),
             common::spec::saturate(raw, 8),
-            "{}",
-            n
+            "{n}"
         );
     }
     for &n in &[
@@ -334,11 +337,11 @@ fn integers_convert_exactly_or_saturate_by_sign() {
         assert_eq!(FixedFloat64::saturating_from_int(n), expected);
     }
     assert_eq!(
-        FixedFloat64::checked_from_int(i32::MIN as i128),
+        FixedFloat64::checked_from_int(i128::from(i32::MIN)),
         Some(FixedFloat64::MIN)
     );
     assert_eq!(
-        FixedFloat64::checked_from_int(i32::MAX as i128),
+        FixedFloat64::checked_from_int(i128::from(i32::MAX)),
         Some(FixedFloat64::MAX.floor())
     );
 }
@@ -366,14 +369,15 @@ fn readme_example() {
     const SPEED: FixedFloat64 = ff64!(12.6);
     assert_eq!(SPEED.to_bits(), 0x0000_000c_9999_999a);
     assert_eq!(
-        format!("{:?}", SPEED),
+        format!("{SPEED:?}"),
         "12.6000000000931322574615478515625 (0x0000000c9999999a)"
     );
-    assert_eq!(format!("{:.1}", SPEED), "12.6");
+    assert_eq!(format!("{SPEED:.1}"), "12.6");
 }
 
 #[cfg(feature = "float-convert")]
 #[test]
+#[allow(clippy::disallowed_types)]
 fn f64_round_trip() {
     let mut rng = common::Pcg32::new(7, 7);
     for _ in 0..100_000 {
@@ -382,13 +386,7 @@ fn f64_round_trip() {
         let y = FixedFloat64::from_bits(rng.edge_bits(64, 32));
         let f = y.to_f64();
         let back = FixedFloat64::saturating_from_f64(f);
-        assert!(
-            back.abs_diff(y).to_bits() <= 1 << 11,
-            "{:?} {} {:?}",
-            y,
-            f,
-            back
-        );
+        assert!(back.abs_diff(y).to_bits() <= 1 << 11, "{y:?} {f} {back:?}");
     }
     assert_eq!(FixedFloat8::checked_from_f64(f64::NAN), None);
     assert_eq!(
@@ -414,7 +412,7 @@ fn f64_round_trip() {
         Some(FixedFloat8::ZERO)
     );
     assert_eq!(FixedFloat64::ONE.to_f64(), 1.0);
-    assert_eq!(FixedFloat64::MIN.to_f64(), -2147483648.0);
+    assert_eq!(FixedFloat64::MIN.to_f64(), -2_147_483_648.0);
 }
 
 macro_rules! try_from_ints {
@@ -443,7 +441,7 @@ macro_rules! try_from_ints {
                     .and_then(|w| w.checked_mul(1 << $f))
                     .filter(|&r| common::spec::fits(r, $bits));
                 assert_eq!(
-                    $T::try_from(n).ok().map(|v| v.to_bits() as i128),
+                    $T::try_from(n).ok().map(|v| i128::from(v.to_bits())),
                     expected,
                     "{} from {} {}",
                     stringify!($T),
@@ -459,7 +457,10 @@ macro_rules! try_from_ints {
 fn integers_convert_by_try_from() {
     for_each_i128_width!(try_from_ints!());
     assert_eq!(FixedFloat8::try_from(8i32), Err(OverflowError));
-    assert_eq!(FixedFloat8::try_from(-8i64).map(|v| v.to_bits()), Ok(-128));
+    assert_eq!(
+        FixedFloat8::try_from(-8i64).map(fulcrum::FixedFloat8::to_bits),
+        Ok(-128)
+    );
     assert_eq!(FixedFloat64::try_from(u128::MAX), Err(OverflowError));
 }
 
@@ -467,36 +468,32 @@ fn integers_convert_by_try_from() {
 fn narrowing_saturates_or_wraps() {
     for raw in i16::MIN..=i16::MAX {
         let x = FixedFloat16::from_bits(raw);
-        let exact = common::spec::round_div(raw as i128, 1 << 4);
+        let exact = common::spec::round_div(i128::from(raw), 1 << 4);
         assert_eq!(
-            FixedFloat8::saturating_from(x).to_bits() as i128,
+            i128::from(FixedFloat8::saturating_from(x).to_bits()),
             common::spec::saturate(exact, 8),
-            "saturating {}",
-            raw
+            "saturating {raw}"
         );
         assert_eq!(
-            FixedFloat8::wrapping_from(x).to_bits() as i128,
+            i128::from(FixedFloat8::wrapping_from(x).to_bits()),
             common::spec::wrap(exact, 8),
-            "wrapping {}",
-            raw
+            "wrapping {raw}"
         );
     }
     let mut rng = common::Pcg32::new(11, 13);
     for _ in 0..100_000 {
         let raw = rng.edge_bits(64, 32);
         let x = FixedFloat64::from_bits(raw);
-        let exact = common::spec::round_div(raw as i128, 1 << 16);
+        let exact = common::spec::round_div(i128::from(raw), 1 << 16);
         assert_eq!(
-            FixedFloat32::saturating_from(x).to_bits() as i128,
+            i128::from(FixedFloat32::saturating_from(x).to_bits()),
             common::spec::saturate(exact, 32),
-            "saturating {}",
-            raw
+            "saturating {raw}"
         );
         assert_eq!(
-            FixedFloat32::wrapping_from(x).to_bits() as i128,
+            i128::from(FixedFloat32::wrapping_from(x).to_bits()),
             common::spec::wrap(exact, 32),
-            "wrapping {}",
-            raw
+            "wrapping {raw}"
         );
         let small = FixedFloat8::from_bits(raw as i8);
         assert_eq!(
@@ -517,7 +514,7 @@ macro_rules! check_shifts {
         let raw = $raw;
         let n: u32 = $n;
         let x = $T::from_bits(raw);
-        let ra = raw as i128;
+        let ra = i128::from(raw);
         let product = if n < 127 {
             ra.checked_mul(1i128 << n)
         } else {
@@ -531,19 +528,19 @@ macro_rules! check_shifts {
         };
         let what = format!("{:?} by {}", x, n);
         assert_eq!(
-            (x << n).to_bits() as i128,
+            i128::from((x << n).to_bits()),
             common::spec::saturate(product, $bits),
             "<< {}",
             what
         );
         assert_eq!(
-            x.saturating_shl(n).to_bits() as i128,
+            i128::from(x.saturating_shl(n).to_bits()),
             common::spec::saturate(product, $bits),
             "saturating_shl {}",
             what
         );
         assert_eq!(
-            x.checked_shl(n).map(|v| v.to_bits() as i128),
+            x.checked_shl(n).map(|v| i128::from(v.to_bits())),
             Some(product).filter(|&p| common::spec::fits(p, $bits)),
             "checked_shl {}",
             what
@@ -554,12 +551,12 @@ macro_rules! check_shifts {
             0
         };
         assert_eq!(
-            x.wrapping_shl(n).to_bits() as i128,
+            i128::from(x.wrapping_shl(n).to_bits()),
             wrapped,
             "wrapping_shl {}",
             what
         );
-        assert_eq!((x >> n).to_bits() as i128, quotient, ">> {}", what);
+        assert_eq!(i128::from((x >> n).to_bits()), quotient, ">> {}", what);
         let mut y = x;
         y <<= n;
         assert_eq!(y, x << n, "<<= {}", what);
@@ -579,10 +576,9 @@ fn shifts_scale_by_powers_of_two() {
         assert_eq!(
             x >> 1,
             x / FixedFloat8::from_bits(2 << 4),
-            "x >> 1 == x / 2 for {:?}",
-            x
+            "x >> 1 == x / 2 for {x:?}"
         );
-        assert_eq!(x >> 2, x.div_int(4), "x >> 2 == x.div_int(4) for {:?}", x);
+        assert_eq!(x >> 2, x.div_int(4), "x >> 2 == x.div_int(4) for {x:?}");
     }
     let mut rng = common::Pcg32::new(17, 19);
     for _ in 0..20_000 {
@@ -596,13 +592,13 @@ fn shifts_scale_by_powers_of_two() {
 /// An `i128` raw value biased toward edge cases of the `i128` itself and of
 /// the type being converted to.
 fn scaled_raw(rng: &mut common::Pcg32) -> i128 {
-    let wide = ((rng.next_u64() as i128) << 64) | rng.next_u64() as i128;
+    let wide = (i128::from(rng.next_u64()) << 64) | i128::from(rng.next_u64());
     match rng.below(8) {
         0 => i128::MIN,
         1 => i128::MAX,
         2 => i128::MIN + 1,
-        3 => rng.edge_bits(64, 32) as i128,
-        4 => (rng.edge_bits(64, 32) as i128).wrapping_shl(rng.below(64)),
+        3 => i128::from(rng.edge_bits(64, 32)),
+        4 => i128::from(rng.edge_bits(64, 32)).wrapping_shl(rng.below(64)),
         5 => wide >> rng.below(128),
         _ => wide,
     }
@@ -622,18 +618,18 @@ macro_rules! check_scaled_bits {
             let exact = common::spec::rescale(raw, src, $f);
             let checked = exact.filter(|&v| common::spec::fits(v, $bits));
             assert_eq!(
-                $T::checked_from_scaled_bits(raw, src).map(|v| v.to_bits() as i128),
+                $T::checked_from_scaled_bits(raw, src).map(|v| i128::from(v.to_bits())),
                 checked,
                 "checked {}",
                 what
             );
             let saturated = match exact {
                 Some(v) => common::spec::saturate(v, $bits),
-                None if raw < 0 => $T::MIN.to_bits() as i128,
-                None => $T::MAX.to_bits() as i128,
+                None if raw < 0 => i128::from($T::MIN.to_bits()),
+                None => i128::from($T::MAX.to_bits()),
             };
             assert_eq!(
-                $T::saturating_from_scaled_bits(raw, src).to_bits() as i128,
+                i128::from($T::saturating_from_scaled_bits(raw, src).to_bits()),
                 saturated,
                 "saturating {}",
                 what
@@ -643,7 +639,7 @@ macro_rules! check_scaled_bits {
                 None => common::spec::wrap(raw.wrapping_mul(1i128 << ($f - src)), $bits),
             };
             assert_eq!(
-                $T::wrapping_from_scaled_bits(raw, src).to_bits() as i128,
+                i128::from($T::wrapping_from_scaled_bits(raw, src).to_bits()),
                 wrapped,
                 "wrapping {}",
                 what
@@ -663,7 +659,7 @@ macro_rules! check_scaled_bits {
             (i128::MAX, u32::MAX, 0),
         ] {
             assert_eq!(
-                $T::checked_from_scaled_bits(raw, src).map(|v| v.to_bits() as i128),
+                $T::checked_from_scaled_bits(raw, src).map(|v| i128::from(v.to_bits())),
                 Some(expected),
                 "{} {} / 2^{}",
                 stringify!($T),

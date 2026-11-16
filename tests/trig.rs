@@ -24,10 +24,10 @@ use fulcrum::*;
 macro_rules! check_trig {
     ($T:ident, $f:expr, $a:expr) => {{
         let x = $T::from_bits($a);
-        let s = x.sin_turns().to_bits() as i128;
-        let c = x.cos_turns().to_bits() as i128;
-        let rs = trig::sin_turns($a as i128, $f);
-        let rc = trig::cos_turns($a as i128, $f);
+        let s = i128::from(x.sin_turns().to_bits());
+        let c = i128::from(x.cos_turns().to_bits());
+        let rs = trig::sin_turns(i128::from($a), $f);
+        let rc = trig::cos_turns(i128::from($a), $f);
         assert!(trig::within_ulp(s, rs, $f), "sin_turns {:?} = {}", x, s);
         assert!(trig::within_ulp(c, rc, $f), "cos_turns {:?} = {}", x, c);
         if x != $T::MIN {
@@ -48,7 +48,7 @@ macro_rules! check_trig {
             x
         );
         let rounded = |got: i128, r: i128| trig::correctly_rounded(r, $f) == Some(got);
-        rounded(s, rs) as u32 + rounded(c, rc) as u32
+        u32::from(rounded(s, rs)) + u32::from(rounded(c, rc))
     }};
 }
 
@@ -97,18 +97,19 @@ fn fixed16_all_values_correctly_rounded() {
 
 /// Every value of `FixedFloat32`, on every available thread.
 #[test]
-#[ignore]
+#[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn fixed32_all_values_correctly_rounded() {
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()) as i64;
+    let threads =
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i64;
     let span = (1i64 << 32) / threads + 1;
     let workers: Vec<_> = (0..threads)
         .map(|k| {
             std::thread::spawn(move || {
-                let start = i32::MIN as i64 + k * span;
-                let end = (start + span).min(i32::MAX as i64 + 1);
+                let start = i64::from(i32::MIN) + k * span;
+                let end = (start + span).min(i64::from(i32::MAX) + 1);
                 let mut rounded = 0u64;
                 for a in start..end {
-                    rounded += check_trig!(FixedFloat32, 16, a as i32) as u64;
+                    rounded += u64::from(check_trig!(FixedFloat32, 16, a as i32));
                 }
                 rounded
             })

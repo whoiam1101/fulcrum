@@ -25,11 +25,7 @@ use fulcrum::*;
 fn check(name: &str, x: &dyn core::fmt::Debug, got: i128, r: i128, f: u32) -> bool {
     assert!(
         trig::within_ulp(got, r, f),
-        "{} {:?} = {}, reference {}",
-        name,
-        x,
-        got,
-        r
+        "{name} {x:?} = {got}, reference {r}"
     );
     trig::correctly_rounded(r, f) == Some(got)
 }
@@ -40,14 +36,14 @@ fn check(name: &str, x: &dyn core::fmt::Debug, got: i128, r: i128, f: u32) -> bo
 macro_rules! check_inverse {
     ($T:ident, $f:expr, $a:expr) => {{
         let x = $T::from_bits($a);
-        let a = $a as i128;
-        let mut rounded = check(
+        let a = i128::from($a);
+        let mut rounded = u32::from(check(
             "atan",
             &x,
-            x.atan().to_bits() as i128,
+            i128::from(x.atan().to_bits()),
             trig::atan(a, $f),
             $f,
-        ) as u32;
+        ));
         if x != $T::MIN {
             assert_eq!((-x).atan(), -x.atan(), "atan odd {:?}", x);
         }
@@ -56,13 +52,26 @@ macro_rules! check_inverse {
             let (s, c) = (x.asin(), x.acos());
             assert_eq!(x.checked_asin(), Some(s), "checked_asin {:?}", x);
             assert_eq!(x.checked_acos(), Some(c), "checked_acos {:?}", x);
-            rounded += check("asin", &x, s.to_bits() as i128, trig::asin(a, $f), $f) as u32;
-            rounded += check("acos", &x, c.to_bits() as i128, trig::acos(a, $f), $f) as u32;
+            rounded += u32::from(check(
+                "asin",
+                &x,
+                i128::from(s.to_bits()),
+                trig::asin(a, $f),
+                $f,
+            ));
+            rounded += u32::from(check(
+                "acos",
+                &x,
+                i128::from(c.to_bits()),
+                trig::acos(a, $f),
+                $f,
+            ));
             if x != $T::MIN {
                 assert_eq!((-x).asin(), -s, "asin odd {:?}", x);
             }
         } else {
-            let edge = $T::from_bits(if a < 0 { -one } else { one } as _);
+            let edge =
+                $T::from_bits(if a < 0 { -one } else { one } as <$T as fulcrum::FixedFloat>::Bits);
             assert_eq!(x.checked_asin(), None, "checked_asin {:?}", x);
             assert_eq!(x.checked_acos(), None, "checked_acos {:?}", x);
             assert_eq!(x.asin(), edge.asin(), "asin clamps {:?}", x);
@@ -84,8 +93,8 @@ macro_rules! check_atan2 {
         check(
             "atan2",
             &(y, x),
-            t.to_bits() as i128,
-            trig::atan2($y as i128, $x as i128),
+            i128::from(t.to_bits()),
+            trig::atan2(i128::from($y), i128::from($x)),
             $f,
         )
     }};
@@ -131,7 +140,7 @@ fn fixed8_all_pairs_of_atan2_correctly_rounded() {
     let mut rounded = 0;
     for y in i8::MIN..=i8::MAX {
         for x in i8::MIN..=i8::MAX {
-            rounded += check_atan2!(FixedFloat8, 4, y, x) as u32;
+            rounded += u32::from(check_atan2!(FixedFloat8, 4, y, x));
         }
     }
     assert_eq!(rounded, 65536);
@@ -148,18 +157,19 @@ fn fixed16_all_values_correctly_rounded() {
 
 /// Every value of `FixedFloat32`, on every available thread.
 #[test]
-#[ignore]
+#[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn fixed32_all_values_correctly_rounded() {
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()) as i64;
+    let threads =
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i64;
     let span = (1i64 << 32) / threads + 1;
     let workers: Vec<_> = (0..threads)
         .map(|k| {
             std::thread::spawn(move || {
-                let start = i32::MIN as i64 + k * span;
-                let end = (start + span).min(i32::MAX as i64 + 1);
+                let start = i64::from(i32::MIN) + k * span;
+                let end = (start + span).min(i64::from(i32::MAX) + 1);
                 let mut rounded = 0u64;
                 for a in start..end {
-                    rounded += check_inverse!(FixedFloat32, 16, a as i32) as u64;
+                    rounded += u64::from(check_inverse!(FixedFloat32, 16, a as i32));
                 }
                 rounded
             })
@@ -172,21 +182,22 @@ fn fixed32_all_values_correctly_rounded() {
 /// Every pair of `atan2` on `FixedFloat16`, without the reference: no panic
 /// (with overflow checks, as in the weekly run) and the result in `[-π, π]`.
 #[test]
-#[ignore]
+#[ignore = "exhaustive over 2^32 pairs, minutes on every core: the weekly run"]
 fn fixed16_all_pairs_of_atan2_in_range() {
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()) as i32;
+    let threads =
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i32;
     let span = 65536 / threads + 1;
     let workers: Vec<_> = (0..threads)
         .map(|k| {
             std::thread::spawn(move || {
-                let start = i16::MIN as i32 + k * span;
-                let end = (start + span).min(i16::MAX as i32 + 1);
+                let start = i32::from(i16::MIN) + k * span;
+                let end = (start + span).min(i32::from(i16::MAX) + 1);
                 let pi = FixedFloat16::PI;
                 for y in start..end {
                     let y = FixedFloat16::from_bits(y as i16);
                     for x in i16::MIN..=i16::MAX {
                         let t = y.atan2(FixedFloat16::from_bits(x));
-                        assert!(-pi <= t && t <= pi, "atan2 {:?} {}", y, x);
+                        assert!(-pi <= t && t <= pi, "atan2 {y:?} {x}");
                     }
                 }
             })

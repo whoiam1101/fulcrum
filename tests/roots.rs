@@ -20,7 +20,7 @@ use fulcrum::*;
 
 macro_rules! check_roots {
     ($T:ident, $bits:expr, $f:expr, $a:expr) => {{
-        let ra = $a as i128;
+        let ra = i128::from($a);
         let x = $T::from_bits($a);
 
         let (sqrt, checked_sqrt) = if ra < 0 {
@@ -29,15 +29,15 @@ macro_rules! check_roots {
             let s = spec::sqrt(ra << $f);
             (s, Some(s))
         };
-        assert_eq!(x.sqrt().to_bits() as i128, sqrt, "sqrt {:?}", x);
+        assert_eq!(i128::from(x.sqrt().to_bits()), sqrt, "sqrt {:?}", x);
         assert_eq!(
-            x.checked_sqrt().map(|v| v.to_bits() as i128),
+            x.checked_sqrt().map(|v| i128::from(v.to_bits())),
             checked_sqrt,
             "checked_sqrt {:?}",
             x
         );
         assert_eq!(
-            generic_sqrt(x).to_bits() as i128,
+            i128::from(generic_sqrt(x).to_bits()),
             sqrt,
             "FixedFloat::sqrt {:?}",
             x
@@ -50,9 +50,9 @@ macro_rules! check_roots {
             assert!(spec::fits(s, $bits), "rsqrt {:?} out of range", x);
             (s, Some(s))
         };
-        assert_eq!(x.rsqrt().to_bits() as i128, rsqrt, "rsqrt {:?}", x);
+        assert_eq!(i128::from(x.rsqrt().to_bits()), rsqrt, "rsqrt {:?}", x);
         assert_eq!(
-            x.checked_rsqrt().map(|v| v.to_bits() as i128),
+            x.checked_rsqrt().map(|v| i128::from(v.to_bits())),
             checked_rsqrt,
             "checked_rsqrt {:?}",
             x
@@ -62,18 +62,18 @@ macro_rules! check_roots {
 
 macro_rules! check_hypot {
     ($T:ident, $bits:expr, $a:expr, $b:expr) => {{
-        let (ra, rb) = ($a as i128, $b as i128);
+        let (ra, rb) = (i128::from($a), i128::from($b));
         let (x, y) = ($T::from_bits($a), $T::from_bits($b));
         let h = spec::sqrt(ra * ra + rb * rb);
         assert_eq!(
-            x.hypot(y).to_bits() as i128,
+            i128::from(x.hypot(y).to_bits()),
             spec::saturate(h, $bits),
             "hypot {:?} {:?}",
             x,
             y
         );
         assert_eq!(
-            x.checked_hypot(y).map(|v| v.to_bits() as i128),
+            x.checked_hypot(y).map(|v| i128::from(v.to_bits())),
             Some(h).filter(|&v| spec::fits(v, $bits)),
             "checked_hypot {:?} {:?}",
             x,
@@ -124,7 +124,8 @@ fn random_values_on_wider_types() {
 }
 
 fn parallel<F: Fn(i64) + Send + Sync + 'static>(lo: i64, hi: i64, f: F) {
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()) as i64;
+    let threads =
+        std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get) as i64;
     let chunk = (hi - lo) / threads + 1;
     let f = std::sync::Arc::new(f);
     let handles: Vec<_> = (0..threads)
@@ -147,25 +148,21 @@ fn parallel<F: Fn(i64) + Send + Sync + 'static>(lo: i64, hi: i64, f: F) {
 #[test]
 #[ignore = "2^32 pairs: run with --ignored --release"]
 fn fixed16_hypot_all_pairs() {
-    parallel(i16::MIN as i64, i16::MAX as i64 + 1, |a| {
+    parallel(i64::from(i16::MIN), i64::from(i16::MAX) + 1, |a| {
         let x = FixedFloat16::from_bits(a as i16);
-        let ra = a as i128;
+        let ra = i128::from(a);
         for b in i16::MIN..=i16::MAX {
-            let rb = b as i128;
+            let rb = i128::from(b);
             let n = ra * ra + rb * rb;
             let h = x.checked_hypot(FixedFloat16::from_bits(b));
             match h {
                 Some(h) => assert!(
-                    spec::is_sqrt_ratio(h.to_bits() as i128, n, 1),
-                    "hypot {} {}",
-                    a,
-                    b
+                    spec::is_sqrt_ratio(i128::from(h.to_bits()), n, 1),
+                    "hypot {a} {b}"
                 ),
                 None => assert!(
-                    4 * n >= (2 * i16::MAX as i128 + 1).pow(2),
-                    "checked_hypot {} {} is None",
-                    a,
-                    b
+                    4 * n >= (2 * i128::from(i16::MAX) + 1).pow(2),
+                    "checked_hypot {a} {b} is None"
                 ),
             }
         }
@@ -175,18 +172,18 @@ fn fixed16_hypot_all_pairs() {
 #[test]
 #[ignore = "2^32 values: run with --ignored --release"]
 fn fixed32_sqrt_rsqrt_all_values() {
-    parallel(i32::MIN as i64, i32::MAX as i64 + 1, |a| {
+    parallel(i64::from(i32::MIN), i64::from(i32::MAX) + 1, |a| {
         let x = FixedFloat32::from_bits(a as i32);
-        let ra = a as i128;
+        let ra = i128::from(a);
         if ra < 0 {
-            assert_eq!(x.sqrt(), FixedFloat32::ZERO, "sqrt {}", a);
-            assert_eq!(x.rsqrt(), FixedFloat32::MAX, "rsqrt {}", a);
+            assert_eq!(x.sqrt(), FixedFloat32::ZERO, "sqrt {a}");
+            assert_eq!(x.rsqrt(), FixedFloat32::MAX, "rsqrt {a}");
         } else {
-            let s = x.sqrt().to_bits() as i128;
-            assert!(spec::is_sqrt_ratio(s, ra << 16, 1), "sqrt {}", a);
+            let s = i128::from(x.sqrt().to_bits());
+            assert!(spec::is_sqrt_ratio(s, ra << 16, 1), "sqrt {a}");
             if ra > 0 {
-                let r = x.rsqrt().to_bits() as i128;
-                assert!(spec::is_sqrt_ratio(r, 1 << 48, ra), "rsqrt {}", a);
+                let r = i128::from(x.rsqrt().to_bits());
+                assert!(spec::is_sqrt_ratio(r, 1 << 48, ra), "rsqrt {a}");
             }
         }
     });

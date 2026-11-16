@@ -80,6 +80,7 @@ macro_rules! impl_ops {
         impl core::iter::Sum for $Name {
             /// Exact and order-independent: the terms are accumulated without
             /// saturation and the total is saturated once.
+            #[inline]
             fn sum<I: Iterator<Item = Self>>(iter: I) -> Self {
                 let mut acc = Self::accumulator();
                 acc.extend(iter);
@@ -89,6 +90,7 @@ macro_rules! impl_ops {
 
         impl<'a> core::iter::Sum<&'a $Name> for $Name {
             /// Exact and order-independent, see `Sum<Self>`.
+            #[inline]
             fn sum<I: Iterator<Item = &'a Self>>(iter: I) -> Self {
                 let mut acc = Self::accumulator();
                 acc.extend(iter);
@@ -100,6 +102,7 @@ macro_rules! impl_ops {
             /// The `*` operator in iteration order: saturating, or panicking
             /// with `strict-overflow`. Rounded multiplication is not
             /// associative, so the order matters.
+            #[inline]
             fn product<I: Iterator<Item = Self>>(iter: I) -> Self {
                 iter.fold(Self::ONE, |a, b| a * b)
             }
@@ -107,6 +110,7 @@ macro_rules! impl_ops {
 
         impl<'a> core::iter::Product<&'a $Name> for $Name {
             /// The `*` operator in iteration order, see `Product<Self>`.
+            #[inline]
             fn product<I: Iterator<Item = &'a Self>>(iter: I) -> Self {
                 iter.fold(Self::ONE, |a, b| a * *b)
             }

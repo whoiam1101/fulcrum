@@ -15,19 +15,19 @@ use fulcrum::*;
 
 macro_rules! check_triple {
     ($T:ident, $bits:expr, $f:expr, $a:expr, $b:expr, $c:expr) => {{
-        let (ra, rb, rc): (i128, i128, i128) = ($a as i128, $b as i128, $c as i128);
+        let (ra, rb, rc): (i128, i128, i128) = (i128::from($a), i128::from($b), i128::from($c));
         let (x, y, z) = ($T::from_bits($a), $T::from_bits($b), $T::from_bits($c));
         let ctx = || format!("{} ({:?}, {:?}, {:?})", stringify!($T), x, y, z);
 
         let fma = spec::mul_add(ra, rb, rc, $f);
         assert_eq!(
-            x.mul_add(y, z).to_bits() as i128,
+            i128::from(x.mul_add(y, z).to_bits()),
             spec::saturate(fma, $bits),
             "mul_add {}",
             ctx()
         );
         assert_eq!(
-            x.checked_mul_add(y, z).map(|v| v.to_bits() as i128),
+            x.checked_mul_add(y, z).map(|v| i128::from(v.to_bits())),
             Some(fma).filter(|&v| spec::fits(v, $bits)),
             "checked_mul_add {}",
             ctx()
@@ -36,7 +36,7 @@ macro_rules! check_triple {
         if rc == 0 {
             let sign = ra.signum() * rb.signum();
             assert_eq!(
-                x.mul_div(y, z).to_bits() as i128,
+                i128::from(x.mul_div(y, z).to_bits()),
                 spec::div_by_zero(sign, $bits),
                 "mul_div0 {}",
                 ctx()
@@ -45,13 +45,13 @@ macro_rules! check_triple {
         } else {
             let q = spec::mul_div(ra, rb, rc);
             assert_eq!(
-                x.mul_div(y, z).to_bits() as i128,
+                i128::from(x.mul_div(y, z).to_bits()),
                 spec::saturate(q, $bits),
                 "mul_div {}",
                 ctx()
             );
             assert_eq!(
-                x.checked_mul_div(y, z).map(|v| v.to_bits() as i128),
+                x.checked_mul_div(y, z).map(|v| i128::from(v.to_bits())),
                 Some(q).filter(|&v| spec::fits(v, $bits)),
                 "checked_mul_div {}",
                 ctx()
@@ -60,13 +60,13 @@ macro_rules! check_triple {
 
         let lerp = spec::lerp(ra, rb, rc, $f);
         assert_eq!(
-            x.lerp(y, z).to_bits() as i128,
+            i128::from(x.lerp(y, z).to_bits()),
             spec::saturate(lerp, $bits),
             "lerp {}",
             ctx()
         );
         assert_eq!(
-            x.checked_lerp(y, z).map(|v| v.to_bits() as i128),
+            x.checked_lerp(y, z).map(|v| i128::from(v.to_bits())),
             Some(lerp).filter(|&v| spec::fits(v, $bits)),
             "checked_lerp {}",
             ctx()

@@ -166,12 +166,22 @@ macro_rules! impl_parse {
 
             /// Parses a decimal string such as `"-12.625"`, exactly, rounding
             /// to nearest with ties toward `+∞`. No exponent, no `_`.
+            ///
+            /// # Errors
+            ///
+            /// [`ParseErrorKind::Empty`](crate::ParseErrorKind::Empty) for an
+            /// empty string or a lone sign,
+            /// [`InvalidDigit`](crate::ParseErrorKind::InvalidDigit) for any
+            /// other string that is not a decimal number, and
+            /// [`Overflow`](crate::ParseErrorKind::Overflow) for a value out of
+            /// range.
             #[inline]
             pub const fn parse(s: &str) -> Result<Self, crate::ParseError> {
                 Self::parse_bytes(s.as_bytes(), false, false)
             }
 
             #[doc(hidden)]
+            #[inline]
             pub const fn __lit(s: &str, negate: bool) -> Self {
                 match Self::parse_bytes(s.as_bytes(), true, negate) {
                     Ok(v) => v,

@@ -11,6 +11,7 @@
 macro_rules! impl_serde {
     ($Name:ident, $Bits:ty) => {
         impl serde::Serialize for $Name {
+            #[inline]
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                 if serializer.is_human_readable() {
                     serializer.collect_str(self)
@@ -21,6 +22,7 @@ macro_rules! impl_serde {
         }
 
         impl<'de> serde::Deserialize<'de> for $Name {
+            #[inline]
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                 struct Visitor;
 
@@ -39,12 +41,12 @@ macro_rules! impl_serde {
                     }
 
                     fn visit_i64<E: serde::de::Error>(self, v: i64) -> Result<$Name, E> {
-                        $Name::checked_from_int(v as i128)
+                        $Name::checked_from_int(i128::from(v))
                             .ok_or_else(|| E::custom(crate::OverflowError))
                     }
 
                     fn visit_u64<E: serde::de::Error>(self, v: u64) -> Result<$Name, E> {
-                        $Name::checked_from_int(v as i128)
+                        $Name::checked_from_int(i128::from(v))
                             .ok_or_else(|| E::custom(crate::OverflowError))
                     }
 
@@ -67,6 +69,7 @@ macro_rules! impl_serde {
 macro_rules! impl_serde_vec {
     ($V:ident, $n:literal, $($c:ident $i:literal),+) => {
         impl<T: serde::Serialize> serde::Serialize for crate::$V<T> {
+            #[inline]
             fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
                 use serde::ser::SerializeTuple;
                 let mut t = serializer.serialize_tuple($n)?;
@@ -76,6 +79,7 @@ macro_rules! impl_serde_vec {
         }
 
         impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for crate::$V<T> {
+            #[inline]
             fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
                 struct Visitor<T>(core::marker::PhantomData<T>);
 

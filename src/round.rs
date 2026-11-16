@@ -5,6 +5,7 @@ macro_rules! impl_round {
         impl $Name {
             /// Largest integer `≤ self`. Never overflows.
             #[inline]
+            #[must_use]
             pub const fn floor(self) -> Self {
                 Self {
                     raw: self.raw & !Self::FRAC_MASK,
@@ -13,6 +14,7 @@ macro_rules! impl_round {
 
             /// Smallest integer `≥ self`, saturating to `MAX` when it is out of range.
             #[inline]
+            #[must_use]
             pub const fn ceil(self) -> Self {
                 Self::saturate(crate::kernel::$k::ceil(self.raw))
             }
@@ -25,6 +27,7 @@ macro_rules! impl_round {
 
             /// Integer part rounded toward zero. Never overflows.
             #[inline]
+            #[must_use]
             pub const fn trunc(self) -> Self {
                 if self.raw < 0 {
                     Self {
@@ -37,6 +40,7 @@ macro_rules! impl_round {
 
             /// `self - self.trunc()`: fractional part with the sign of `self`.
             #[inline]
+            #[must_use]
             pub const fn fract(self) -> Self {
                 Self {
                     raw: self.raw - self.trunc().raw,
@@ -45,6 +49,7 @@ macro_rules! impl_round {
 
             /// Nearest integer, ties away from zero, saturating to `MAX` when out of range.
             #[inline]
+            #[must_use]
             pub const fn round(self) -> Self {
                 Self::saturate(crate::kernel::$k::round_half_away(self.raw))
             }
@@ -57,6 +62,7 @@ macro_rules! impl_round {
 
             /// Nearest integer, ties to even, saturating to `MAX` when out of range.
             #[inline]
+            #[must_use]
             pub const fn round_ties_even(self) -> Self {
                 Self::saturate(crate::kernel::$k::round_ties_even(self.raw))
             }

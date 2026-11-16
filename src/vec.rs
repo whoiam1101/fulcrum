@@ -81,18 +81,21 @@ macro_rules! impl_vec {
 
             /// The component-wise minimum.
             #[inline]
+            #[must_use]
             pub fn min(self, other: Self) -> Self {
                 Self { $($c: core::cmp::min(self.$c, other.$c)),+ }
             }
 
             /// The component-wise maximum.
             #[inline]
+            #[must_use]
             pub fn max(self, other: Self) -> Self {
                 Self { $($c: core::cmp::max(self.$c, other.$c)),+ }
             }
 
             /// The component-wise absolute value, saturating: `|MIN|` is `MAX`.
             #[inline]
+            #[must_use]
             pub fn abs(self) -> Self {
                 Self { $($c: self.$c.abs()),+ }
             }
@@ -148,6 +151,7 @@ macro_rules! impl_vec {
             /// [`Self::try_normalize`], with the zero vector for the zero
             /// vector.
             #[inline]
+            #[must_use]
             pub fn normalize(self) -> Self {
                 self.try_normalize().unwrap_or(Self::ZERO)
             }
@@ -157,6 +161,7 @@ macro_rules! impl_vec {
             /// exact and each scaled component `x · max / |v|` is correctly
             /// rounded, never longer than `max` in any component.
             #[inline]
+            #[must_use]
             pub fn clamp_length_max(self, max: T) -> Self {
                 let max = core::cmp::max(max, T::ZERO);
                 if T::__cmp_length(self.to_xyz(), max) == core::cmp::Ordering::Greater {
@@ -173,6 +178,7 @@ macro_rules! impl_vec {
             /// comparisons, correctly rounded components as in
             /// [`Self::clamp_length_max`].
             #[inline]
+            #[must_use]
             pub fn clamp_length(self, min: T, max: T) -> Self {
                 let min = core::cmp::max(min, T::ZERO);
                 if T::__cmp_length(self.to_xyz(), min) == core::cmp::Ordering::Less {
@@ -185,6 +191,7 @@ macro_rules! impl_vec {
             /// Linear interpolation `self + (other - self) · t` per component,
             /// each rounded once like [`FixedFloat::lerp`].
             #[inline]
+            #[must_use]
             pub fn lerp(self, other: Self, t: T) -> Self {
                 Self { $($c: self.$c.lerp(other.$c, t)),+ }
             }
@@ -301,6 +308,7 @@ impl<T: FixedFloat> Vec2<T> {
     /// `3.3·10^7` on `FixedFloat64`), and its error grows with the length
     /// beyond.
     #[inline]
+    #[must_use]
     pub fn rotate(self, angle: T::Angle) -> Self {
         let (x, y) = T::__rotate(self.x, self.y, angle);
         Self { x, y }
@@ -342,6 +350,7 @@ impl<T: FixedFloat> Vec2<T> {
     /// `self` turned a quarter turn counterclockwise, `(-y, x)`; `-MIN`
     /// saturates like unary `-`.
     #[inline]
+    #[must_use]
     pub fn perp(self) -> Self {
         Self {
             x: -self.y,
@@ -404,6 +413,7 @@ impl<T: FixedFloat> Vec3<T> {
     /// The cross product, each component rounded once from its exact value
     /// and saturated.
     #[inline]
+    #[must_use]
     pub fn cross(self, other: Self) -> Self {
         Self {
             x: T::__det(self.y, self.z, other.y, other.z),

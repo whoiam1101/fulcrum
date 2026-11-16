@@ -11,6 +11,20 @@ use core::fmt::{self, Write};
 const MAX_FRAC_DIGITS: usize = 64;
 const MAX_INT_DIGITS: usize = 40;
 
+/// Adds one unit of the last place to the decimal digits; `true` when the
+/// carry leaves the first digit (every digit was 9 and is now 0).
+fn increment(digits: &mut [u8]) -> bool {
+    for d in digits.iter_mut().rev() {
+        if *d == 9 {
+            *d = 0;
+        } else {
+            *d += 1;
+            return false;
+        }
+    }
+    true
+}
+
 pub(crate) fn write_fixed(
     f: &mut fmt::Formatter<'_>,
     negative: bool,
@@ -52,21 +66,8 @@ pub(crate) fn write_fixed(
                 } else {
                     int & 1 == 1
                 };
-                if frac > half || (frac == half && last_odd) {
-                    let mut i = n;
-                    let mut carry = true;
-                    while carry && i > 0 {
-                        i -= 1;
-                        if digits[i] == 9 {
-                            digits[i] = 0;
-                        } else {
-                            digits[i] += 1;
-                            carry = false;
-                        }
-                    }
-                    if carry {
-                        int += 1;
-                    }
+                if (frac > half || (frac == half && last_odd)) && increment(&mut digits[..n]) {
+                    int += 1;
                 }
             }
         }
@@ -91,7 +92,7 @@ pub(crate) fn write_fixed(
         ""
     };
     let has_dot = n > 0 || zeros > 0;
-    let len = sign.len() + il + has_dot as usize + n + zeros;
+    let len = sign.len() + il + usize::from(has_dot) + n + zeros;
     let pad = f.width().unwrap_or(0).saturating_sub(len);
     let fill = f.fill();
     let (pre, post, zero_pad) = if f.sign_aware_zero_pad() {
@@ -132,17 +133,19 @@ pub(crate) fn write_fixed(
 macro_rules! impl_fmt {
     ($Name:ident, $UBits:ty, $NB:literal) => {
         impl core::fmt::Display for $Name {
+            #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 crate::fmt::write_fixed(
                     f,
                     self.raw < 0,
-                    self.raw.unsigned_abs() as u128,
+                    u128::from(self.raw.unsigned_abs()),
                     Self::FRAC_BITS,
                 )
             }
         }
 
         impl core::fmt::Debug for $Name {
+            #[inline]
             fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
                 write!(f, "{} (0x{:0w$x})", self, self.raw as $UBits, w = 2 * $NB)
             }

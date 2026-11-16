@@ -26,10 +26,10 @@ macro_rules! check_angle {
         let x = $T::from_bits($x);
         let (s, c) = (a.sin(), a.cos());
         let (rs, rc) = (
-            trig::sin_turns($t as i128, $n),
-            trig::cos_turns($t as i128, $n),
+            trig::sin_turns(i128::from($t), $n),
+            trig::cos_turns(i128::from($t), $n),
         );
-        let (si, ci) = (s.to_bits() as i128, c.to_bits() as i128);
+        let (si, ci) = (i128::from(s.to_bits()), i128::from(c.to_bits()));
         assert!(trig::within_ulp(si, rs, $f), "sin {:?} = {:?}", a, s);
         assert!(trig::within_ulp(ci, rc, $f), "cos {:?} = {:?}", a, c);
         assert_eq!(a.sin_cos(), (s, c));
@@ -39,7 +39,7 @@ macro_rules! check_angle {
 
         let shift = $n - $f;
         let mask = (1u128 << $f) - 1;
-        let turns = ((($t as u128) + (1 << (shift - 1))) >> shift) & mask;
+        let turns = (((u128::from($t)) + (1 << (shift - 1))) >> shift) & mask;
         assert_eq!(
             a.to_turns().to_bits() as u128 & mask,
             turns,
@@ -49,7 +49,7 @@ macro_rules! check_angle {
         assert!(!a.to_turns().is_negative() && a.to_turns() < $T::ONE);
         let from = (($x as u128) & mask) << shift;
         assert_eq!(
-            $A::from_turns(x).to_bits() as u128,
+            u128::from($A::from_turns(x).to_bits()),
             from,
             "from_turns {:?}",
             x
@@ -73,11 +73,11 @@ macro_rules! check_angle {
             );
         }
 
-        let signed = ((($t as u128) << (128 - $n)) as i128) >> (128 - $n);
-        let scaled = ((signed * $x as i128) + (1 << ($f - 1))) >> $f;
+        let signed = (((u128::from($t)) << (128 - $n)) as i128) >> (128 - $n);
+        let scaled = ((signed * i128::from($x)) + (1 << ($f - 1))) >> $f;
         let wrap = (1u128 << $n) - 1;
         assert_eq!(
-            a.scale(x).to_bits() as u128,
+            u128::from(a.scale(x).to_bits()),
             scaled as u128 & wrap,
             "scale {:?} {:?}",
             a,
@@ -85,7 +85,8 @@ macro_rules! check_angle {
         );
         assert_eq!(a * x, a.scale(x));
 
-        let b = $A::from_bits(($t as u128).wrapping_mul(0x9e37_79b9_7f4a_7c15) as _);
+        let b = $A::from_bits((u128::from($t)).wrapping_mul(0x9e37_79b9_7f4a_7c15)
+            as <$A as fulcrum::FixedAngle>::Bits);
         assert_eq!((a + b).to_bits(), a.to_bits().wrapping_add(b.to_bits()));
         assert_eq!((a - b).to_bits(), a.to_bits().wrapping_sub(b.to_bits()));
         let mut c2 = a;
@@ -93,8 +94,8 @@ macro_rules! check_angle {
         c2 -= b;
         assert_eq!(c2, a);
 
-        (trig::correctly_rounded(rs, $f) == Some(si)) as u32
-            + (trig::correctly_rounded(rc, $f) == Some(ci)) as u32
+        u32::from(trig::correctly_rounded(rs, $f) == Some(si))
+            + u32::from(trig::correctly_rounded(rc, $f) == Some(ci))
     }};
 }
 
@@ -163,9 +164,10 @@ fn angle16_all_values() {
 
 /// Every value of `Angle32`, on every available thread.
 #[test]
-#[ignore]
+#[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn angle32_all_values() {
-    let threads = std::thread::available_parallelism().map_or(1, |n| n.get()) as u64;
+    let threads =
+        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as u64;
     let span = (1u64 << 32) / threads + 1;
     let workers: Vec<_> = (0..threads)
         .map(|k| {
@@ -175,7 +177,7 @@ fn angle32_all_values() {
                 let mut rounded = 0u64;
                 for t in start..end {
                     let t = t as u32;
-                    rounded += check_angle!(Angle32, FixedFloat32, 32, 16, t, t as i32) as u64;
+                    rounded += u64::from(check_angle!(Angle32, FixedFloat32, 32, 16, t, t as i32));
                     check_same_as_turns!(Angle32, FixedFloat32, t as i32);
                 }
                 rounded
@@ -231,6 +233,6 @@ fn trait_angle() {
 fn generic_rotate<A: FixedAngle>(a: A) -> A {
     let half = A::Fixed::HALF;
     let b = A::from_bits(A::QUARTER_TURN.to_bits()) * half + a * half;
-    assert_eq!((b.sin(), b.cos()), b.sin_cos());
+    assert_eq!((b.sin(), b.cos()), b.sin_cos(), "sin_cos {b:?}");
     b - A::QUARTER_TURN * half + A::ZERO - A::DELTA + A::DELTA
 }

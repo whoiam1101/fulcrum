@@ -56,7 +56,7 @@ macro_rules! define_angle {
             #[inline]
             pub const fn to_turns(self) -> $Fixed {
                 let r = crate::kernel::shr_round(self.raw as i128, $N - $F);
-                $Fixed::from_bits((r as u64 & ((1 << $F) - 1)) as _)
+                $Fixed::from_bits((r as u64 & ((1 << $F) - 1)) as <$Fixed as crate::FixedFloat>::Bits)
             }
 
             /// The angle of `radians` radians, `radians / 2π` modulo a turn,
@@ -75,14 +75,14 @@ macro_rules! define_angle {
             /// `a ≠ HALF_TURN`.
             #[inline]
             pub const fn to_radians(self) -> $Fixed {
-                $Fixed::from_bits(crate::trig::angle_to_radians(self.raw as u64, $N, $F) as _)
+                $Fixed::from_bits(crate::trig::angle_to_radians(self.raw as u64, $N, $F) as <$Fixed as crate::FixedFloat>::Bits)
             }
 
             /// The sine of the angle, within 1 ulp; `(-a).sin() = -a.sin()` bit
             /// for bit.
             #[inline]
             pub const fn sin(self) -> $Fixed {
-                $Fixed::from_bits(crate::trig::angle_sin(self.raw as u64, $N, $F) as _)
+                $Fixed::from_bits(crate::trig::angle_sin(self.raw as u64, $N, $F) as <$Fixed as crate::FixedFloat>::Bits)
             }
 
             /// The cosine of the angle, within 1 ulp;
@@ -90,7 +90,7 @@ macro_rules! define_angle {
             /// bit for bit.
             #[inline]
             pub const fn cos(self) -> $Fixed {
-                $Fixed::from_bits(crate::trig::angle_cos(self.raw as u64, $N, $F) as _)
+                $Fixed::from_bits(crate::trig::angle_cos(self.raw as u64, $N, $F) as <$Fixed as crate::FixedFloat>::Bits)
             }
 
             /// `(self.sin(), self.cos())`.
@@ -101,18 +101,21 @@ macro_rules! define_angle {
 
             /// `self + other` modulo a turn.
             #[inline]
+            #[must_use]
             pub const fn wrapping_add(self, other: Self) -> Self {
                 Self { raw: self.raw.wrapping_add(other.raw) }
             }
 
             /// `self - other` modulo a turn.
             #[inline]
+            #[must_use]
             pub const fn wrapping_sub(self, other: Self) -> Self {
                 Self { raw: self.raw.wrapping_sub(other.raw) }
             }
 
             /// `-self` modulo a turn: the same rotation the other way.
             #[inline]
+            #[must_use]
             pub const fn wrapping_neg(self) -> Self {
                 Self { raw: self.raw.wrapping_neg() }
             }
@@ -121,6 +124,7 @@ macro_rules! define_angle {
             /// as everywhere in the crate), with the angle taken in `[-½, ½)`
             /// of a turn: a rotation rate times a time step.
             #[inline]
+            #[must_use]
             pub const fn scale(self, x: $Fixed) -> Self {
                 Self { raw: crate::trig::angle_scale(self.raw as u64, $N, x.to_bits() as i64, $F) as $Bits }
             }

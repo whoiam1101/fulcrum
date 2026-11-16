@@ -105,25 +105,25 @@ fn angle_within_ulp(
 macro_rules! check_geometry {
     ($T:ident, $bits:expr, $f:expr, $a:expr, $b:expr, $s:expr, $t:expr) => {{
         type A = <$T as FixedFloat>::Angle;
-        let ra: [i128; 3] = [$a[0] as i128, $a[1] as i128, $a[2] as i128];
-        let rb: [i128; 3] = [$b[0] as i128, $b[1] as i128, $b[2] as i128];
+        let ra: [i128; 3] = [i128::from($a[0]), i128::from($a[1]), i128::from($a[2])];
+        let rb: [i128; 3] = [i128::from($b[0]), i128::from($b[1]), i128::from($b[2])];
         let v = |r: &[i128; 3]| {
             Vec3::new(
-                $T::from_bits(r[0] as _),
-                $T::from_bits(r[1] as _),
-                $T::from_bits(r[2] as _),
+                $T::from_bits(r[0] as <$T as fulcrum::FixedFloat>::Bits),
+                $T::from_bits(r[1] as <$T as fulcrum::FixedFloat>::Bits),
+                $T::from_bits(r[2] as <$T as fulcrum::FixedFloat>::Bits),
             )
         };
         let (a3, b3) = (v(&ra), v(&rb));
         let a2 = Vec2::new(a3.x, a3.y);
         let b2 = Vec2::new(b3.x, b3.y);
-        let len = $T::from_bits($s as _);
+        let len = $T::from_bits($s as <$T as fulcrum::FixedFloat>::Bits);
         let ctx = || format!("{} {:?} {:?} {:?}", stringify!($T), a3, b3, len);
         let raw3 = |w: Vec3<$T>| {
             [
-                w.x.to_bits() as i128,
-                w.y.to_bits() as i128,
-                w.z.to_bits() as i128,
+                i128::from(w.x.to_bits()),
+                i128::from(w.y.to_bits()),
+                i128::from(w.z.to_bits()),
             ]
         };
         let one = 1u128 << $f;
@@ -132,7 +132,7 @@ macro_rules! check_geometry {
             (
                 2,
                 a2.try_normalize()
-                    .map(|w| [w.x.to_bits() as i128, w.y.to_bits() as i128, 0]),
+                    .map(|w| [i128::from(w.x.to_bits()), i128::from(w.y.to_bits()), 0]),
                 "2",
             ),
             (3, a3.try_normalize().map(raw3), "3"),
@@ -154,18 +154,18 @@ macro_rules! check_geometry {
             assert_eq!(a3.normalize(), Vec3::ZERO);
         }
 
-        let k = len.to_bits().max(0) as i128;
+        let k = i128::from(len.to_bits().max(0));
         let k2 = (k as u128) * (k as u128);
         for &(n, got_max, got_both, name) in &[
             (
                 2,
                 {
                     let w = a2.clamp_length_max(len);
-                    [w.x.to_bits() as i128, w.y.to_bits() as i128, 0]
+                    [i128::from(w.x.to_bits()), i128::from(w.y.to_bits()), 0]
                 },
                 {
                     let w = a2.clamp_length(len, len);
-                    [w.x.to_bits() as i128, w.y.to_bits() as i128, 0]
+                    [i128::from(w.x.to_bits()), i128::from(w.y.to_bits()), 0]
                 },
                 "2",
             ),
@@ -210,12 +210,12 @@ macro_rules! check_geometry {
         }
 
         let t = $t;
-        let angle = A::from_bits(t as _);
+        let angle = A::from_bits(t as <A as fulcrum::FixedAngle>::Bits);
         let (x, y) = (ra[0], ra[1]);
         let r = a2.rotate(angle);
-        let (rx, ry) = (r.x.to_bits() as i128, r.y.to_bits() as i128);
+        let (rx, ry) = (i128::from(r.x.to_bits()), i128::from(r.y.to_bits()));
         let quarter = 1u128 << ($bits - 2);
-        let tt = (t as u128) & ((quarter << 2) - 1);
+        let tt = u128::from(t) & ((quarter << 2) - 1);
         if tt % quarter == 0 {
             let sat = |w: i128| spec::saturate(w, $bits);
             let want = match tt / quarter {
@@ -250,7 +250,7 @@ macro_rules! check_geometry {
 
         let cross = ra[0] * rb[1] - ra[1] * rb[0];
         if let Some(dot) = (ra[0] * rb[0]).checked_add(ra[1] * rb[1]) {
-            let got = a2.angle_to(b2).to_bits() as i128;
+            let got = i128::from(a2.angle_to(b2).to_bits());
             let ok = if cross == 0 && dot >= 0 {
                 got == 0
             } else {
@@ -276,7 +276,7 @@ macro_rules! check_geometry {
             let dot = (ra[0] * rb[0])
                 .checked_add(ra[1] * rb[1])
                 .and_then(|d| d.checked_add(ra[2] * rb[2]));
-            let got = a3.angle_to(b3).to_bits() as i128;
+            let got = i128::from(a3.angle_to(b3).to_bits());
             let ok = match (checked_sum_sq(&c), dot) {
                 (None, _) | (_, None) => true,
                 (Some(c2), Some(dot)) if c2 == 0 && dot >= 0 => got == 0,
@@ -351,7 +351,7 @@ fn worked_examples() {
     );
     assert_eq!(
         Vec3::new(ff64!(2), ff64!(3), ff64!(6)).normalize().z,
-        FixedFloat64::from_bits(3681400539)
+        FixedFloat64::from_bits(3_681_400_539)
     );
     assert_eq!(Vec2f32::X.rotate(Angle32::QUARTER_TURN), Vec2f32::Y);
     assert_eq!(Vec2f32::X.angle_to(Vec2f32::Y), FixedFloat32::FRAC_PI_2);

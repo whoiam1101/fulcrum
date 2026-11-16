@@ -33,16 +33,18 @@ fmt-check:
 fmt:
     for m in {{ manifests }}; do cargo fmt --manifest-path "$m"; done
 
-[doc("clippy -D warnings on the root crate: default features, then all")]
+[doc("clippy -D warnings on the root crate: default features, every feature but strict-overflow (the tests it turns off), then all")]
 [group("lint")]
 clippy:
     cargo clippy --all-targets -- -D warnings
+    cargo clippy --all-targets --features {{ test_features }} -- -D warnings
     cargo clippy --all-targets --all-features -- -D warnings
 
-[doc("clippy -D warnings on the root crate with default features, then with all features on every manifest")]
+[doc("clippy -D warnings on the root crate with default features and every feature but strict-overflow, then with all features on every manifest")]
 [group("lint")]
 clippy-all:
     cargo clippy --all-targets -- -D warnings
+    cargo clippy --all-targets --features {{ test_features }} -- -D warnings
     for m in {{ manifests }}; do cargo clippy --manifest-path "$m" --all-targets --all-features -- -D warnings; done
 
 [doc("rustdoc with warnings as errors")]
@@ -116,7 +118,7 @@ cov min=min_coverage:
 [doc("Mutation testing, hours; extra arguments go to cargo mutants, e.g. --jobs 4 --shard 0/8. The Kani harnesses (`src/proofs`, only under `cfg(kani)`) are not mutated. A build over 2 minutes (a mutant that loops in the const evaluation of `ff!`) is a timeout. A mutant that times out counts as caught: only exit code 3 (timeouts, nothing missed) passes")]
 [group("test")]
 mutants *args:
-    cargo mutants --no-shuffle --timeout-multiplier 3 --build-timeout 120 --exclude src/proofs/mod.rs --features {{ test_features }} {{ args }} || test $? -eq 3
+    cargo mutants --no-shuffle --timeout-multiplier 3 --build-timeout 120 --exclude src/proofs/mod.rs --exclude src/proofs/geometry.rs --features {{ test_features }} {{ args }} || test $? -eq 3
 
 [doc("cargo deny: advisories, bans, licenses, sources of every manifest")]
 [group("security")]

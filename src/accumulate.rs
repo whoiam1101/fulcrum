@@ -109,13 +109,13 @@ macro_rules! impl_accumulator {
             /// Adds `x` exactly.
             #[inline]
             pub fn add(&mut self, x: $Name) {
-                self.sum = crate::accumulate::$st::add_value(self.sum, x.to_bits() as i128, $F);
+                self.sum = crate::accumulate::$st::add_value(self.sum, i128::from(x.to_bits()), $F);
             }
 
             /// Subtracts `x` exactly.
             #[inline]
             pub fn sub(&mut self, x: $Name) {
-                self.sum = crate::accumulate::$st::sub_value(self.sum, x.to_bits() as i128, $F);
+                self.sum = crate::accumulate::$st::sub_value(self.sum, i128::from(x.to_bits()), $F);
             }
 
             /// Adds the exact, unrounded product `a · b`. A dot product built with
@@ -124,13 +124,14 @@ macro_rules! impl_accumulator {
             pub fn add_product(&mut self, a: $Name, b: $Name) {
                 self.sum = crate::accumulate::$st::add_product(
                     self.sum,
-                    a.to_bits() as i128,
-                    b.to_bits() as i128,
+                    i128::from(a.to_bits()),
+                    i128::from(b.to_bits()),
                 );
             }
 
             /// Combines two partial accumulators. Associative and commutative.
             #[inline]
+            #[must_use]
             pub const fn merge(self, other: Self) -> Self {
                 Self { sum: crate::accumulate::$st::merge(self.sum, other.sum) }
             }
@@ -183,6 +184,7 @@ macro_rules! impl_accumulator {
         }
 
         impl Extend<$Name> for $Acc {
+            #[inline]
             fn extend<I: IntoIterator<Item = $Name>>(&mut self, iter: I) {
                 for x in iter {
                     self.add(x);
@@ -191,6 +193,7 @@ macro_rules! impl_accumulator {
         }
 
         impl<'a> Extend<&'a $Name> for $Acc {
+            #[inline]
             fn extend<I: IntoIterator<Item = &'a $Name>>(&mut self, iter: I) {
                 for x in iter {
                     self.add(*x);
@@ -199,6 +202,7 @@ macro_rules! impl_accumulator {
         }
 
         impl core::iter::FromIterator<$Name> for $Acc {
+            #[inline]
             fn from_iter<I: IntoIterator<Item = $Name>>(iter: I) -> Self {
                 let mut acc = Self::ZERO;
                 acc.extend(iter);
@@ -207,6 +211,7 @@ macro_rules! impl_accumulator {
         }
 
         impl core::iter::Sum<$Acc> for $Acc {
+            #[inline]
             fn sum<I: Iterator<Item = $Acc>>(iter: I) -> Self {
                 iter.fold(Self::ZERO, Self::merge)
             }

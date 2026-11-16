@@ -159,12 +159,14 @@ macro_rules! define_fixed {
 
             /// Saturating addition.
             #[inline]
+            #[must_use]
             pub const fn saturating_add(self, rhs: Self) -> Self {
                 Self { raw: self.raw.saturating_add(rhs.raw) }
             }
 
             /// Wrapping addition (modulo `2^BITS` of the raw value).
             #[inline]
+            #[must_use]
             pub const fn wrapping_add(self, rhs: Self) -> Self {
                 Self { raw: self.raw.wrapping_add(rhs.raw) }
             }
@@ -187,12 +189,14 @@ macro_rules! define_fixed {
 
             /// Saturating subtraction.
             #[inline]
+            #[must_use]
             pub const fn saturating_sub(self, rhs: Self) -> Self {
                 Self { raw: self.raw.saturating_sub(rhs.raw) }
             }
 
             /// Wrapping subtraction.
             #[inline]
+            #[must_use]
             pub const fn wrapping_sub(self, rhs: Self) -> Self {
                 Self { raw: self.raw.wrapping_sub(rhs.raw) }
             }
@@ -212,12 +216,14 @@ macro_rules! define_fixed {
 
             /// Saturating multiplication, rounded to nearest (ties toward `+∞`).
             #[inline]
+            #[must_use]
             pub const fn saturating_mul(self, rhs: Self) -> Self {
                 Self::saturate(crate::kernel::$k::mul(self.raw, rhs.raw))
             }
 
             /// Wrapping multiplication, rounded to nearest (ties toward `+∞`).
             #[inline]
+            #[must_use]
             pub const fn wrapping_mul(self, rhs: Self) -> Self {
                 Self::wrapped(crate::kernel::$k::mul(self.raw, rhs.raw))
             }
@@ -244,6 +250,7 @@ macro_rules! define_fixed {
             /// Saturating division, rounded to nearest (ties toward `+∞`).
             /// Division by zero gives `MAX`, `MIN` or `0` by the sign of `self`.
             #[inline]
+            #[must_use]
             pub const fn saturating_div(self, rhs: Self) -> Self {
                 let w = crate::kernel::$k::div_total(self.raw, rhs.raw);
                 if rhs.raw == 0 {
@@ -256,6 +263,7 @@ macro_rules! define_fixed {
             /// Wrapping division, rounded to nearest (ties toward `+∞`).
             /// Division by zero gives the same result as [`Self::saturating_div`].
             #[inline]
+            #[must_use]
             pub const fn wrapping_div(self, rhs: Self) -> Self {
                 let w = crate::kernel::$k::div_total(self.raw, rhs.raw);
                 if rhs.raw == 0 {
@@ -290,6 +298,7 @@ macro_rules! define_fixed {
 
             /// Remainder; `rhs = 0` gives `0`. The remainder is exact and never overflows.
             #[inline]
+            #[must_use]
             pub const fn saturating_rem(self, rhs: Self) -> Self {
                 if rhs.raw == 0 {
                     Self::ZERO
@@ -300,6 +309,7 @@ macro_rules! define_fixed {
 
             /// Same as [`Self::saturating_rem`].
             #[inline]
+            #[must_use]
             pub const fn wrapping_rem(self, rhs: Self) -> Self {
                 self.saturating_rem(rhs)
             }
@@ -321,12 +331,14 @@ macro_rules! define_fixed {
 
             /// Saturating negation; `-MIN` gives `MAX`.
             #[inline]
+            #[must_use]
             pub const fn saturating_neg(self) -> Self {
                 Self { raw: self.raw.saturating_neg() }
             }
 
             /// Wrapping negation; `-MIN` gives `MIN`.
             #[inline]
+            #[must_use]
             pub const fn wrapping_neg(self) -> Self {
                 Self { raw: self.raw.wrapping_neg() }
             }
@@ -340,6 +352,7 @@ macro_rules! define_fixed {
 
             /// Absolute value, saturating: `abs(MIN)` gives `MAX`.
             #[inline]
+            #[must_use]
             pub const fn abs(self) -> Self {
                 self.saturating_abs()
             }
@@ -355,12 +368,14 @@ macro_rules! define_fixed {
 
             /// Saturating absolute value.
             #[inline]
+            #[must_use]
             pub const fn saturating_abs(self) -> Self {
                 Self { raw: self.raw.saturating_abs() }
             }
 
             /// Wrapping absolute value; `abs(MIN)` gives `MIN`.
             #[inline]
+            #[must_use]
             pub const fn wrapping_abs(self) -> Self {
                 Self { raw: self.raw.wrapping_abs() }
             }
@@ -374,6 +389,7 @@ macro_rules! define_fixed {
 
             /// Multiplication by an integer, saturating. Exact, no rounding.
             #[inline]
+            #[must_use]
             pub const fn mul_int(self, n: $Bits) -> Self {
                 Self { raw: self.raw.saturating_mul(n) }
             }
@@ -389,6 +405,7 @@ macro_rules! define_fixed {
 
             /// Wrapping multiplication by an integer.
             #[inline]
+            #[must_use]
             pub const fn wrapping_mul_int(self, n: $Bits) -> Self {
                 Self { raw: self.raw.wrapping_mul(n) }
             }
@@ -405,6 +422,7 @@ macro_rules! define_fixed {
             /// `self · 2^n`, saturating; the operator `<<` does the same. Exact
             /// when in range; any `n` is accepted, `n ≥ BITS` gives `0`, `MAX` or `MIN`.
             #[inline]
+            #[must_use]
             pub const fn saturating_shl(self, n: u32) -> Self {
                 match crate::kernel::$k::shl(self.raw, n) {
                     (raw, false) => Self { raw },
@@ -415,6 +433,7 @@ macro_rules! define_fixed {
             /// `self · 2^n` modulo `2^BITS` of the raw value; `n ≥ BITS` gives `0`.
             /// Unlike `wrapping_shl` of the primitive integers, `n` is not masked.
             #[inline]
+            #[must_use]
             pub const fn wrapping_shl(self, n: u32) -> Self {
                 Self { raw: crate::kernel::$k::shl(self.raw, n).0 }
             }
@@ -423,6 +442,7 @@ macro_rules! define_fixed {
             /// `>>` does the same, so `x >> 1 == x / 2`. Never overflows; any `n`
             /// is accepted, `n ≥ BITS` gives `0`.
             #[inline]
+            #[must_use]
             pub const fn shr_round(self, n: u32) -> Self {
                 Self { raw: crate::kernel::$k::shr(self.raw, n) }
             }
@@ -430,6 +450,7 @@ macro_rules! define_fixed {
             /// Division by an integer, rounded to nearest (ties toward `+∞`),
             /// saturating. `n = 0` gives `MAX`, `MIN` or `0` by the sign of `self`.
             #[inline]
+            #[must_use]
             pub const fn div_int(self, n: $Bits) -> Self {
                 if n == 0 {
                     return self.div_by_zero();
@@ -449,6 +470,7 @@ macro_rules! define_fixed {
 
             /// `1 / self`, saturating; `1 / 0` gives `MAX`.
             #[inline]
+            #[must_use]
             pub const fn recip(self) -> Self {
                 Self::ONE.saturating_div(self)
             }
@@ -461,6 +483,7 @@ macro_rules! define_fixed {
 
             /// `self · self`, saturating.
             #[inline]
+            #[must_use]
             pub const fn sqr(self) -> Self {
                 self.saturating_mul(self)
             }
@@ -468,6 +491,7 @@ macro_rules! define_fixed {
             /// `√self`, correctly rounded to nearest; never overflows. A
             /// negative `self` gives `0`.
             #[inline]
+            #[must_use]
             pub const fn sqrt(self) -> Self {
                 match self.checked_sqrt() {
                     Some(root) => root,
@@ -487,6 +511,7 @@ macro_rules! define_fixed {
             /// `1 / √self`, correctly rounded to nearest; never overflows for
             /// `self > 0`. `self ≤ 0` gives `MAX`, like `1 / 0` in [`Self::recip`].
             #[inline]
+            #[must_use]
             pub const fn rsqrt(self) -> Self {
                 match self.checked_rsqrt() {
                     Some(root) => root,
@@ -507,6 +532,7 @@ macro_rules! define_fixed {
             /// saturated: the squares are exact, so nothing overflows before
             /// the root.
             #[inline]
+            #[must_use]
             pub const fn hypot(self, other: Self) -> Self {
                 Self::saturate(crate::kernel::$k::hypot(self.raw, other.raw))
             }
@@ -524,6 +550,7 @@ macro_rules! define_fixed {
             /// the result is in `[-1, 1]`, and `sin_turns(-x) = -sin_turns(x)`
             /// bit for bit for every `x > MIN` (`-MIN` saturates to `MAX`).
             #[inline]
+            #[must_use]
             pub const fn sin_turns(self) -> Self {
                 Self { raw: crate::trig::sin_turns(self.raw as u64, $F) as $Bits }
             }
@@ -532,6 +559,7 @@ macro_rules! define_fixed {
             /// within 1 ulp; `cos_turns(x) = sin_turns(x + ¼)` and
             /// `cos_turns(-x) = cos_turns(x)` bit for bit for every `x > MIN`.
             #[inline]
+            #[must_use]
             pub const fn cos_turns(self) -> Self {
                 Self { raw: crate::trig::cos_turns(self.raw as u64, $F) as $Bits }
             }
@@ -541,6 +569,7 @@ macro_rules! define_fixed {
             /// loses nothing on any input; the result is in `[-1, 1]`, and
             /// `sin(-x) = -sin(x)` bit for bit for every `x > MIN`.
             #[inline]
+            #[must_use]
             pub const fn sin(self) -> Self {
                 Self { raw: crate::trig::sin(self.raw as i64, $F) as $Bits }
             }
@@ -548,6 +577,7 @@ macro_rules! define_fixed {
             /// `cos(self)` of an angle of `self` radians, within 1 ulp;
             /// `cos(-x) = cos(x)` bit for bit for every `x > MIN`.
             #[inline]
+            #[must_use]
             pub const fn cos(self) -> Self {
                 Self { raw: crate::trig::cos(self.raw as i64, $F) as $Bits }
             }
@@ -563,6 +593,7 @@ macro_rules! define_fixed {
             /// saturated near the poles; `tan(-x) = -tan(x)` bit for bit for
             /// every `x > MIN`.
             #[inline]
+            #[must_use]
             pub const fn tan(self) -> Self {
                 Self::saturate(crate::trig::tan(self.raw as i64, $F) as crate::kernel::$k::Wide)
             }
@@ -578,6 +609,7 @@ macro_rules! define_fixed {
             /// never overflows, and `atan(-x) = -atan(x)` bit for bit for every
             /// `x > MIN`.
             #[inline]
+            #[must_use]
             pub const fn atan(self) -> Self {
                 Self { raw: crate::trig::atan(self.raw as i64, $F) as $Bits }
             }
@@ -589,6 +621,7 @@ macro_rules! define_fixed {
             /// `atan2(0, x < 0) = π`. Odd in `self ≠ 0` bit for bit; nothing
             /// overflows, whatever the magnitudes.
             #[inline]
+            #[must_use]
             pub const fn atan2(self, other: Self) -> Self {
                 Self { raw: crate::trig::atan2(self.raw as i64, other.raw as i64, $F) as $Bits }
             }
@@ -597,6 +630,7 @@ macro_rules! define_fixed {
             /// `self` outside `[-1, 1]` is clamped to it, so it gives `±π/2`.
             /// `asin(-x) = -asin(x)` bit for bit.
             #[inline]
+            #[must_use]
             pub const fn asin(self) -> Self {
                 Self { raw: crate::trig::asin(self.clamp_unit(), $F) as $Bits }
             }
@@ -614,6 +648,7 @@ macro_rules! define_fixed {
             /// `acos(self)` in radians, in `[0, π]`, within 1 ulp; `self`
             /// outside `[-1, 1]` is clamped to it, so it gives `0` or `π`.
             #[inline]
+            #[must_use]
             pub const fn acos(self) -> Self {
                 Self { raw: crate::trig::acos(self.clamp_unit(), $F) as $Bits }
             }
@@ -644,6 +679,7 @@ macro_rules! define_fixed {
 
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
+            #[must_use]
             pub const fn signum(self) -> Self {
                 if self.raw > 0 {
                     Self::ONE
@@ -674,6 +710,7 @@ macro_rules! define_fixed {
 
             /// The smaller of two values.
             #[inline]
+            #[must_use]
             pub const fn min(self, other: Self) -> Self {
                 if other.raw < self.raw {
                     other
@@ -684,6 +721,7 @@ macro_rules! define_fixed {
 
             /// The larger of two values.
             #[inline]
+            #[must_use]
             pub const fn max(self, other: Self) -> Self {
                 if other.raw > self.raw {
                     other
@@ -694,12 +732,14 @@ macro_rules! define_fixed {
 
             /// Restricts `self` to `[lo, hi]`. Never panics: when `lo > hi` the result is `hi`.
             #[inline]
+            #[must_use]
             pub const fn clamp(self, lo: Self, hi: Self) -> Self {
                 self.max(lo).min(hi)
             }
 
             /// `|self - other|`, saturating.
             #[inline]
+            #[must_use]
             pub const fn abs_diff(self, other: Self) -> Self {
                 if self.raw >= other.raw {
                     self.saturating_sub(other)
@@ -710,6 +750,7 @@ macro_rules! define_fixed {
 
             /// `(self + other) / 2` without overflow, rounded to nearest (ties toward `+∞`).
             #[inline]
+            #[must_use]
             pub const fn midpoint(self, other: Self) -> Self {
                 Self { raw: crate::kernel::$k::midpoint(self.raw, other.raw) }
             }
@@ -718,6 +759,7 @@ macro_rules! define_fixed {
             /// saturated once: the product is neither rounded nor saturated
             /// before the addition.
             #[inline]
+            #[must_use]
             pub const fn mul_add(self, a: Self, b: Self) -> Self {
                 Self::saturate(crate::kernel::$k::mul_add(self.raw, a.raw, b.raw))
             }
@@ -734,6 +776,7 @@ macro_rules! define_fixed {
             /// loses bits before the division. `b = 0` gives `MAX`, `MIN` or `0`
             /// by the sign of `self · a`.
             #[inline]
+            #[must_use]
             pub const fn mul_div(self, a: Self, b: Self) -> Self {
                 if b.raw == 0 {
                     return Self { raw: self.raw.signum() * a.raw.signum() }.div_by_zero();
@@ -756,6 +799,7 @@ macro_rules! define_fixed {
             /// and `t = 1` gives `other` exactly; `t` outside `[0, 1]`
             /// extrapolates. The difference is exact, so it never overflows.
             #[inline]
+            #[must_use]
             pub const fn lerp(self, other: Self, t: Self) -> Self {
                 Self::saturate(crate::kernel::$k::lerp(self.raw, other.raw, t.raw))
             }
@@ -798,7 +842,7 @@ macro_rules! define_fixed {
             }
             #[inline]
             fn __raw_i128(self) -> i128 {
-                self.raw as i128
+                i128::from(self.raw)
             }
             #[inline]
             fn saturating_from_int(n: i128) -> Self {
@@ -904,9 +948,9 @@ macro_rules! define_fixed {
             #[inline]
             fn __rotate(x: Self, y: Self, angle: crate::$Angle) -> (Self, Self) {
                 let (rx, ry) = crate::trig::rotate(
-                    x.raw as i64,
-                    y.raw as i64,
-                    angle.to_bits() as u64,
+                    i64::from(x.raw),
+                    i64::from(y.raw),
+                    u64::from(angle.to_bits()),
                     <$Bits>::BITS,
                 );
                 (
@@ -917,24 +961,24 @@ macro_rules! define_fixed {
             #[inline]
             fn __angle2(a: [Self; 2], b: [Self; 2]) -> Self {
                 Self::saturating_from_scaled_bits(
-                    crate::trig::angle_between2(
-                        a[0].raw as i64,
-                        a[1].raw as i64,
-                        b[0].raw as i64,
-                        b[1].raw as i64,
+                    i128::from(crate::trig::angle_between2(
+                        i64::from(a[0].raw),
+                        i64::from(a[1].raw),
+                        i64::from(b[0].raw),
+                        i64::from(b[1].raw),
                         $F,
-                    ) as i128,
+                    )),
                     $F,
                 )
             }
             #[inline]
             fn __angle3(a: [Self; 3], b: [Self; 3]) -> Self {
                 Self::saturating_from_scaled_bits(
-                    crate::trig::angle_between3(
-                        [a[0].raw as i64, a[1].raw as i64, a[2].raw as i64],
-                        [b[0].raw as i64, b[1].raw as i64, b[2].raw as i64],
+                    i128::from(crate::trig::angle_between3(
+                        [i64::from(a[0].raw), i64::from(a[1].raw), i64::from(a[2].raw)],
+                        [i64::from(b[0].raw), i64::from(b[1].raw), i64::from(b[2].raw)],
                         $F,
-                    ) as i128,
+                    )),
                     $F,
                 )
             }

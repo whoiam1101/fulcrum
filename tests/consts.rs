@@ -35,7 +35,7 @@ fn decimal_prefixes() {
         (FixedFloat64::FRAC_1_PI, "0.31830988"),
     ];
     for (c, prefix) in cases {
-        assert!(c.to_string().starts_with(prefix), "{} vs {}", c, prefix);
+        assert!(c.to_string().starts_with(prefix), "{c} vs {prefix}");
     }
 }
 

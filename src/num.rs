@@ -40,6 +40,7 @@ macro_rules! impl_num_traits {
         impl num_traits::Num for $Name {
             type FromStrRadixErr = crate::ParseError;
 
+            #[inline]
             fn from_str_radix(text: &str, radix: u32) -> Result<Self, crate::ParseError> {
                 if radix == 10 {
                     text.parse()

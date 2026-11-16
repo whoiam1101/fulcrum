@@ -34,7 +34,24 @@ missing_docs = "warn"
 unexpected_cfgs = { level = "warn", check-cfg = ["cfg(kani)"] }
 
 [lints.clippy]
+pedantic = { level = "warn", priority = -1 }
+cast_possible_truncation = "allow"
+cast_possible_wrap = "allow"
+cast_sign_loss = "allow"
+module_name_repetitions = "allow"
+many_single_char_names = "allow"
 float_arithmetic = "deny"
+todo = "deny"
+unimplemented = "deny"
+dbg_macro = "deny"
+mem_forget = "deny"
+fn_to_numeric_cast_any = "deny"
+as_underscore = "deny"
+lossy_float_literal = "deny"
+float_cmp_const = "deny"
+missing_assert_message = "warn"
+multiple_unsafe_ops_per_block = "deny"
+undocumented_unsafe_blocks = "deny"
 
 [profile.release]
 codegen-units = 1

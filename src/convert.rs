@@ -133,7 +133,7 @@ macro_rules! impl_widen {
             impl From<$Small> for $Big {
                 #[inline]
                 fn from(v: $Small) -> Self {
-                    Self::from_bits((v.to_bits() as <$Big as crate::FixedFloat>::Bits) << ($Big::FRAC_BITS - $Small::FRAC_BITS))
+                    Self::from_bits(<<$Big as crate::FixedFloat>::Bits>::from(v.to_bits()) << ($Big::FRAC_BITS - $Small::FRAC_BITS))
                 }
             }
         )+
@@ -147,7 +147,7 @@ macro_rules! impl_narrow {
                 type Error = crate::OverflowError;
                 #[inline]
                 fn try_from(v: $Big) -> Result<Self, Self::Error> {
-                    match Self::checked_from_scaled_bits(v.to_bits() as i128, $Big::FRAC_BITS) {
+                    match Self::checked_from_scaled_bits(i128::from(v.to_bits()), $Big::FRAC_BITS) {
                         Some(x) => Ok(x),
                         None => Err(crate::OverflowError),
                     }

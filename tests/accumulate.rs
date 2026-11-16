@@ -27,10 +27,15 @@ macro_rules! order_suite {
                 for round in 0..200 {
                     let n = 1 + rng.below(300) as usize;
                     let mut v: Vec<$T> = (0..n)
-                        .map(|_| $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS) as _))
+                        .map(|_| {
+                            $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS)
+                                as <$T as fulcrum::FixedFloat>::Bits)
+                        })
                         .collect();
-                    let exact: i128 = v.iter().map(|x| x.to_bits() as i128).sum();
-                    let expected = $T::from_bits(spec::saturate(exact, $bits) as _);
+                    let exact: i128 = v.iter().map(|x| i128::from(x.to_bits())).sum();
+                    let expected = $T::from_bits(
+                        spec::saturate(exact, $bits) as <$T as fulcrum::FixedFloat>::Bits
+                    );
 
                     let sequential: $Acc =
                         v.iter().collect::<Vec<_>>().into_iter().copied().collect();
@@ -94,20 +99,26 @@ macro_rules! order_suite {
                 for _ in 0..2000 {
                     let n = 1 + rng.below(64) as usize;
                     let a: Vec<$T> = (0..n)
-                        .map(|_| $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS) as _))
+                        .map(|_| {
+                            $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS)
+                                as <$T as fulcrum::FixedFloat>::Bits)
+                        })
                         .collect();
                     let b: Vec<$T> = (0..n)
-                        .map(|_| $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS) as _))
+                        .map(|_| {
+                            $T::from_bits(rng.edge_bits($bits, $T::FRAC_BITS)
+                                as <$T as fulcrum::FixedFloat>::Bits)
+                        })
                         .collect();
                     let expected =
-                        spec::saturate(exact_dot(&a, &b, |x| x.to_bits() as i128, $f), $bits);
+                        spec::saturate(exact_dot(&a, &b, |x| i128::from(x.to_bits()), $f), $bits);
                     let mut forward = $Acc::new();
                     let mut backward = $Acc::new();
                     for i in 0..n {
                         forward.add_product(a[i], b[i]);
                         backward.add_product(b[n - 1 - i], a[n - 1 - i]);
                     }
-                    assert_eq!(forward.finish().to_bits() as i128, expected);
+                    assert_eq!(i128::from(forward.finish().to_bits()), expected);
                     assert_eq!(forward, backward);
                 }
             }
@@ -195,16 +206,9 @@ fn accumulator8_product_plus_value_on_every_triple() {
                 let mut acc = FixedFloat8::accumulator();
                 acc.add_product(x, y);
                 acc.add(z);
-                let exact = spec::mul_add(a as i128, b as i128, c as i128, 4);
+                let exact = spec::mul_add(i128::from(a), i128::from(b), i128::from(c), 4);
                 let expected = spec::saturate(exact, 8);
-                assert_eq!(
-                    acc.finish().to_bits() as i128,
-                    expected,
-                    "{} {} {}",
-                    a,
-                    b,
-                    c
-                );
+                assert_eq!(i128::from(acc.finish().to_bits()), expected, "{a} {b} {c}");
                 assert_eq!(acc.checked_finish().is_some(), expected == exact);
                 assert_eq!(acc.finish(), x.mul_add(y, z));
             }

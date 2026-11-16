@@ -54,6 +54,18 @@
 
 #![no_std]
 #![deny(unsafe_code)]
+#![deny(
+    clippy::panic,
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::exit,
+    clippy::std_instead_of_core,
+    clippy::std_instead_of_alloc,
+    clippy::alloc_instead_of_core
+)]
+#![warn(clippy::missing_inline_in_public_items)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
 #[cfg(feature = "alloc")]
@@ -101,6 +113,10 @@ mod vec;
 
 #[cfg(kani)]
 mod proofs;
+
+#[cfg(kani)]
+#[path = "proofs/geometry.rs"]
+mod proofs_geometry;
 
 /// The README example, compiled and run as a doctest.
 #[cfg(doctest)]
@@ -196,30 +212,41 @@ pub trait FixedFloat:
     /// Checked division.
     fn checked_div(self, rhs: Self) -> Option<Self>;
     /// Wrapping addition.
+    #[must_use]
     fn wrapping_add(self, rhs: Self) -> Self;
     /// Wrapping subtraction.
+    #[must_use]
     fn wrapping_sub(self, rhs: Self) -> Self;
     /// Wrapping multiplication.
+    #[must_use]
     fn wrapping_mul(self, rhs: Self) -> Self;
     /// Absolute value, saturating.
+    #[must_use]
     fn abs(self) -> Self;
     /// `self < 0`.
     fn is_negative(self) -> bool;
     /// Largest integer `≤ self`.
+    #[must_use]
     fn floor(self) -> Self;
     /// Smallest integer `≥ self`, saturating.
+    #[must_use]
     fn ceil(self) -> Self;
     /// Nearest integer, ties away from zero, saturating.
+    #[must_use]
     fn round(self) -> Self;
     /// `√self`, correctly rounded; a negative `self` gives `0`.
+    #[must_use]
     fn sqrt(self) -> Self;
     /// Sine and cosine of an angle in radians, each within 1 ulp.
     fn sin_cos(self) -> (Self, Self);
     /// The angle of the point `(other, self)` in radians, within 1 ulp.
+    #[must_use]
     fn atan2(self, other: Self) -> Self;
     /// `√(self² + other²)`, correctly rounded and saturated.
+    #[must_use]
     fn hypot(self, other: Self) -> Self;
     /// `self + (other - self) · t`, rounded once and saturated.
+    #[must_use]
     fn lerp(self, other: Self, t: Self) -> Self;
     #[doc(hidden)]
     fn __dot(a: &[Self], b: &[Self]) -> Self;
@@ -295,6 +322,7 @@ pub trait FixedAngle:
     /// Sine and cosine, each within 1 ulp.
     fn sin_cos(self) -> (Self::Fixed, Self::Fixed);
     /// `self · x` modulo a turn, rounded to nearest.
+    #[must_use]
     fn scale(self, x: Self::Fixed) -> Self;
 }
 

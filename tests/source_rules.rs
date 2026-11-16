@@ -5,8 +5,8 @@
 //!   none at all in TOML, YAML and `.gitignore`;
 //! - no platform-specific code and no floating point in `src`, except
 //!   `src/float.rs` behind the `float-convert` feature;
-//! - no `unsafe` in `src`, except the two trait impls of `src/pod.rs` behind
-//!   the `bytemuck` feature;
+//! - no `unsafe` in `src`, except the `bytemuck` trait impls of `src/pod.rs`
+//!   behind the `bytemuck` feature;
 //! - no bare `$` in Markdown outside code: math only in the forms GitHub
 //!   renders without Markdown mangling it, ```` ```math ```` blocks and
 //!   `` $`…`$ `` inline, and no `\operatorname`, which GitHub refuses.
@@ -62,7 +62,7 @@ fn rust_violation(line: &str) -> bool {
         }
         if chars[i] == '/' && chars[i + 1] == '/' && after_space_or_start(&chars, i) {
             match chars.get(i + 2) {
-                Some('/') | Some('!') => {}
+                Some('/' | '!') => {}
                 _ => return true,
             }
         }
@@ -84,7 +84,7 @@ fn lean_violation(line: &str) -> bool {
         let dashes = chars[i] == '-' && chars[i + 1] == '-' && after_space_or_start(&chars, i);
         let block = chars[i] == '/'
             && chars[i + 1] == '-'
-            && !matches!(chars.get(i + 2), Some('-') | Some('!') | None);
+            && !matches!(chars.get(i + 2), Some('-' | '!') | None);
         dashes || block
     })
 }
@@ -308,7 +308,7 @@ fn markdown_math_renders_on_github() {
 #[test]
 fn rules_catch_what_they_forbid() {
     let slashes = "/".repeat(2);
-    assert!(rust_violation(&format!("let x = 1; {} note", slashes)));
+    assert!(rust_violation(&format!("let x = 1; {slashes} note")));
     assert!(rust_violation("// note"));
     assert!(rust_violation(&format!("{}{} block", '/', '*')));
     assert!(!rust_violation("/// doc"));

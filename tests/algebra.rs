@@ -86,7 +86,7 @@ macro_rules! check_commutative {
 /// association of `*` saturated, so the `*` checks actually ran.
 macro_rules! check_triple {
     ($T:ident, $bits:expr, $f:expr, $a:expr, $b:expr, $c:expr) => {{
-        let (ra, rb, rc): (i128, i128, i128) = ($a as i128, $b as i128, $c as i128);
+        let (ra, rb, rc): (i128, i128, i128) = (i128::from($a), i128::from($b), i128::from($c));
         let x = $T::from_bits($a);
         let y = $T::from_bits($b);
         let z = $T::from_bits($c);
@@ -100,7 +100,7 @@ macro_rules! check_triple {
             ctx()
         );
         assert_eq!(
-            x.wrapping_add(y).wrapping_add(z).to_bits() as i128,
+            i128::from(x.wrapping_add(y).wrapping_add(z).to_bits()),
             spec::wrap(sum, $bits),
             "wrapping_add sum {}",
             ctx()
@@ -111,7 +111,7 @@ macro_rules! check_triple {
         if spec::fits(ra + rb, $bits) && spec::fits(rb + rc, $bits) && spec::fits(sum, $bits) {
             assert_eq!(left, right, "checked_add associates {}", ctx());
             assert_eq!(
-                left.map(|v| v.to_bits() as i128),
+                left.map(|v| i128::from(v.to_bits())),
                 Some(sum),
                 "checked_add exact sum {}",
                 ctx()
@@ -121,13 +121,13 @@ macro_rules! check_triple {
 
         if (ra >= 0 && rb >= 0 && rc >= 0) || (ra <= 0 && rb <= 0 && rc <= 0) {
             assert_eq!(
-                ((x + y) + z).to_bits() as i128,
+                i128::from(((x + y) + z).to_bits()),
                 spec::saturate(sum, $bits),
                 "+ same sign, left {}",
                 ctx()
             );
             assert_eq!(
-                (x + (y + z)).to_bits() as i128,
+                i128::from((x + (y + z)).to_bits()),
                 spec::saturate(sum, $bits),
                 "+ same sign, right {}",
                 ctx()
@@ -142,7 +142,7 @@ macro_rules! check_triple {
             assert_eq!((x * y) * z, l, "* left without saturation {}", ctx());
             assert_eq!(x * (y * z), r, "* right without saturation {}", ctx());
             let one = 1i128 << $f;
-            let (rl, rr) = (l.to_bits() as i128, r.to_bits() as i128);
+            let (rl, rr) = (i128::from(l.to_bits()), i128::from(r.to_bits()));
             if rb % one == 0 && rc % one == 0 {
                 assert_eq!(rl, rr, "* associates on integers {}", ctx());
             }
@@ -174,10 +174,10 @@ macro_rules! check_width {
         check_commutative!($T, x, y);
         check_commutative!($T, y, z);
         check_commutative!($T, x, z);
-        let mut mul = check_triple!($T, $bits, $f, a, b, c) as u64;
+        let mut mul = u64::from(check_triple!($T, $bits, $f, a, b, c));
         let b = int_bits(rng, $bits, $f) as $I;
         let c = int_bits(rng, $bits, $f) as $I;
-        mul += check_triple!($T, $bits, $f, a, b, c) as u64;
+        mul += u64::from(check_triple!($T, $bits, $f, a, b, c));
         mul
     }};
 }
@@ -219,11 +219,11 @@ fn exhaustive_fixed8() {
     for a in i8::MIN..=i8::MAX {
         for b in i8::MIN..=i8::MAX {
             for c in i8::MIN..=i8::MAX {
-                mul += check_triple!(FixedFloat8, 8, 4, a, b, c) as u64;
+                mul += u64::from(check_triple!(FixedFloat8, 8, 4, a, b, c));
             }
         }
     }
-    eprintln!("algebra: {} of 2^24 Q4.4 triples reached the * checks", mul);
+    eprintln!("algebra: {mul} of 2^24 Q4.4 triples reached the * checks");
     assert!(mul > 0);
 }
 
