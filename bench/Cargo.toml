@@ -14,6 +14,7 @@ cordic = "0.1.5"
 fixed = "1"
 fulcrum = { path = ".." }
 fulcrum-oracle = { path = "../oracle" }
+glam = "0.34"
 libm = "0.2"
 num-bigint = "0.4"
 num-traits = "0.2"

@@ -77,6 +77,33 @@ const TRIG_GROUPS: [(&str, &str, &str, &str); 2] = [
     ("FixedFloat64", "f64", "I32F32", "Q32.32"),
 ];
 
+/// Functions of the vectors: id and label.
+const VECTORS: [(&str, &str); 10] = [
+    ("vec_dot", "`Vec2::dot`"),
+    ("vec_length", "`Vec2::length`"),
+    ("vec_normalize", "`Vec2::normalize`"),
+    ("vec_distance_sq", "`Vec2::distance_sq`"),
+    ("vec_rotate", "`Vec2::rotate`"),
+    ("vec_angle_to", "`Vec2::angle_to`"),
+    ("vec_clamp_length", "`Vec2::clamp_length`"),
+    ("vec3_cross", "`Vec3::cross`"),
+    ("vec3_length", "`Vec3::length`"),
+    ("vec3_normalize", "`Vec3::normalize`"),
+];
+
+/// The fulcrum types of the vector benchmarks.
+const VECTOR_TYPES: [&str; 2] = ["FixedFloat32", "FixedFloat64"];
+
+/// Implementations of the "one tick" benchmark: implementation, type and
+/// label.
+const TICK: [(&str, &str, &str); 5] = [
+    ("fulcrum", "FixedFloat32", "fulcrum `FixedFloat32`"),
+    ("fulcrum", "FixedFloat64", "fulcrum `FixedFloat64`"),
+    ("fixed-sat", "I16F16", "`fixed` `I16F16` + `cordic`"),
+    ("fixed-sat", "I32F32", "`fixed` `I32F32` + `cordic`"),
+    ("glam", "f32", "`glam` `f32`"),
+];
+
 /// Operands per function and implementation in the trigonometry accuracy
 /// table; each needs the 256-bit oracle.
 const TRIG_ACCURACY_SAMPLES: usize = 20_000;
@@ -134,6 +161,15 @@ fn expected() -> Vec<String> {
                 ids.push(id("throughput", op, "cordic", fixed));
             }
         }
+    }
+    for (op, _) in VECTORS {
+        for ours in VECTOR_TYPES {
+            ids.push(id("throughput", op, "fulcrum", ours));
+        }
+        ids.push(id("throughput", op, "glam", "f32"));
+    }
+    for (imp, ty, _) in TICK {
+        ids.push(id("tick", "one", imp, ty));
     }
     ids
 }
@@ -378,6 +414,67 @@ impl Report {
             self.get("throughput", op, "fulcrum", ours),
             self.get("throughput", op, imp, float),
         )
+    }
+
+    fn vector_table(&self, s: &mut String) {
+        s.push_str("| Function |");
+        for ours in VECTOR_TYPES {
+            let _ = write!(s, " `{}` |", ours);
+        }
+        s.push_str(" `glam` `f32` |");
+        for ours in VECTOR_TYPES {
+            let _ = write!(s, " `{}` vs `glam` |", ours);
+        }
+        s.push_str("\n|---|");
+        for _ in 0..=VECTOR_TYPES.len() {
+            s.push_str("---:|");
+        }
+        for _ in VECTOR_TYPES {
+            s.push_str("---|");
+        }
+        s.push('\n');
+        for (op, label) in VECTORS {
+            let _ = write!(s, "| {}", label);
+            for ours in VECTOR_TYPES {
+                let _ = write!(
+                    s,
+                    " | {}",
+                    ns(self.get("throughput", op, "fulcrum", ours).ns)
+                );
+            }
+            let _ = write!(s, " | {}", ns(self.get("throughput", op, "glam", "f32").ns));
+            for ours in VECTOR_TYPES {
+                let _ = write!(
+                    s,
+                    " | {}",
+                    verdict_text(self.vs_float(op, ours, "glam", "f32"))
+                );
+            }
+            s.push_str(" |\n");
+        }
+    }
+
+    fn tick_table(&self, s: &mut String) {
+        s.push_str(
+            "| Implementation | ns per unit | µs per tick | vs `glam` |\n|---|---:|---:|---|\n",
+        );
+        let glam = self.get("tick", "one", "glam", "f32");
+        for (imp, ty, label) in TICK {
+            let e = self.get("tick", "one", imp, ty);
+            let vs = if imp == "glam" {
+                "—".to_string()
+            } else {
+                verdict_text(compare(e, glam))
+            };
+            let _ = writeln!(
+                s,
+                "| {} | {} | {:.1} | {} |",
+                label,
+                ns(e.ns),
+                e.ns * fulcrum_bench::tick::UNITS as f64 / 1000.0,
+                vs
+            );
+        }
     }
 
     fn roots_table(&self, s: &mut String) {
@@ -707,6 +804,23 @@ impl Report {
             self.trig_table(&mut s, group);
             s.push('\n');
         }
+        s.push_str("### Vectors, ns per operation (throughput)\n\n");
+        s.push_str(
+            "Coordinates in `[-2, 2)`, `clamp_length` bounds `[0.5, 1.5]`. fulcrum rounds `dot`, `distance_sq` and `cross` once \
+             from exact products, `length` and every component of `normalize` and `clamp_length` are correctly rounded, \
+             `rotate` takes a sine and cosine of 62 bits and `angle_to` the `atan2` of exact products, both within 1 ulp. \
+             `glam` is `f32` on the hardware: `normalize_or_zero`, `Vec2::from_angle(t).rotate(v)`.\n\n",
+        );
+        self.vector_table(&mut s);
+        s.push_str("\n### One tick: 5 000 units\n\n");
+        s.push_str(
+            "The macro benchmark of [`bench/src/tick.rs`](bench/src/tick.rs): each unit normalizes the vector to its target, \
+             turns its heading toward the target's `atan2` by at most 0.1 rad, sets its velocity from the heading's sine and cosine \
+             and the direction, moves by `vel · dt`, and counts the next 16 units within radius 4 by `distance_sq`; every measured tick starts from the same state. \
+             `fixed` uses saturating operators, its `sqrt` and the `cordic` crate.\n\n",
+        );
+        self.tick_table(&mut s);
+        s.push('\n');
         s.push_str("### Accuracy of square roots\n\n");
         accuracy_table(&mut s);
         s.push_str("\n### Accuracy of trigonometry\n\n");

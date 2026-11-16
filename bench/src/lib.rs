@@ -2,6 +2,7 @@
 //! and the accuracy tables of the square roots and of trigonometry.
 
 pub mod accuracy;
+pub mod tick;
 pub mod trig_accuracy;
 
 /// `n` pseudo-random `u64` values from a fixed seed (SplitMix64).

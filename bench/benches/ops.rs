@@ -29,6 +29,13 @@
 //! `atan2` on two operands, against `libm`, the `std` floats (both get
 //! `sin(τ·x)` for the functions in turns) and the `cordic` crate on the
 //! `fixed` types of the same format (it has no functions in turns).
+//!
+//! Vectors: `dot`, `length`, `normalize`, `distance_sq`, `rotate`,
+//! `angle_to` and `clamp_length` of `Vec2` and `cross`, `length`,
+//! `normalize` of `Vec3` for throughput, coordinates in `[-2, 2)`, against
+//! `glam` on `f32`. The macro benchmark "one tick" of `fulcrum_bench::tick`
+//! steers 5 000 units from a fresh state each time; its time is reported
+//! per unit.
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
@@ -569,5 +576,152 @@ fn trig(c: &mut Criterion) {
         asin: cordic::asin::<I32F32>, acos: cordic::acos::<I32F32>);
 }
 
-criterion_group!(benches, ops, combined, roots, trig);
+/// The vector functions of one implementation over 4096 pairs of vectors:
+/// `Vec2` and `Vec3`, coordinates in `[-2, 2)`, length bounds in `[0.5, 1.5]`.
+macro_rules! bench_vectors {
+    ($c:expr, $name:literal, $V:ty, $V3:ty, $A:ty, $vector:expr, $vector3:expr, $angle:expr,
+     dot: $dot:expr, length: $length:expr, normalize: $normalize:expr,
+     distance_sq: $distance_sq:expr, rotate: $rotate:expr, angle_to: $angle_to:expr,
+     clamp_length: $clamp_length:expr,
+     cross3: $cross3:expr, length3: $length3:expr, normalize3: $normalize3:expr) => {{
+        let (vector, vector3, angle) = ($vector, $vector3, $angle);
+        let r = inputs(9 * N, 21);
+        let o = |i: usize| operand(r[i]);
+        let a: Vec<$V> = (0..N).map(|i| vector(o(9 * i), o(9 * i + 1))).collect();
+        let b: Vec<$V> = (0..N).map(|i| vector(o(9 * i + 2), o(9 * i + 3))).collect();
+        let t: Vec<$A> = (0..N).map(|i| angle(r[9 * i + 4])).collect();
+        let a3: Vec<$V3> = (0..N)
+            .map(|i| vector3(o(9 * i), o(9 * i + 1), o(9 * i + 5)))
+            .collect();
+        let b3: Vec<$V3> = (0..N)
+            .map(|i| vector3(o(9 * i + 6), o(9 * i + 7), o(9 * i + 8)))
+            .collect();
+        let mut g = $c.benchmark_group("throughput");
+        g.throughput(Throughput::Elements(N as u64));
+        let (dot, length, normalize, distance_sq, rotate) =
+            ($dot, $length, $normalize, $distance_sq, $rotate);
+        let (angle_to, clamp_length) = ($angle_to, $clamp_length);
+        let (cross3, length3, normalize3) = ($cross3, $length3, $normalize3);
+        bench_trig_one(&mut g, "vec_dot", $name, &a, &b, |x: $V, y: $V| dot(x, y));
+        bench_trig_one(&mut g, "vec_length", $name, &a, &b, |x: $V, _| length(x));
+        bench_trig_one(&mut g, "vec_normalize", $name, &a, &b, |x: $V, _| {
+            normalize(x)
+        });
+        bench_trig_one(&mut g, "vec_distance_sq", $name, &a, &b, |x: $V, y: $V| {
+            distance_sq(x, y)
+        });
+        bench_trig_one(&mut g, "vec_angle_to", $name, &a, &b, |x: $V, y: $V| {
+            angle_to(x, y)
+        });
+        bench_trig_one(&mut g, "vec_clamp_length", $name, &a, &b, |x: $V, _| {
+            clamp_length(x)
+        });
+        let pairs: Vec<($V, $A)> = a.iter().copied().zip(t.iter().copied()).collect();
+        bench_trig_one(
+            &mut g,
+            "vec_rotate",
+            $name,
+            &pairs,
+            &pairs,
+            |p: ($V, $A), _| rotate(p.0, p.1),
+        );
+        bench_trig_one(&mut g, "vec3_cross", $name, &a3, &b3, |x: $V3, y: $V3| {
+            cross3(x, y)
+        });
+        bench_trig_one(&mut g, "vec3_length", $name, &a3, &b3, |x: $V3, _| {
+            length3(x)
+        });
+        bench_trig_one(&mut g, "vec3_normalize", $name, &a3, &b3, |x: $V3, _| {
+            normalize3(x)
+        });
+        g.finish();
+    }};
+}
+
+/// The vector functions of fulcrum on one type `$T` with its angle type
+/// `$A`, made from Q16.16 by `$q`.
+macro_rules! bench_fulcrum_vectors {
+    ($c:expr, $name:literal, $T:ty, $A:ty, $q:expr, $angle:expr) => {{
+        use fulcrum::{Vec2, Vec3};
+        let q = $q;
+        let (lo, hi) = (q(1 << 15), q(3 << 15));
+        bench_vectors!($c, $name, Vec2<$T>, Vec3<$T>, $A,
+            move |x, y| Vec2::new(q(x), q(y)), move |x, y, z| Vec3::new(q(x), q(y), q(z)), $angle,
+            dot: |a: Vec2<$T>, b| a.dot(b), length: |a: Vec2<$T>| a.length(),
+            normalize: |a: Vec2<$T>| a.normalize(),
+            distance_sq: |a: Vec2<$T>, b| a.distance_sq(b),
+            rotate: |a: Vec2<$T>, t| a.rotate(t),
+            angle_to: |a: Vec2<$T>, b| a.angle_to(b),
+            clamp_length: move |a: Vec2<$T>| a.clamp_length(lo, hi),
+            cross3: |a: Vec3<$T>, b| a.cross(b), length3: |a: Vec3<$T>| a.length(),
+            normalize3: |a: Vec3<$T>| a.normalize());
+    }};
+}
+
+fn vectors(c: &mut Criterion) {
+    use fulcrum::{Angle32, Angle64};
+    bench_fulcrum_vectors!(
+        c,
+        "fulcrum/FixedFloat32",
+        FixedFloat32,
+        Angle32,
+        ff32,
+        |r: u64| Angle32::from_bits(r as u32)
+    );
+    bench_fulcrum_vectors!(
+        c,
+        "fulcrum/FixedFloat64",
+        FixedFloat64,
+        Angle64,
+        ff64,
+        |r: u64| Angle64::from_bits(r)
+    );
+    let f = |q: i64| to_f64(q) as f32;
+    bench_vectors!(c, "glam/f32", glam::Vec2, glam::Vec3, f32,
+        |x, y| glam::Vec2::new(f(x), f(y)), |x, y, z| glam::Vec3::new(f(x), f(y), f(z)),
+        |r: u64| (r >> 40) as f32 / (1u64 << 24) as f32 * std::f32::consts::TAU,
+        dot: |a: glam::Vec2, b| a.dot(b), length: |a: glam::Vec2| a.length(),
+        normalize: |a: glam::Vec2| a.normalize_or_zero(),
+        distance_sq: |a: glam::Vec2, b| a.distance_squared(b),
+        rotate: |a: glam::Vec2, t: f32| glam::Vec2::from_angle(t).rotate(a),
+        angle_to: |a: glam::Vec2, b| a.angle_to(b),
+        clamp_length: |a: glam::Vec2| a.clamp_length(0.5, 1.5),
+        cross3: |a: glam::Vec3, b| a.cross(b), length3: |a: glam::Vec3| a.length(),
+        normalize3: |a: glam::Vec3| a.normalize_or_zero());
+}
+
+/// One tick of `fulcrum_bench::tick` per iteration from a fresh starting
+/// state (built outside the measurement), reported per unit.
+fn tick(c: &mut Criterion) {
+    use criterion::BatchSize;
+    use fulcrum_bench::tick;
+    let mut g = c.benchmark_group("tick");
+    g.throughput(Throughput::Elements(tick::UNITS as u64));
+    g.bench_function(BenchmarkId::new("one", "fulcrum/FixedFloat32"), |bn| {
+        bn.iter_batched_ref(
+            tick::fulcrum32,
+            |u| tick::fulcrum(u, |v| FixedFloat32::from_bits(v as i32)),
+            BatchSize::LargeInput,
+        )
+    });
+    g.bench_function(BenchmarkId::new("one", "fulcrum/FixedFloat64"), |bn| {
+        bn.iter_batched_ref(
+            tick::fulcrum64,
+            |u| tick::fulcrum(u, |v| FixedFloat64::from_bits(v << 16)),
+            BatchSize::LargeInput,
+        )
+    });
+    g.bench_function(BenchmarkId::new("one", "fixed-sat/I16F16"), |bn| {
+        bn.iter_batched_ref(tick::fixed16_units, tick::fixed16, BatchSize::LargeInput)
+    });
+    g.bench_function(BenchmarkId::new("one", "fixed-sat/I32F32"), |bn| {
+        bn.iter_batched_ref(tick::fixed32_units, tick::fixed32, BatchSize::LargeInput)
+    });
+    g.bench_function(BenchmarkId::new("one", "glam/f32"), |bn| {
+        bn.iter_batched_ref(tick::glam_units, tick::glam, BatchSize::LargeInput)
+    });
+    g.finish();
+}
+
+criterion_group!(benches, ops, combined, roots, trig, vectors, tick);
 criterion_main!(benches);
