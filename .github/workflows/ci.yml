@@ -130,7 +130,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [parse, ops, format]
+        target: [parse, ops, format, vec]
     defaults:
       run:
         working-directory: fuzz
