@@ -27,6 +27,26 @@ struct Interval {
     hi: BigInt,
 }
 
+/// A decimal literal with `_` between groups of three digits from the right,
+/// as `clippy::unreadable_literal` asks of numbers of five digits and more.
+fn lit(v: &BigInt) -> String {
+    let digits = v.abs().to_string();
+    if digits.len() < 5 {
+        return v.to_string();
+    }
+    let mut out = String::new();
+    if v.is_negative() {
+        out.push('-');
+    }
+    for (i, d) in digits.chars().enumerate() {
+        if i > 0 && (digits.len() - i) % 3 == 0 {
+            out.push('_');
+        }
+        out.push(d);
+    }
+    out
+}
+
 fn one() -> BigInt {
     BigInt::one() << P
 }
@@ -283,7 +303,7 @@ fn render() -> String {
             if raw > max || raw.is_zero() {
                 continue;
             }
-            writeln!(out, "        {} = {}, \"{}\";", c.name, raw, c.doc).unwrap();
+            writeln!(out, "        {} = {}, \"{}\";", c.name, lit(&raw), c.doc).unwrap();
         }
         writeln!(out, "    }}").unwrap();
         writeln!(out, "}}\n").unwrap();
@@ -380,7 +400,7 @@ fn render_trig() -> String {
     writeln!(
         out,
         "pub(crate) const PI: u64 = {};\n",
-        pi.round_to(TRIG_FRAC)
+        lit(&pi.round_to(TRIG_FRAC))
     )
     .unwrap();
     writeln!(
@@ -391,21 +411,21 @@ fn render_trig() -> String {
     writeln!(
         out,
         "pub(crate) const PI_126: u128 = {};\n",
-        pi.round_to(126)
+        lit(&pi.round_to(126))
     )
     .unwrap();
     writeln!(out, "/// π/2, correctly rounded.").unwrap();
     writeln!(
         out,
         "pub(crate) const FRAC_PI_2: u64 = {};\n",
-        pi.div_int(2).round_to(TRIG_FRAC)
+        lit(&pi.div_int(2).round_to(TRIG_FRAC))
     )
     .unwrap();
     let two_over_pi = pi.recip().mul_int(2).round_to(TRIG_REDUCTION_BITS);
     let mask = (BigInt::one() << 64u32) - 1;
     let words: Vec<String> = (0..3u32)
         .rev()
-        .map(|i| ((&two_over_pi >> (64 * i)) & &mask).to_string())
+        .map(|i| lit(&((&two_over_pi >> (64 * i)) & &mask)))
         .collect();
     writeln!(
         out,
@@ -431,7 +451,7 @@ fn render_trig() -> String {
     .unwrap();
     for k in 0..=steps {
         let x = pi.mul_int(k).div_int(2 * steps);
-        writeln!(out, "    {},", sin(&x).round_to(TRIG_FRAC)).unwrap();
+        writeln!(out, "    {},", lit(&sin(&x).round_to(TRIG_FRAC))).unwrap();
     }
     out.push_str("];\n\n");
     writeln!(
@@ -444,7 +464,7 @@ fn render_trig() -> String {
         writeln!(
             out,
             "    {},",
-            atan_ratio(k, steps, &pi).round_to(TRIG_FRAC)
+            lit(&atan_ratio(k, steps, &pi).round_to(TRIG_FRAC))
         )
         .unwrap();
     }

@@ -42,7 +42,7 @@ define_consts! {
         FRAC_1_PI = 81, "1/π";
         FRAC_2_PI = 163, "2/π";
         DEG_TO_RAD = 4, "π/180: one degree in radians";
-        RAD_TO_DEG = 14668, "180/π: one radian in degrees";
+        RAD_TO_DEG = 14_668, "180/π: one radian in degrees";
         SQRT_2 = 362, "√2";
         FRAC_1_SQRT_2 = 181, "1/√2";
         SQRT_3 = 443, "√3";
@@ -60,56 +60,56 @@ define_consts! {
 
 define_consts! {
     FixedFloat32 {
-        PI = 205887, "π";
-        TAU = 411775, "τ = 2π";
-        FRAC_PI_2 = 102944, "π/2";
-        FRAC_PI_3 = 68629, "π/3";
-        FRAC_PI_4 = 51472, "π/4";
-        FRAC_PI_6 = 34315, "π/6";
-        FRAC_PI_8 = 25736, "π/8";
-        FRAC_1_PI = 20861, "1/π";
-        FRAC_2_PI = 41722, "2/π";
+        PI = 205_887, "π";
+        TAU = 411_775, "τ = 2π";
+        FRAC_PI_2 = 102_944, "π/2";
+        FRAC_PI_3 = 68_629, "π/3";
+        FRAC_PI_4 = 51_472, "π/4";
+        FRAC_PI_6 = 34_315, "π/6";
+        FRAC_PI_8 = 25_736, "π/8";
+        FRAC_1_PI = 20_861, "1/π";
+        FRAC_2_PI = 41_722, "2/π";
         DEG_TO_RAD = 1144, "π/180: one degree in radians";
-        RAD_TO_DEG = 3754936, "180/π: one radian in degrees";
-        SQRT_2 = 92682, "√2";
-        FRAC_1_SQRT_2 = 46341, "1/√2";
-        SQRT_3 = 113512, "√3";
-        FRAC_1_SQRT_3 = 37837, "1/√3";
-        E = 178145, "Euler's number e";
-        LN_2 = 45426, "ln 2";
-        LN_10 = 150902, "ln 10";
-        LOG2_E = 94548, "log₂ e";
-        LOG2_10 = 217706, "log₂ 10";
-        LOG10_2 = 19728, "log₁₀ 2";
-        LOG10_E = 28462, "log₁₀ e";
-        GOLDEN_RATIO = 106039, "golden ratio φ = (1 + √5)/2";
+        RAD_TO_DEG = 3_754_936, "180/π: one radian in degrees";
+        SQRT_2 = 92_682, "√2";
+        FRAC_1_SQRT_2 = 46_341, "1/√2";
+        SQRT_3 = 113_512, "√3";
+        FRAC_1_SQRT_3 = 37_837, "1/√3";
+        E = 178_145, "Euler's number e";
+        LN_2 = 45_426, "ln 2";
+        LN_10 = 150_902, "ln 10";
+        LOG2_E = 94_548, "log₂ e";
+        LOG2_10 = 217_706, "log₂ 10";
+        LOG10_2 = 19_728, "log₁₀ 2";
+        LOG10_E = 28_462, "log₁₀ e";
+        GOLDEN_RATIO = 106_039, "golden ratio φ = (1 + √5)/2";
     }
 }
 
 define_consts! {
     FixedFloat64 {
-        PI = 13493037705, "π";
-        TAU = 26986075409, "τ = 2π";
-        FRAC_PI_2 = 6746518852, "π/2";
-        FRAC_PI_3 = 4497679235, "π/3";
-        FRAC_PI_4 = 3373259426, "π/4";
-        FRAC_PI_6 = 2248839617, "π/6";
-        FRAC_PI_8 = 1686629713, "π/8";
-        FRAC_1_PI = 1367130551, "1/π";
-        FRAC_2_PI = 2734261102, "2/π";
-        DEG_TO_RAD = 74961321, "π/180: one degree in radians";
-        RAD_TO_DEG = 246083499208, "180/π: one radian in degrees";
-        SQRT_2 = 6074001000, "√2";
-        FRAC_1_SQRT_2 = 3037000500, "1/√2";
-        SQRT_3 = 7439101574, "√3";
-        FRAC_1_SQRT_3 = 2479700525, "1/√3";
-        E = 11674931555, "Euler's number e";
-        LN_2 = 2977044472, "ln 2";
-        LN_10 = 9889527671, "ln 10";
-        LOG2_E = 6196328019, "log₂ e";
-        LOG2_10 = 14267572527, "log₂ 10";
-        LOG10_2 = 1292913986, "log₁₀ 2";
-        LOG10_E = 1865280597, "log₁₀ e";
-        GOLDEN_RATIO = 6949403065, "golden ratio φ = (1 + √5)/2";
+        PI = 13_493_037_705, "π";
+        TAU = 26_986_075_409, "τ = 2π";
+        FRAC_PI_2 = 6_746_518_852, "π/2";
+        FRAC_PI_3 = 4_497_679_235, "π/3";
+        FRAC_PI_4 = 3_373_259_426, "π/4";
+        FRAC_PI_6 = 2_248_839_617, "π/6";
+        FRAC_PI_8 = 1_686_629_713, "π/8";
+        FRAC_1_PI = 1_367_130_551, "1/π";
+        FRAC_2_PI = 2_734_261_102, "2/π";
+        DEG_TO_RAD = 74_961_321, "π/180: one degree in radians";
+        RAD_TO_DEG = 246_083_499_208, "180/π: one radian in degrees";
+        SQRT_2 = 6_074_001_000, "√2";
+        FRAC_1_SQRT_2 = 3_037_000_500, "1/√2";
+        SQRT_3 = 7_439_101_574, "√3";
+        FRAC_1_SQRT_3 = 2_479_700_525, "1/√3";
+        E = 11_674_931_555, "Euler's number e";
+        LN_2 = 2_977_044_472, "ln 2";
+        LN_10 = 9_889_527_671, "ln 10";
+        LOG2_E = 6_196_328_019, "log₂ e";
+        LOG2_10 = 14_267_572_527, "log₂ 10";
+        LOG10_2 = 1_292_913_986, "log₁₀ 2";
+        LOG10_E = 1_865_280_597, "log₁₀ e";
+        GOLDEN_RATIO = 6_949_403_065, "golden ratio φ = (1 + √5)/2";
     }
 }
