@@ -8,7 +8,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 2 | `FixedFloat64` complete: `mul_add`, `mul_div`, `lerp`, `add_product` | `v0.2.0` | ✅ done |
 | 3 | `sqrt`, `rsqrt`, `hypot` | `v0.3.0` | ✅ done |
 | 4 | Trigonometry and angle types | `v0.4.0` | ✅ done |
-| 5 | `Vec2`, `Vec3` | `v0.5.0` | |
+| 5 | `Vec2`, `Vec3` | `v0.5.0` | code done, verification pending |
 | 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | |
 | 7 | Batch operations, optimizations | `v0.7.0` | |
 | 8 | Lean proofs of the kernel, API freeze | `v1.0.0` | |
@@ -115,13 +115,30 @@ Quality gates:
 
 ## 5. Vectors `v0.5.0`
 
-- `Vec2<T: FixedFloat>`, `Vec3<T: FixedFloat>`, `#[repr(C)]`, aliases `Vec2f32`, `Vec2f64`, …
-- `new`, `ZERO`, `X`/`Y`/`Z`; `+ -`, `*` and `/` by a scalar; component-wise `mul`, `min`, `max`, `abs`; `dot`, `cross` (`Vec3`), `perp_dot` and `perp` (`Vec2`); `length`, `length_sq`, `distance`, `distance_sq`; `normalize`, `try_normalize` (zero vector gives `None`); `lerp`, `rotate`, `angle_to`, `clamp_length`; `to_le_bytes`.
-- `dot` and `length_sq` in the wide type, rounded once (the accumulator with `add_product`).
+- [x] `Vec2<T>`, `Vec3<T>` with public fields, `#[repr(C)]`, aliases `Vec2f8` … `Vec2f64`, `Vec3f8` … `Vec3f64` (`src/vec.rs`).
+- [x] `new`, `splat`, `ZERO`, `X`/`Y`/`Z`; `+ -`, unary `-`, `*` by a scalar on either side, `/` by a scalar, component-wise `*` of two vectors (an operator, as in `glam`), `min`, `max`, `abs`, `lerp`; all saturate per component like the scalar operators.
+- [x] `dot`, `length_sq`, `distance_sq`, `perp_dot`, `cross`: the exact sum of exact products, rounded once (`dot` through the accumulator, `I256` on 64 bits; the 2×2 determinant in the kernel, `det`). `length` and `distance` correctly rounded: `hypot` for `Vec2`, a new kernel `hypot3` for `Vec3`, with the domain of `isqrt` widened to `3 · 2^(2W-2)`.
+- [x] `perp` (`Vec2`).
+- [x] `normalize`, `try_normalize` (zero vector gives `None`), `clamp_length_max`, `clamp_length` (bounds as in `glam`): each component correctly rounded from the exact squared length, a 256/128-bit division (Knuth's algorithm D, `src/wide.rs`) on 64 bits; there are no ties (INTERNALS §3.15).
+- [x] `rotate` by `T::Angle` with a sine and cosine of 62 bits, within 1 ulp below a raw length of `2^57`; `angle_to` (`Vec2` signed, `Vec3` in `[0, π]`) as `atan2` of exact cross and dot products, within 1 ulp.
+- [x] `to_le_bytes`, `from_le_bytes`, `to_be_bytes`, `from_be_bytes`; `bytemuck` (`Pod` for vectors of a `Pod` type) and `serde` (a tuple of the components) behind their features.
+- [x] API guide (`API.md`, `API.ru.md`), INTERNALS §3.15, README.
 
-**Done when:** tests pass and the macro benchmark "one tick" runs: 5 000 units, `pos += vel · dt`, neighbour search by `distance_sq`, `normalize`, turning toward a target with `atan2`; variants `FixedFloat32`, `FixedFloat64`, `fixed`, `f32` with `glam`.
-**Verified by:** Kani, no panics.
-**Benchmarks against:** `glam`.
+**Done when:** every item above is checked, the tests and the oracle pass on every width, and the macro benchmark "one tick" runs: 5 000 units, `pos += vel · dt`, neighbour search by `distance_sq`, `normalize`, turning toward a target with `atan2`; variants `FixedFloat32`, `FixedFloat64`, `fixed`, `f32` with `glam`; results in the README.
+**Verified by:** the integer reference of `tests/common/reference.rs` (`tests/vec.rs`, `tests/vec_geometry.rs`): every `length` of `Vec2` and `Vec3` on `FixedFloat8`, edge-biased random vectors on every width, `normalize` and `clamp_length` by the definition of rounding, `rotate` and `angle_to` against the independent sine and `atan2` of `tests/common/trig.rs`; the rational oracle on every width (`oracle/tests/vec.rs`), including the 64-bit sums beyond `i128` and `clamp_length` with `min > max` and negative bounds; the fuzz target `vec`; a golden hash of the vectors next to the one of the scalars; Kani "no panic": the operators, `dot`, `cross`, `perp_dot` and `distance_sq` on every width (`vec_no_panic_*`), every vector method on 8 and 16 bits (`vec_geometry_no_panic_8/16`), and `isqrt` on the widened domain for `k8` and `k16` (`isqrt_spec_8/16`). The roots, `normalize`, `rotate` and `angle_to` of 32 and 64 bits divide `u64` and `u128` in loops, where Kani does not converge (as for `sqrt` in stage 3); there the oracle, fuzzing and the bounds of INTERNALS §3.15 stand in.
+**Benchmarks against:** `glam` (`dot`, `length`, `normalize`, `distance_sq`, `rotate`, `angle_to`, `clamp_length` of `Vec2`; `cross`, `length`, `normalize` of `Vec3`), and the "one tick" macro benchmark of `bench/src/tick.rs`, each tick from the same starting state. Result on x86-64: the tick takes 105 ns per unit on `FixedFloat32` and 159 ns on `FixedFloat64`, against 150 and 616 ns for `fixed` `I16F16` and `I32F32` with `cordic` and 52 ns for `glam`; the vector functions are 2–94× slower than `glam` on hardware floats.
+
+Before the tag `v0.5.0`:
+- [ ] Every Kani harness of the stage passes (`vec_no_panic_8/16/32/64`, `vec_geometry_no_panic_8/16`, `isqrt_spec_8/16`), run outside the developer machine.
+- [ ] The bench workflow puts the vector and tick tables into the README.
+- [ ] The golden hash of the vectors is the same on x86-64, ARM64 and 32-bit x86 in debug and release.
+
+### Between 5 and 6 (`v0.5.x`)
+
+Speed:
+- [ ] `normalize` and `clamp_length` of `FixedFloat32` (41 and 27 ns) divide a `u128` above 64 bits in software; a quotient of at most 33 bits allows a narrower division.
+- [ ] `length` and `rotate`: the roots and the 62-bit sine dominate; measure against an `isqrt` without division (the item of [Between 3 and 4](#between-3-and-4-v03x)).
+- [ ] Vector operations in the instruction-count gate (`bench/benches/instr.rs`).
 
 ## 6. Exponentials and logarithms `v0.6.0`
 

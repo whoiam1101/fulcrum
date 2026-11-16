@@ -1,14 +1,14 @@
-# fulcrum 0.4: руководство по API
+# fulcrum 0.5: руководство по API
 
 [English](API.md) · **Русский**
 
-Как пользоваться библиотекой: какие есть типы, как создавать значения, что делают операции на границах, как сериализовать и как писать обобщённый код. Описывает `v0.4.0`.
+Как пользоваться библиотекой: какие есть типы, как создавать значения, что делают операции на границах, как сериализовать и как писать обобщённый код. Описывает `v0.5.0`.
 
 ## 1. Подключение
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.4.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.5.0" }
 ```
 
 Крейт `no_std`, без обязательных зависимостей, MSRV 1.60, без `unsafe` вне необязательной фичи `bytemuck`. Фичи (все выключены по умолчанию):
@@ -284,6 +284,40 @@ assert!(s > c);
 
 `Ord` нет: у углов на круге нет порядка. Трейт `FixedAngle` (все методы и константы выше, сырой тип `Bits` и парный тип `Fixed`) и ассоциированный тип `FixedFloat::Angle` позволяют обобщённому коду перейти от типа с фиксированной точкой к его типу угла.
 
+### Векторы: `Vec2`, `Vec3`
+
+`Vec2<T>` и `Vec3<T>` над любым типом с фиксированной точкой, с открытыми полями `x`, `y` (`z`), `#[repr(C)]`: две или три компоненты подряд, без выравнивающих байтов. Алиасы для каждой ширины: `Vec2f8` … `Vec2f64`, `Vec3f8` … `Vec3f64`. Правила те же, что у скаляров: операторы насыщаются покомпонентно (и паникуют под `strict-overflow`), а каждый метод, сводящий компоненты вместе, округляет один раз из точных промежуточных.
+
+| Метод | Значение |
+|---|---|
+| `new`, `splat(v)`, `ZERO`, `X`, `Y`, `Z` | конструкторы и единичные векторы |
+| `a + b`, `a - b`, `-a`, `a * b`, `a * s`, `s * a`, `a / s`, `*Assign` | покомпонентно, как операторы компоненты; `a * b` — покомпонентное произведение |
+| `min`, `max`, `abs`, `lerp(b, t)` | покомпонентно; `lerp` округляет один раз на компоненту |
+| `dot`, `length_sq`, `distance_sq`, `perp_dot` (`Vec2`), `cross` (`Vec3`) | точная сумма точных произведений, одно округление и насыщение; разность компонент вне диапазона даёт `MAX` у расстояний |
+| `length`, `distance` | правильно округлённый корень точной суммы квадратов (`hypot` у `Vec2`) |
+| `try_normalize`, `normalize` | каждая компонента, `x`, делённое на длину, правильно округлена; нулевой вектор даёт `None` и `ZERO` |
+| `clamp_length_max(max)`, `clamp_length(min, max)` | приведение к границе, когда вектор длиннее (короче) её: точное сравнение, правильно округлённые компоненты; `min` проверяется первым, как в `glam`; отрицательные границы считаются `0` |
+| `perp()` (`Vec2`) | `(-y, x)`, четверть оборота против часовой |
+| `rotate(angle)` (`Vec2`) | поворот на угол типа `T::Angle` с синусом и косинусом на 62 битах: в пределах 1 ulp при длине меньше `2^(57 - FRAC_BITS)` (любой вектор до `FixedFloat32`, `3.3·10⁷` у `FixedFloat64`); четверти оборота точны |
+| `angle_to(b)` | `Vec2`: знаковый угол от `a` к `b` в `(-π, π]`; `Vec3`: угол между ними в `[0, π]`; `atan2` точных векторного и скалярного произведений, в пределах 1 ulp; `0` для нулевого вектора |
+| `to_le_bytes`, `from_le_bytes`, `to_be_bytes`, `from_be_bytes` | компоненты по порядку, каждая в своём формате (§8) |
+
+```rust
+use fulcrum::{ff32, Angle32, FixedFloat32, Vec2, Vec2f32, Vec3};
+
+let v = Vec2::new(ff32!(3), ff32!(4));
+assert_eq!(v.length(), ff32!(5));
+assert_eq!(v.normalize(), Vec2::new(ff32!(0.6), ff32!(0.8)));
+assert_eq!(v.clamp_length_max(ff32!(2.5)), Vec2::new(ff32!(1.5), ff32!(2)));
+assert_eq!(Vec2f32::X.rotate(Angle32::QUARTER_TURN), Vec2f32::Y);
+assert_eq!(Vec2f32::X.angle_to(Vec2f32::Y), FixedFloat32::FRAC_PI_2);
+let mut pos = Vec3::new(ff32!(1), ff32!(2), ff32!(3));
+pos += Vec3::splat(ff32!(0.5)) * ff32!(2);
+assert_eq!(pos, Vec3::new(ff32!(2), ff32!(3), ff32!(4)));
+```
+
+С `serde` вектор — кортеж компонент (`["1.5","-2"]` в JSON); с `bytemuck` `Vec2<T>` и `Vec3<T>` — `Pod`, когда `T` — `Pod`.
+
 ## 5. Округление и целые
 
 | Метод | Правило | Переполнение |
@@ -407,7 +441,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 Состав трейта:
 - `type Bits`;
 - константы `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`, `atan2` и ассоциированный тип `Angle` (тип угла той же ширины с трейтом `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, константы, заворачивающиеся `+ - neg` и `* x`).
+- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `hypot`, `lerp`, `sin_cos`, `atan2` и ассоциированный тип `Angle` (тип угла той же ширины с трейтом `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, константы, заворачивающиеся `+ - neg` и `* x`).
 
 ```rust
 use fulcrum::FixedFloat;
@@ -417,7 +451,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошли `sin_cos` и `atan2`.
+Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошли `sin_cos` и `atan2`, на этапе 5 — `hypot` и `lerp` для обобщённых векторов.
 
 ## 12. `strict-overflow`
 
@@ -429,7 +463,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.4.0", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.5.0", features = ["strict-overflow"] }
 ```
 
 Учтите: Cargo объединяет фичи, поэтому в `cargo test` вашего крейта фича включится и для обычной зависимости.

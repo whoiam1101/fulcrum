@@ -1,14 +1,14 @@
-# fulcrum 0.4: API guide
+# fulcrum 0.5: API guide
 
 **English** · [Русский](API.ru.md)
 
-How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.4.0`.
+How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.5.0`.
 
 ## 1. Setup
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.4.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.5.0" }
 ```
 
 The crate is `no_std`, has no required dependencies, MSRV 1.60, and no `unsafe` outside the optional `bytemuck` feature. Features (all off by default):
@@ -284,6 +284,40 @@ assert!(s > c);
 
 There is no `Ord`: angles on a circle have no order. The trait `FixedAngle` (every method and constant above, the raw type `Bits` and the paired fixed-point type `Fixed`) and the associated type `FixedFloat::Angle` let generic code go from a fixed-point type to its angle type.
 
+### Vectors: `Vec2`, `Vec3`
+
+`Vec2<T>` and `Vec3<T>` over any fixed-point type, with public fields `x`, `y` (`z`), `#[repr(C)]`: two or three components in a row, no padding. Aliases name each width: `Vec2f8` … `Vec2f64`, `Vec3f8` … `Vec3f64`. The rules are those of the scalars: operators saturate per component (and panic under `strict-overflow`), and every method that combines components rounds once, from exact intermediates.
+
+| Method | Value |
+|---|---|
+| `new`, `splat(v)`, `ZERO`, `X`, `Y`, `Z` | constructors and unit vectors |
+| `a + b`, `a - b`, `-a`, `a * b`, `a * s`, `s * a`, `a / s`, `*Assign` | per component, like the operators of the component; `a * b` is the component-wise product |
+| `min`, `max`, `abs`, `lerp(b, t)` | per component; `lerp` rounds once per component |
+| `dot`, `length_sq`, `distance_sq`, `perp_dot` (`Vec2`), `cross` (`Vec3`) | the exact sum of exact products, rounded once and saturated; a difference of components out of range gives `MAX` for the distances |
+| `length`, `distance` | correctly rounded root of the exact sum of squares (`hypot` for `Vec2`) |
+| `try_normalize`, `normalize` | each component, `x` divided by the length, correctly rounded; the zero vector gives `None` and `ZERO` |
+| `clamp_length_max(max)`, `clamp_length(min, max)` | scaled to the bound when longer (shorter) than it: exact comparison, correctly rounded components; `min` is checked first, like `glam`; negative bounds count as `0` |
+| `perp()` (`Vec2`) | `(-y, x)`, a quarter turn counterclockwise |
+| `rotate(angle)` (`Vec2`) | turned by an angle type `T::Angle`, with a sine and cosine of 62 bits: within 1 ulp for a length below `2^(57 - FRAC_BITS)` (every vector up to `FixedFloat32`, `3.3·10⁷` for `FixedFloat64`); quarter turns are exact |
+| `angle_to(b)` | `Vec2`: the signed angle from `a` to `b` in `(-π, π]`; `Vec3`: the angle between them in `[0, π]`; `atan2` of exact cross and dot products, within 1 ulp; `0` for a zero vector |
+| `to_le_bytes`, `from_le_bytes`, `to_be_bytes`, `from_be_bytes` | the components in order, each in its own format (§8) |
+
+```rust
+use fulcrum::{ff32, Angle32, FixedFloat32, Vec2, Vec2f32, Vec3};
+
+let v = Vec2::new(ff32!(3), ff32!(4));
+assert_eq!(v.length(), ff32!(5));
+assert_eq!(v.normalize(), Vec2::new(ff32!(0.6), ff32!(0.8)));
+assert_eq!(v.clamp_length_max(ff32!(2.5)), Vec2::new(ff32!(1.5), ff32!(2)));
+assert_eq!(Vec2f32::X.rotate(Angle32::QUARTER_TURN), Vec2f32::Y);
+assert_eq!(Vec2f32::X.angle_to(Vec2f32::Y), FixedFloat32::FRAC_PI_2);
+let mut pos = Vec3::new(ff32!(1), ff32!(2), ff32!(3));
+pos += Vec3::splat(ff32!(0.5)) * ff32!(2);
+assert_eq!(pos, Vec3::new(ff32!(2), ff32!(3), ff32!(4)));
+```
+
+With `serde`, a vector is a tuple of its components (`["1.5","-2"]` in JSON); with `bytemuck`, `Vec2<T>` and `Vec3<T>` are `Pod` when `T` is.
+
 ## 5. Rounding and integers
 
 | Method | Rule | Overflow |
@@ -407,7 +441,7 @@ Sealed: only fulcrum's types implement it. It requires `Copy + Default + Ord + H
 Contents:
 - `type Bits`;
 - constants `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `sin_cos`, `atan2`, and the associated type `Angle` (the angle type of the same width, with the trait `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, the constants, wrapping `+ - neg` and `* x`).
+- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `hypot`, `lerp`, `sin_cos`, `atan2`, and the associated type `Angle` (the angle type of the same width, with the trait `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, the constants, wrapping `+ - neg` and `* x`).
 
 ```rust
 use fulcrum::FixedFloat;
@@ -417,7 +451,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` and `atan2` joined in stage 4.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` and `atan2` joined in stage 4, `hypot` and `lerp` in stage 5 for the generic vectors.
 
 ## 12. `strict-overflow`
 
@@ -429,7 +463,7 @@ For tests only:
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.4.0", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.5.0", features = ["strict-overflow"] }
 ```
 
 Cargo unifies features, so under `cargo test` of your crate the feature is enabled for the normal dependency too.
