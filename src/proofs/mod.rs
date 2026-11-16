@@ -6,12 +6,19 @@
 //!
 //! The reference is `tests/common/reference.rs`, the same file the tests
 //! use, over `i32` and `i64` where the solver is faster and over `i128`.
+//!
+//! CI shards the harnesses of this module by name: one job each for the
+//! substrings `_8`, `_16`, `_32` and `_64`, and one for the exact names
+//! `double_spec`, `i256_spec` and `accumulator64_product_spec`. A new
+//! harness ends with `_` and its width, so exactly one shard runs it (a
+//! narrowing names its source width that way and its target without the
+//! `_`: `narrow_spec_64to16`), or joins that list in
+//! `.github/workflows/ci.yml`.
 
 use core::convert::TryFrom;
 
 use crate::{
-    Accumulator8, Angle16, Angle32, Angle64, Angle8, FixedFloat16, FixedFloat32, FixedFloat64,
-    FixedFloat8,
+    Accumulator8, Angle32, Angle64, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8,
 };
 
 #[macro_use]
@@ -303,7 +310,7 @@ mul_int_spec!(mul_int_spec_16, FixedFloat16, i16, 16);
 mul_int_spec!(mul_int_spec_32, FixedFloat32, i32, 32);
 
 narrow_spec!(
-    narrow_spec_16_8,
+    narrow_spec_16to8,
     FixedFloat16,
     i16,
     8,
@@ -313,7 +320,7 @@ narrow_spec!(
     4
 );
 narrow_spec!(
-    narrow_spec_32_8,
+    narrow_spec_32to8,
     FixedFloat32,
     i32,
     16,
@@ -323,7 +330,7 @@ narrow_spec!(
     4
 );
 narrow_spec!(
-    narrow_spec_32_16,
+    narrow_spec_32to16,
     FixedFloat32,
     i32,
     16,
@@ -333,7 +340,7 @@ narrow_spec!(
     8
 );
 narrow_spec!(
-    narrow_spec_64_8,
+    narrow_spec_64to8,
     FixedFloat64,
     i64,
     32,
@@ -343,7 +350,7 @@ narrow_spec!(
     4
 );
 narrow_spec!(
-    narrow_spec_64_16,
+    narrow_spec_64to16,
     FixedFloat64,
     i64,
     32,
@@ -353,7 +360,7 @@ narrow_spec!(
     8
 );
 narrow_spec!(
-    narrow_spec_64_32,
+    narrow_spec_64to32,
     FixedFloat64,
     i64,
     32,
@@ -770,42 +777,3 @@ vec_no_panic!(vec_no_panic_8, FixedFloat8);
 vec_no_panic!(vec_no_panic_16, FixedFloat16);
 vec_no_panic!(vec_no_panic_32, FixedFloat32);
 vec_no_panic!(vec_no_panic_64, FixedFloat64);
-
-macro_rules! vec_geometry_no_panic {
-    ($name:ident, $T:ident, $A:ident) => {
-        /// `length`, `distance`, `normalize`, `try_normalize`,
-        /// `clamp_length`, `rotate` and `angle_to` never panic: the roots of
-        /// sums of three squares, the 256-bit product and division of
-        /// `kernel::scale_to`, the 62-bit sine and cosine of the rotation and
-        /// the exact cross and dot products of the angle stay in range.
-        #[kani::proof]
-        #[kani::unwind(130)]
-        fn $name() {
-            let a = crate::Vec3::new(
-                $T::from_bits(kani::any()),
-                $T::from_bits(kani::any()),
-                $T::from_bits(kani::any()),
-            );
-            let b = crate::Vec2::new($T::from_bits(kani::any()), $T::from_bits(kani::any()));
-            let len = $T::from_bits(kani::any());
-            let angle = $A::from_bits(kani::any());
-            let _ = (a.try_normalize(), a.clamp_length(len, a.x));
-            let _ = (
-                b.normalize(),
-                b.rotate(angle),
-                b.angle_to(crate::Vec2::new(a.x, a.y)),
-            );
-            let c = crate::Vec3::new(b.x, b.y, len);
-            let _ = (
-                a.angle_to(c),
-                a.length(),
-                a.distance(c),
-                b.length(),
-                b.distance(b.perp()),
-            );
-        }
-    };
-}
-
-vec_geometry_no_panic!(vec_geometry_no_panic_8, FixedFloat8, Angle8);
-vec_geometry_no_panic!(vec_geometry_no_panic_16, FixedFloat16, Angle16);

@@ -317,16 +317,43 @@ jobs:
             --harness proofs::angle_no_panic_64
 
   kani-all:
-    name: kani all
+    name: kani ${{ matrix.shard.name }}
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
     runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        shard:
+          - { name: "8 bits", filter: "--harness _8" }
+          - { name: "16 bits", filter: "--harness _16" }
+          - { name: "32 bits", filter: "--harness _32" }
+          - { name: "64 bits", filter: "--harness _64" }
+          - { name: "other", filter: "--exact --harness proofs::double_spec --harness proofs::i256_spec --harness proofs::accumulator64_product_spec" }
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
       - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f
         with:
-          args: -Z stubbing -j --output-format=terse
+          args: -Z stubbing -j --output-format=terse ${{ matrix.shard.filter }}
+
+  kani-geometry:
+    name: kani geometry ${{ matrix.harness }}
+    if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        harness: [length8, normalize8, clamp_length8, rotate8, vec2_angle8, vec3_angle8, length16, normalize16, clamp_length16, rotate16, vec2_angle16, vec3_angle16]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - uses: model-checking/kani-github-action@f838096619a707b0f6b2118cf435eaccfa33e51f
+        with:
+          args: -Z stubbing --output-format=terse --exact --harness proofs_geometry::${{ matrix.harness }}
 
   lean:
     runs-on: ubuntu-latest
