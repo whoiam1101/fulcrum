@@ -20,6 +20,9 @@
 //!   exactly and never overflows before the root;
 //! - `sin_turns` and `cos_turns` take the angle in turns (1.0 = 360°), reduce
 //!   it exactly with a bit mask and are within 1 ulp;
+//! - [`Vec2`] and [`Vec3`] over any of these types: operators per component,
+//!   `dot`, `cross` and the squared lengths rounded once from exact products,
+//!   `length` and every component of `normalize` correctly rounded;
 //! - division by zero gives `MAX`, `MIN` or `0` by the sign of the dividend,
 //!   `x % 0` gives `0`, and the `checked_*` variants return `None`;
 //! - nothing panics, unless the `strict-overflow` feature below is enabled;
@@ -94,6 +97,7 @@ mod angle;
 mod error;
 mod tables;
 mod trig;
+mod vec;
 
 #[cfg(kani)]
 mod proofs;
@@ -109,6 +113,7 @@ pub use define::{
     FixedFloat64, FixedFloat8,
 };
 pub use error::{OverflowError, ParseError, ParseErrorKind};
+pub use vec::{Vec2, Vec2f16, Vec2f32, Vec2f64, Vec2f8, Vec3, Vec3f16, Vec3f32, Vec3f64, Vec3f8};
 
 mod sealed {
     pub trait Sealed {}
@@ -212,6 +217,26 @@ pub trait FixedFloat:
     fn sin_cos(self) -> (Self, Self);
     /// The angle of the point `(other, self)` in radians, within 1 ulp.
     fn atan2(self, other: Self) -> Self;
+    /// `√(self² + other²)`, correctly rounded and saturated.
+    fn hypot(self, other: Self) -> Self;
+    /// `self + (other - self) · t`, rounded once and saturated.
+    fn lerp(self, other: Self, t: Self) -> Self;
+    #[doc(hidden)]
+    fn __dot(a: &[Self], b: &[Self]) -> Self;
+    #[doc(hidden)]
+    fn __det(a: Self, b: Self, c: Self, d: Self) -> Self;
+    #[doc(hidden)]
+    fn __hypot3(a: Self, b: Self, c: Self) -> Self;
+    #[doc(hidden)]
+    fn __scale_to(v: [Self; 3], len: Self) -> [Self; 3];
+    #[doc(hidden)]
+    fn __cmp_length(v: [Self; 3], len: Self) -> core::cmp::Ordering;
+    #[doc(hidden)]
+    fn __rotate(x: Self, y: Self, angle: Self::Angle) -> (Self, Self);
+    #[doc(hidden)]
+    fn __angle2(a: [Self; 2], b: [Self; 2]) -> Self;
+    #[doc(hidden)]
+    fn __angle3(a: [Self; 3], b: [Self; 3]) -> Self;
 }
 
 /// Interface shared by the angle types [`Angle8`] … [`Angle64`], for generic

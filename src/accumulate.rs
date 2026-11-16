@@ -164,6 +164,17 @@ macro_rules! impl_accumulator {
                 }
             }
 
+            /// `Σ a[i] · b[i]` for slices of equal length, from the exact
+            /// products, rounded once and saturated: `dot` of the vectors.
+            #[inline]
+            pub(crate) fn dot_slices(a: &[Self], b: &[Self]) -> Self {
+                let mut acc = $Acc::ZERO;
+                for (&x, &y) in a.iter().zip(b) {
+                    acc.add_product(x, y);
+                }
+                acc.finish()
+            }
+
             #[doc = concat!("A new empty [`", stringify!($Acc), "`].")]
             #[inline]
             pub const fn accumulator() -> $Acc {

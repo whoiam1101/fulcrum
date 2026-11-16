@@ -102,3 +102,19 @@ fn inside_a_struct() {
     assert_eq!(bin, raws);
     assert_eq!(postcard::from_bytes::<Unit>(&bin).unwrap(), u);
 }
+
+#[test]
+fn vectors_are_tuples_of_components() {
+    use fulcrum::{ff32, Vec2f32, Vec3f64};
+    let v = Vec2f32::new(ff32!(1.5), ff32!(-2));
+    assert_eq!(serde_json::to_string(&v).unwrap(), "[\"1.5\",\"-2\"]");
+    assert_eq!(serde_json::from_str::<Vec2f32>("[\"1.5\", -2]").unwrap(), v);
+    assert!(serde_json::from_str::<Vec2f32>("[\"1.5\"]").is_err());
+    let w = Vec3f64::new(ff64!(0.1), ff64!(-7), FixedFloat64::MIN);
+    let text = serde_json::to_string(&w).unwrap();
+    assert_eq!(serde_json::from_str::<Vec3f64>(&text).unwrap(), w);
+    let bytes = postcard::to_stdvec(&w).unwrap();
+    assert_eq!(postcard::from_bytes::<Vec3f64>(&bytes).unwrap(), w);
+    let bytes = postcard::to_stdvec(&v).unwrap();
+    assert_eq!(postcard::from_bytes::<Vec2f32>(&bytes).unwrap(), v);
+}

@@ -313,7 +313,7 @@ macro_rules! kernel {
                 }
             }
 
-            /// `⌊√n⌋` for `n ≤ 2^(BITS - 1)`: a start from [`sqrt_start!`],
+            /// `⌊√n⌋` for `n ≤ 3 · 2^(BITS - 2)`: a start from [`sqrt_start!`],
             /// a fixed number of Newton steps `x ← ⌊(x + ⌊n / x⌋) / 2⌋`,
             /// then `x ← x - 1` while `x² > n`.
             ///
@@ -327,8 +327,9 @@ macro_rules! kernel {
             /// (measured on every 16- and 32-bit argument and on samples of
             /// wider ones). After a step `x` exceeds `√n` by a relative
             /// `2^-16` for large `n` and by a unit or two for small `n`, so
-            /// `x²` fits the type for `n ≤ 2^(BITS - 1)`; Kani checks that
-            /// the squares fit and the loops stop on 16- and 32-bit arguments.
+            /// `x²` fits the type for `n ≤ 3 · 2^(BITS - 2)`, the sum of three
+            /// squares of raw values; Kani checks that the squares fit and the
+            /// loops stop on 16- and 32-bit arguments.
             ///
             /// With the `half` start, an `n` below `2^(BITS/2 - 1)` returns
             /// the exact `isqrt` of the narrower kernel before any step.
@@ -389,6 +390,103 @@ macro_rules! kernel {
                 let ua = a.unsigned_abs() as $UWide;
                 let ub = b.unsigned_abs() as $UWide;
                 sqrt_round(ua * ua + ub * ub) as $Wide
+            }
+
+            /// `round((a · d - b · c) / 2^F)` for raw operands, rounded once:
+            /// a 2×2 determinant, the `perp_dot` and each component of the
+            /// `cross` of vectors. Each product lies in
+            /// `[-(2^(2N - 2) - 2^(N - 1)), 2^(2N - 2)]` for `N`-bit storage, so
+            /// the exact difference is within `2^(2N - 1) - 2^(N - 1)` and fits
+            /// the wide type.
+            #[inline]
+            pub(crate) const fn det(a: $Bits, b: $Bits, c: $Bits, d: $Bits) -> $Wide {
+                let p = (a as $Wide) * (d as $Wide) - (b as $Wide) * (c as $Wide);
+                (p >> $F) + ((p >> ($F - 1)) & 1)
+            }
+
+            /// `a² + b² + c²` of raw operands, exactly: at most `3 · 2^126`.
+            #[inline]
+            pub(crate) const fn norm_sq(a: $Bits, b: $Bits, c: $Bits) -> u128 {
+                let ua = a.unsigned_abs() as u128;
+                let ub = b.unsigned_abs() as u128;
+                let uc = c.unsigned_abs() as u128;
+                ua * ua + ub * ub + uc * uc
+            }
+
+            /// `m²` of a raw `m ≥ 0`, exactly, to compare with [`norm_sq`].
+            #[inline]
+            pub(crate) const fn sq(m: $Bits) -> u128 {
+                let um = m.unsigned_abs() as u128;
+                um * um
+            }
+
+            /// `x · k / √s` for raw `x` and `k` with `x² ≤ s`, `s > 0` and
+            /// `k ≥ 0`, where `s` is the squared length of a vector with `x`
+            /// as a component: that component of the vector scaled to the
+            /// raw length `k`. Correctly rounded and never above `k` in
+            /// magnitude, so it fits.
+            ///
+            /// `q = ⌊x²k² / s⌋` and its remainder `r` come from the exact
+            /// 256-bit product; `t = ⌊√q⌋ = ⌊|x|k/√s⌋`. The magnitude rounds
+            /// up when `q + r/s > (t + ½)²`, that is when `q - t² - t` is
+            /// positive, or zero and `4r > s`. There are no ties: a midpoint
+            /// is rational, so `s` would be a square `h²` of a sum of at most
+            /// three squares; then halving all of them reaches an odd `h`,
+            /// and `2|x|k = (2t + 1) · h` cannot hold with an odd right side
+            /// (INTERNALS §3.15).
+            #[inline]
+            pub(crate) const fn scale_to(x: $Bits, k: $Bits, s: u128) -> $Bits {
+                let ux = x.unsigned_abs() as u128;
+                let k = k.unsigned_abs() as u128;
+                let (hi, lo) = crate::wide::widening_mul_u128(ux * ux, k * k);
+                let (q, r) = crate::wide::div_rem_u256(hi, lo, s);
+                let t = isqrt(q as $UWide) as u128;
+                let d = q as i128 - (t * t + t) as i128;
+                let up = d > 0 || (d == 0 && r > s >> 2);
+                let m = (t + up as u128) as $Bits;
+                if x < 0 {
+                    -m
+                } else {
+                    m
+                }
+            }
+
+            /// The raw vector `(a, b, c)` scaled to the raw length `k ≥ 0`, each
+            /// component by [`scale_to`]; the zero vector stays zero.
+            #[inline]
+            pub(crate) const fn scale_vec(a: $Bits, b: $Bits, c: $Bits, k: $Bits) -> [$Bits; 3] {
+                let s = norm_sq(a, b, c);
+                if s == 0 {
+                    return [a, b, c];
+                }
+                [scale_to(a, k, s), scale_to(b, k, s), scale_to(c, k, s)]
+            }
+
+            /// The sign of `|(a, b, c)| - k` for a raw `k ≥ 0`: `-1`, `0` or
+            /// `1`, from the exact squares.
+            #[inline]
+            pub(crate) const fn cmp_length(a: $Bits, b: $Bits, c: $Bits, k: $Bits) -> i8 {
+                let s = norm_sq(a, b, c);
+                let k2 = sq(k);
+                if s < k2 {
+                    -1
+                } else if s > k2 {
+                    1
+                } else {
+                    0
+                }
+            }
+
+            /// `round(√(a² + b² + c²))` for raw operands, correctly rounded:
+            /// the length of a three-component vector. The sum of squares is
+            /// at most `3 · 2^(4F - 2)`, inside the domain of `isqrt`; the
+            /// root may exceed the storage range.
+            #[inline]
+            pub(crate) const fn hypot3(a: $Bits, b: $Bits, c: $Bits) -> $Wide {
+                let ua = a.unsigned_abs() as $UWide;
+                let ub = b.unsigned_abs() as $UWide;
+                let uc = c.unsigned_abs() as $UWide;
+                sqrt_round(ua * ua + ub * ub + uc * uc) as $Wide
             }
 
             /// `⌈(a + b) / 2⌉ = shr_round(a + b, 1)` without overflow.

@@ -94,3 +94,63 @@ impl I256 {
         (self.lo, self.hi)
     }
 }
+
+/// The full product `a · b` as `(high, low)` 128-bit halves.
+#[inline]
+pub(crate) const fn widening_mul_u128(a: u128, b: u128) -> (u128, u128) {
+    let (a1, a0) = (a >> 64, a as u64 as u128);
+    let (b1, b0) = (b >> 64, b as u64 as u128);
+    let p00 = a0 * b0;
+    let p01 = a0 * b1;
+    let p10 = a1 * b0;
+    let mid = (p00 >> 64) + (p01 as u64 as u128) + (p10 as u64 as u128);
+    let lo = (p00 as u64 as u128) | (mid << 64);
+    let hi = a1 * b1 + (p01 >> 64) + (p10 >> 64) + (mid >> 64);
+    (hi, lo)
+}
+
+/// `(u · 2^64 + v) / d` and its remainder for a normalized `d` (top bit
+/// set) and `u < d`, so the quotient is below `2^64`: one step of Knuth's
+/// algorithm D with a divisor of two 64-bit digits `d1`, `d0`. The estimate
+/// `⌊u / d1⌋`, capped at `2^64 - 1`, is lowered while `q · d0 > r · 2^64 + v`
+/// for `r = u - q · d1 < 2^64`; with a two-digit divisor this test is exact,
+/// so the quotient is then exact. The remainder, below `d`, is the low 128
+/// bits of `u · 2^64 + v - q · d`.
+#[inline]
+const fn div_rem_3by2(u: u128, v: u64, d: u128) -> (u128, u128) {
+    let d1 = d >> 64;
+    let d0 = d as u64 as u128;
+    let mut q = if u >> 64 >= d1 {
+        u64::MAX as u128
+    } else {
+        u / d1
+    };
+    let mut r = u - q * d1;
+    while r >> 64 == 0 && q * d0 > ((r << 64) | v as u128) {
+        q -= 1;
+        r += d1;
+    }
+    let rem = ((u << 64) | v as u128).wrapping_sub(q.wrapping_mul(d));
+    (q, rem)
+}
+
+/// The quotient and remainder of `hi · 2^128 + lo` by `d`, for `hi < d`, so
+/// the quotient fits `u128`. One `u128` division when `hi = 0`; otherwise
+/// `d` is shifted until its top bit is set, the dividend with it, and two
+/// steps of [`div_rem_3by2`] give the two 64-bit digits of the quotient.
+#[inline]
+pub(crate) const fn div_rem_u256(hi: u128, lo: u128, d: u128) -> (u128, u128) {
+    if hi == 0 {
+        return (lo / d, lo % d);
+    }
+    let s = d.leading_zeros();
+    let d = d << s;
+    let (hi, lo) = if s == 0 {
+        (hi, lo)
+    } else {
+        ((hi << s) | (lo >> (128 - s)), lo << s)
+    };
+    let (q1, r) = div_rem_3by2(hi, (lo >> 64) as u64, d);
+    let (q0, r) = div_rem_3by2(r, lo as u64, d);
+    ((q1 << 64) | q0, r >> s)
+}

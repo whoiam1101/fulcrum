@@ -14,6 +14,7 @@ use fulcrum::*;
 
 const ROUNDS: usize = 250_000;
 const GOLDEN: u64 = 0x268a_4fee_8564_c727;
+const GOLDEN_VECTORS: u64 = 0x86e8_db5a_35e6_ed72;
 
 macro_rules! mix {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
@@ -88,5 +89,72 @@ fn golden_hash() {
         hash, GOLDEN,
         "determinism hash changed: got {:#018x}, expected {:#018x}",
         hash, GOLDEN
+    );
+}
+
+macro_rules! mix_vectors {
+    ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
+        let mut g = || $T::from_bits($rng.edge_bits($bits, $T::FRAC_BITS) as _);
+        let a = Vec3::new(g(), g(), g());
+        let b = Vec3::new(g(), g(), g());
+        let s = g();
+        let (a2, b2) = (Vec2::new(a.x, a.y), Vec2::new(b.x, b.y));
+        let angle = <$T as FixedFloat>::Angle::from_turns(s);
+        for v in [
+            a + b,
+            a - b,
+            a * b,
+            a * s,
+            a / s,
+            a.lerp(b, s),
+            a.cross(b),
+            a.normalize(),
+            a.clamp_length_max(s),
+            a.clamp_length(s, b.x),
+        ] {
+            $h.write(&v.to_le_bytes());
+        }
+        for v in [
+            a2.rotate(angle),
+            a2.normalize(),
+            a2.clamp_length(s, b.y),
+            a2.perp(),
+        ] {
+            $h.write(&v.to_le_bytes());
+        }
+        for v in [
+            a.dot(b),
+            a.length(),
+            a.distance(b),
+            a.distance_sq(b),
+            a.angle_to(b),
+            a2.dot(b2),
+            a2.length(),
+            a2.perp_dot(b2),
+            a2.angle_to(b2),
+        ] {
+            $h.write(&v.to_le_bytes());
+        }
+    }};
+}
+
+fn compute_vectors() -> u64 {
+    let mut rng = Pcg32::new(0x5eed_0ec5, 55);
+    let mut h = Fnv::new();
+    for _ in 0..ROUNDS / 5 {
+        for_each_width!(mix_vectors!(h, rng,));
+    }
+    h.finish()
+}
+
+/// The vectors of stage 5, hashed apart from `golden_hash` so that its
+/// constant, checked on every target, stays the same.
+#[test]
+fn golden_hash_vectors() {
+    let hash = compute_vectors();
+    assert_eq!(
+        hash, GOLDEN_VECTORS,
+        "determinism hash of the vectors changed: got {:#018x}, expected {:#018x}",
+        hash, GOLDEN_VECTORS
     );
 }

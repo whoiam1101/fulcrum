@@ -378,3 +378,148 @@ pub(crate) const fn angle_scale(t: u64, n: u32, raw: i64, f: u32) -> u64 {
     let r = crate::kernel::shr_round(s as i128 * raw as i128, f);
     r as u64 & angle_mask(n)
 }
+
+/// `sin(2π · t / 2^n)` at `FRAC` fractional bits, signed, unrounded: the
+/// quarter of [`sin_position`] before its rounding, error below `2^-59`.
+/// `t < 2^n`, `4 ≤ n ≤ 64`.
+#[inline]
+const fn angle_sin_frac(t: u64, n: u32) -> i64 {
+    let bits = n - 2;
+    let quadrant = t >> bits;
+    let p = t & ((1 << bits) - 1);
+    let m = if quadrant & 1 == 0 {
+        sin_quarter(p, bits)
+    } else {
+        sin_quarter((1 << bits) - p, bits)
+    } as i64;
+    if quadrant < 2 {
+        m
+    } else {
+        -m
+    }
+}
+
+/// The raw vector `(x, y)` with `f` fractional bits turned by the angle
+/// `t / 2^n` of a turn: `x·cos - y·sin` and `x·sin + y·cos` with the sine and
+/// cosine at `FRAC` bits, each product exact on `i128` (`|x| ≤ 2^63`,
+/// `|sin| ≤ 2^62`), rounded once to `f` bits by `kernel::shr_round`, before
+/// saturation. A quarter turn is exact; the error of a component is below
+/// `½ + √2 · |v| · 2^(f - 59)` ulp for a vector of length `|v|`
+/// (INTERNALS §3.15). `4 ≤ n ≤ 64`.
+#[inline]
+pub(crate) const fn rotate(x: i64, y: i64, t: u64, n: u32) -> (i128, i128) {
+    let s = angle_sin_frac(t & angle_mask(n), n) as i128;
+    let c = angle_sin_frac(t.wrapping_add(1 << (n - 2)) & angle_mask(n), n) as i128;
+    let (x, y) = (x as i128, y as i128);
+    (
+        crate::kernel::shr_round(x * c - y * s, FRAC),
+        crate::kernel::shr_round(x * s + y * c, FRAC),
+    )
+}
+
+/// `v · 2^(target - bits)`: a left shift when `bits < target`, otherwise
+/// a truncating right shift.
+#[inline]
+const fn shift_to(v: u128, bits: u32, target: u32) -> u128 {
+    if bits > target {
+        v >> (bits - target)
+    } else {
+        v << (target - bits)
+    }
+}
+
+/// `(a, b)` shifted together so that the larger has exactly 63 bits: exact
+/// when shifted left, truncated by less than one unit in `2^62` of the larger
+/// when shifted right. Not both `0`.
+#[inline]
+const fn to_63_bits(a: u128, b: u128) -> (u128, u128) {
+    let m = if a > b { a } else { b };
+    let bits = 128 - m.leading_zeros();
+    (shift_to(a, bits, 63), shift_to(b, bits, 63))
+}
+
+/// `atan2(y, x)` of a sign and a magnitude each, in `(-π, π]`, rounded to
+/// `f` fractional bits; `0` when `y = 0` and `x ≥ 0`. Both magnitudes are
+/// brought to 63 bits by [`to_63_bits`], inside the domain of
+/// [`atan_ratio`].
+#[inline]
+const fn atan2_wide(y_negative: bool, y: u128, x_negative: bool, x: u128, f: u32) -> i64 {
+    if y == 0 && (x == 0 || !x_negative) {
+        return 0;
+    }
+    let (n, d) = to_63_bits(y, x);
+    round_angle(atan_ratio(n, d), x_negative, y_negative, f)
+}
+
+/// The sign and magnitude of `p + q` for `p, q ∈ [-(2^126 - 2^63), 2^126]`:
+/// only `2^127` overflows `i128`, and then the sum is positive.
+#[inline]
+const fn sum_parts(p: i128, q: i128) -> (bool, u128) {
+    let (sum, overflow) = p.overflowing_add(q);
+    if overflow {
+        (false, sum as u128)
+    } else {
+        (sum < 0, sum.unsigned_abs())
+    }
+}
+
+/// The signed angle from the raw vector `a` to `b`, `atan2(a × b, a · b)` of
+/// the exact cross and dot products, in `(-π, π]`, rounded to `f` fractional
+/// bits. `0` when either vector is zero. `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn angle_between2(ax: i64, ay: i64, bx: i64, by: i64, f: u32) -> i64 {
+    let (ax, ay, bx, by) = (ax as i128, ay as i128, bx as i128, by as i128);
+    let cross = ax * by - ay * bx;
+    let (dot_negative, dot) = sum_parts(ax * bx, ay * by);
+    atan2_wide(cross < 0, cross.unsigned_abs(), dot_negative, dot, f)
+}
+
+/// `a + b` of two numbers given as a sign and a magnitude, whose sum fits
+/// `u128` in magnitude.
+#[inline]
+const fn add_parts(a: (bool, u128), b: (bool, u128)) -> (bool, u128) {
+    if a.0 == b.0 {
+        (a.0, a.1 + b.1)
+    } else if a.1 >= b.1 {
+        (a.0, a.1 - b.1)
+    } else {
+        (b.0, b.1 - a.1)
+    }
+}
+
+/// The unsigned angle between the raw vectors `a` and `b`, `atan2(|a × b|,
+/// a · b)` in `[0, π]`, rounded to `f` fractional bits; `0` when either
+/// vector is zero. Every product of raw values is exact on `i128`, each
+/// cross component (a difference of two) fits it, and the dot product is
+/// summed as a sign and a magnitude, at most `3 · 2^126`. The cross
+/// components and the dot product are brought together to 63 bits, as in
+/// [`to_63_bits`], and the length of the cross product is the integer root
+/// of the sum of their squares, at most `3 · 2^126`. Error below `2^-59`
+/// (INTERNALS §3.15). `2 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn angle_between3(a: [i64; 3], b: [i64; 3], f: u32) -> i64 {
+    let (a0, a1, a2) = (a[0] as i128, a[1] as i128, a[2] as i128);
+    let (b0, b1, b2) = (b[0] as i128, b[1] as i128, b[2] as i128);
+    let c = [a1 * b2 - a2 * b1, a2 * b0 - a0 * b2, a0 * b1 - a1 * b0];
+    let p = a2 * b2;
+    let (dot_negative, dot) = add_parts(sum_parts(a0 * b0, a1 * b1), (p < 0, p.unsigned_abs()));
+    let mut m = dot;
+    let mut i = 0;
+    while i < 3 {
+        if c[i].unsigned_abs() > m {
+            m = c[i].unsigned_abs();
+        }
+        i += 1;
+    }
+    if m == 0 {
+        return 0;
+    }
+    let bits = 128 - m.leading_zeros();
+    let c0 = shift_to(c[0].unsigned_abs(), bits, 63);
+    let c1 = shift_to(c[1].unsigned_abs(), bits, 63);
+    let c2 = shift_to(c[2].unsigned_abs(), bits, 63);
+    let n = crate::kernel::k64::isqrt(c0 * c0 + c1 * c1 + c2 * c2);
+    let d = shift_to(dot, bits, 63);
+    let (n, d) = to_63_bits(n, d);
+    round_angle(atan_ratio(n, d), dot_negative, false, f)
+}

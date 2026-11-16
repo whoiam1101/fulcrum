@@ -61,3 +61,47 @@ macro_rules! impl_serde {
         }
     };
 }
+
+/// `serde` for a vector: a tuple of its components, `[x, y]` or `[x, y, z]`
+/// in JSON, each in the format of the component type.
+macro_rules! impl_serde_vec {
+    ($V:ident, $n:literal, $($c:ident $i:literal),+) => {
+        impl<T: serde::Serialize> serde::Serialize for crate::$V<T> {
+            fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+                use serde::ser::SerializeTuple;
+                let mut t = serializer.serialize_tuple($n)?;
+                $(t.serialize_element(&self.$c)?;)+
+                t.end()
+            }
+        }
+
+        impl<'de, T: serde::Deserialize<'de>> serde::Deserialize<'de> for crate::$V<T> {
+            fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+                struct Visitor<T>(core::marker::PhantomData<T>);
+
+                impl<'de, T: serde::Deserialize<'de>> serde::de::Visitor<'de> for Visitor<T> {
+                    type Value = crate::$V<T>;
+
+                    fn expecting(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+                        f.write_str(concat!("a sequence of ", $n, " components"))
+                    }
+
+                    fn visit_seq<A: serde::de::SeqAccess<'de>>(self, mut seq: A) -> Result<Self::Value, A::Error> {
+                        $(
+                            let $c = match seq.next_element()? {
+                                Some(v) => v,
+                                None => return Err(serde::de::Error::invalid_length($i, &self)),
+                            };
+                        )+
+                        Ok(crate::$V { $($c),+ })
+                    }
+                }
+
+                deserializer.deserialize_tuple($n, Visitor(core::marker::PhantomData))
+            }
+        }
+    };
+}
+
+impl_serde_vec!(Vec2, 2, x 0, y 1);
+impl_serde_vec!(Vec3, 3, x 0, y 1, z 2);

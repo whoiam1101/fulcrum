@@ -42,3 +42,20 @@ fn slices_cast_both_ways() {
     assert_eq!(bytes.len(), 8 * raw.len());
     assert_eq!(&bytes[8..16], 1i64.to_ne_bytes());
 }
+
+#[test]
+fn vectors_cast_to_their_components() {
+    use fulcrum::{Vec2f32, Vec3f64};
+    assert_eq!(<Vec3f64 as bytemuck::Zeroable>::zeroed(), Vec3f64::ZERO);
+    let raw: Vec<i32> = vec![1 << 16, -1, i32::MIN, 7];
+    let vs: &[Vec2f32] = bytemuck::cast_slice(&raw);
+    assert_eq!(vs.len(), 2);
+    assert_eq!(vs[0], Vec2f32::new(FixedFloat32::ONE, -FixedFloat32::DELTA));
+    assert_eq!(vs[1].x, FixedFloat32::MIN);
+    let v = Vec3f64::new(FixedFloat64::ONE, FixedFloat64::MIN, FixedFloat64::DELTA);
+    let mut ne = Vec::new();
+    for c in [v.x, v.y, v.z] {
+        ne.extend_from_slice(&c.to_bits().to_ne_bytes());
+    }
+    assert_eq!(bytemuck::bytes_of(&v), &ne[..]);
+}

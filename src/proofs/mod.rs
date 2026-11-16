@@ -10,7 +10,8 @@
 use core::convert::TryFrom;
 
 use crate::{
-    Accumulator8, Angle32, Angle64, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8,
+    Accumulator8, Angle16, Angle32, Angle64, Angle8, FixedFloat16, FixedFloat32, FixedFloat64,
+    FixedFloat8,
 };
 
 #[macro_use]
@@ -650,14 +651,15 @@ fn div_no_panic_64() {
 
 macro_rules! isqrt_spec {
     ($name:ident, $k:ident, $U:ty, $unwind:literal) => {
-        /// `kernel::isqrt` is `⌊√n⌋` for every `n ≤ 2^(BITS - 1)` of the
-        /// unsigned wide type: `s² ≤ n < (s + 1)²`, both loops stop within
-        /// the unwinding bound, and nothing overflows.
+        /// `kernel::isqrt` is `⌊√n⌋` for every `n ≤ 3 · 2^(BITS - 2)` of the
+        /// unsigned wide type, the sum of three squares of raw values:
+        /// `s² ≤ n < (s + 1)²`, both loops stop within the unwinding bound,
+        /// and nothing overflows.
         #[kani::proof]
         #[kani::unwind($unwind)]
         fn $name() {
             let n: $U = kani::any();
-            kani::assume(n <= 1 << (<$U>::BITS - 1));
+            kani::assume(n <= 3 << (<$U>::BITS - 2));
             let s = crate::kernel::$k::isqrt(n);
             assert!(s.checked_mul(s).map_or(false, |q| q <= n));
             assert!((s + 1).checked_mul(s + 1).map_or(true, |q| q > n));
@@ -732,3 +734,78 @@ macro_rules! angle_no_panic {
 
 angle_no_panic!(angle_no_panic_32, Angle32, FixedFloat32);
 angle_no_panic!(angle_no_panic_64, Angle64, FixedFloat64);
+
+macro_rules! vec_no_panic {
+    ($name:ident, $T:ident) => {
+        /// The vectors never panic outside their roots: the operators, `dot`,
+        /// `length_sq`, `distance_sq`, `perp_dot` and `cross` keep their exact
+        /// sums in range on every input (each product of raw values within
+        /// `2^126`, the sums of `Accumulator64` in 256 bits). `length` and
+        /// `distance` add only `kernel::isqrt` on a sum of at most three
+        /// squares: `isqrt_spec_8` and `isqrt_spec_16` prove it on the
+        /// widened domain for 8 and 16 bits, `tests/vec.rs` checks every
+        /// length of `FixedFloat8` and samples the wider types.
+        #[kani::proof]
+        fn $name() {
+            let a = crate::Vec3::new(
+                $T::from_bits(kani::any()),
+                $T::from_bits(kani::any()),
+                $T::from_bits(kani::any()),
+            );
+            let b = crate::Vec3::new(
+                $T::from_bits(kani::any()),
+                $T::from_bits(kani::any()),
+                $T::from_bits(kani::any()),
+            );
+            let s = $T::from_bits(kani::any());
+            let (a2, b2) = (crate::Vec2::new(a.x, a.y), crate::Vec2::new(b.x, b.y));
+            let _ = (a + b, a - b, -a, a * b, a * s, a / s, a.abs(), a.lerp(b, s));
+            let _ = (a.dot(b), a.length_sq(), a.distance_sq(b), a.cross(b));
+            let _ = (a2.dot(b2), a2.distance_sq(b2), a2.perp_dot(b2), a2.perp());
+        }
+    };
+}
+
+vec_no_panic!(vec_no_panic_8, FixedFloat8);
+vec_no_panic!(vec_no_panic_16, FixedFloat16);
+vec_no_panic!(vec_no_panic_32, FixedFloat32);
+vec_no_panic!(vec_no_panic_64, FixedFloat64);
+
+macro_rules! vec_geometry_no_panic {
+    ($name:ident, $T:ident, $A:ident) => {
+        /// `length`, `distance`, `normalize`, `try_normalize`,
+        /// `clamp_length`, `rotate` and `angle_to` never panic: the roots of
+        /// sums of three squares, the 256-bit product and division of
+        /// `kernel::scale_to`, the 62-bit sine and cosine of the rotation and
+        /// the exact cross and dot products of the angle stay in range.
+        #[kani::proof]
+        #[kani::unwind(130)]
+        fn $name() {
+            let a = crate::Vec3::new(
+                $T::from_bits(kani::any()),
+                $T::from_bits(kani::any()),
+                $T::from_bits(kani::any()),
+            );
+            let b = crate::Vec2::new($T::from_bits(kani::any()), $T::from_bits(kani::any()));
+            let len = $T::from_bits(kani::any());
+            let angle = $A::from_bits(kani::any());
+            let _ = (a.try_normalize(), a.clamp_length(len, a.x));
+            let _ = (
+                b.normalize(),
+                b.rotate(angle),
+                b.angle_to(crate::Vec2::new(a.x, a.y)),
+            );
+            let c = crate::Vec3::new(b.x, b.y, len);
+            let _ = (
+                a.angle_to(c),
+                a.length(),
+                a.distance(c),
+                b.length(),
+                b.distance(b.perp()),
+            );
+        }
+    };
+}
+
+vec_geometry_no_panic!(vec_geometry_no_panic_8, FixedFloat8, Angle8);
+vec_geometry_no_panic!(vec_geometry_no_panic_16, FixedFloat16, Angle16);

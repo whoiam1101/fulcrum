@@ -868,6 +868,76 @@ macro_rules! define_fixed {
             fn atan2(self, other: Self) -> Self {
                 Self::atan2(self, other)
             }
+            #[inline]
+            fn hypot(self, other: Self) -> Self {
+                Self::hypot(self, other)
+            }
+            #[inline]
+            fn lerp(self, other: Self, t: Self) -> Self {
+                Self::lerp(self, other, t)
+            }
+            #[inline]
+            fn __det(a: Self, b: Self, c: Self, d: Self) -> Self {
+                Self::saturate(crate::kernel::$k::det(a.raw, b.raw, c.raw, d.raw))
+            }
+            #[inline]
+            fn __dot(a: &[Self], b: &[Self]) -> Self {
+                Self::dot_slices(a, b)
+            }
+            #[inline]
+            fn __hypot3(a: Self, b: Self, c: Self) -> Self {
+                Self::saturate(crate::kernel::$k::hypot3(a.raw, b.raw, c.raw))
+            }
+            #[inline]
+            fn __scale_to(v: [Self; 3], len: Self) -> [Self; 3] {
+                let r = crate::kernel::$k::scale_vec(v[0].raw, v[1].raw, v[2].raw, len.raw);
+                [Self { raw: r[0] }, Self { raw: r[1] }, Self { raw: r[2] }]
+            }
+            #[inline]
+            fn __cmp_length(v: [Self; 3], len: Self) -> core::cmp::Ordering {
+                match crate::kernel::$k::cmp_length(v[0].raw, v[1].raw, v[2].raw, len.raw) {
+                    -1 => core::cmp::Ordering::Less,
+                    0 => core::cmp::Ordering::Equal,
+                    _ => core::cmp::Ordering::Greater,
+                }
+            }
+            #[inline]
+            fn __rotate(x: Self, y: Self, angle: crate::$Angle) -> (Self, Self) {
+                let (rx, ry) = crate::trig::rotate(
+                    x.raw as i64,
+                    y.raw as i64,
+                    angle.to_bits() as u64,
+                    <$Bits>::BITS,
+                );
+                (
+                    Self::saturating_from_scaled_bits(rx, $F),
+                    Self::saturating_from_scaled_bits(ry, $F),
+                )
+            }
+            #[inline]
+            fn __angle2(a: [Self; 2], b: [Self; 2]) -> Self {
+                Self::saturating_from_scaled_bits(
+                    crate::trig::angle_between2(
+                        a[0].raw as i64,
+                        a[1].raw as i64,
+                        b[0].raw as i64,
+                        b[1].raw as i64,
+                        $F,
+                    ) as i128,
+                    $F,
+                )
+            }
+            #[inline]
+            fn __angle3(a: [Self; 3], b: [Self; 3]) -> Self {
+                Self::saturating_from_scaled_bits(
+                    crate::trig::angle_between3(
+                        [a[0].raw as i64, a[1].raw as i64, a[2].raw as i64],
+                        [b[0].raw as i64, b[1].raw as i64, b[2].raw as i64],
+                        $F,
+                    ) as i128,
+                    $F,
+                )
+            }
         }
 
         impl_ops!($Name);

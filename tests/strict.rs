@@ -3,7 +3,7 @@
 
 #![cfg(feature = "strict-overflow")]
 
-use fulcrum::{FixedFloat64, FixedFloat8};
+use fulcrum::{FixedFloat64, FixedFloat8, Vec2f8, Vec3f64};
 
 #[test]
 #[should_panic(expected = "strict-overflow")]
@@ -89,4 +89,27 @@ fn shl_in_range_and_shr_do_not_panic() {
     assert_eq!(FixedFloat8::ONE << 2, FixedFloat8::from_bits(64));
     assert_eq!(FixedFloat8::MIN >> 200, FixedFloat8::ZERO);
     assert_eq!(FixedFloat8::ONE.saturating_shl(3), FixedFloat8::MAX);
+}
+
+#[test]
+#[should_panic(expected = "strict-overflow")]
+fn vector_add_overflow_panics() {
+    let _ = Vec2f8::splat(FixedFloat8::MAX) + Vec2f8::X;
+}
+
+#[test]
+#[should_panic(expected = "strict-overflow")]
+fn vector_scale_overflow_panics() {
+    let _ = Vec3f64::splat(FixedFloat64::MAX) * FixedFloat64::MAX;
+}
+
+#[test]
+fn vector_methods_saturate() {
+    let v = Vec3f64::splat(FixedFloat64::MIN);
+    assert_eq!(v.length_sq(), FixedFloat64::MAX);
+    assert_eq!(v.length(), FixedFloat64::MAX);
+    assert_eq!(
+        v.distance(Vec3f64::splat(FixedFloat64::MAX)),
+        FixedFloat64::MAX
+    );
 }
