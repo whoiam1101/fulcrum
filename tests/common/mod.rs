@@ -672,3 +672,27 @@ where
     assert!(!failed, "{name} failed, see the replay line above");
     totals
 }
+
+/// Calls `f` on every value of `lo..hi`, the range split evenly over the
+/// available threads.
+pub fn parallel<F: Fn(i64) + Send + Sync + 'static>(lo: i64, hi: i64, f: F) {
+    let threads =
+        std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get) as i64;
+    let chunk = (hi - lo) / threads + 1;
+    let f = std::sync::Arc::new(f);
+    let handles: Vec<_> = (0..threads)
+        .map(|t| {
+            let f = std::sync::Arc::clone(&f);
+            std::thread::spawn(move || {
+                let start = lo + t * chunk;
+                let end = (start + chunk).min(hi);
+                for v in start..end {
+                    f(v);
+                }
+            })
+        })
+        .collect();
+    for h in handles {
+        h.join().unwrap();
+    }
+}

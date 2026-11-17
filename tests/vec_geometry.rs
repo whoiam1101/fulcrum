@@ -14,6 +14,16 @@
 //! is within 1 ulp below a raw length of `2^57`; the error bound `2^-56` of
 //! the integer sine allows the check below `2^50`, and the oracle
 //! (`oracle/tests/vec.rs`) takes the rest.
+//!
+//! Exhaustive, in place of the Kani harnesses that do not converge (their
+//! debug or overflow-checked release run also proves "no panic" on the
+//! domain): `normalize` of every `Vec2` of `FixedFloat8`, `angle_to` of
+//! every pair of `Vec3` of `FixedFloat16` with components in
+//! `{MIN, -1, 0, 1, MAX}`; with `--ignored`, `normalize` of every `Vec3` of
+//! `FixedFloat8` and every `Vec2` of `FixedFloat16`, `clamp_length` of
+//! every `Vec2` of `FixedFloat8` with every pair of bounds and of every
+//! `Vec3` with every single bound, `angle_to` of every `Vec3` of
+//! `FixedFloat8` against the 27 with components in `{MIN, 0, MAX}`.
 
 #![cfg(not(feature = "strict-overflow"))]
 
@@ -100,6 +110,34 @@ fn angle_within_ulp(
     let r = if y_neg { -r } else { r };
     let slack = trig::ERROR + 8 * (err + shift_err);
     trig::within_ulp_of(got, r - slack, r + slack, f)
+}
+
+/// Whether `got` is `angle_to` of the `Vec3` `a` to `b` within 1 ulp, or
+/// `true` when the exact cross or dot product does not fit `i128`.
+fn angle3_ok(a: [i128; 3], b: [i128; 3], got: i128, f: u32) -> bool {
+    let c = [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ];
+    let dot = (a[0] * b[0])
+        .checked_add(a[1] * b[1])
+        .and_then(|d| d.checked_add(a[2] * b[2]));
+    match (checked_sum_sq(&c), dot) {
+        (None, _) | (_, None) => true,
+        (Some(c2), Some(dot)) if c2 == 0 && dot >= 0 => got == 0,
+        (Some(c2), Some(dot)) => {
+            let m = floor_sqrt(c2).max(dot.unsigned_abs());
+            let bits = 128 - m.leading_zeros();
+            let up = 62u32.saturating_sub(bits);
+            let n = if 2 * up + 128 - c2.leading_zeros() <= 127 {
+                floor_sqrt(c2 << (2 * up))
+            } else {
+                floor_sqrt(c2) << up
+            };
+            angle_within_ulp(got, false, n, dot < 0, dot.unsigned_abs() << up, 2, f)
+        }
+    }
 }
 
 macro_rules! check_geometry {
@@ -267,33 +305,8 @@ macro_rules! check_geometry {
             assert!(ok, "angle_to2 {}", ctx());
         }
 
-        {
-            let c = [
-                ra[1] * rb[2] - ra[2] * rb[1],
-                ra[2] * rb[0] - ra[0] * rb[2],
-                ra[0] * rb[1] - ra[1] * rb[0],
-            ];
-            let dot = (ra[0] * rb[0])
-                .checked_add(ra[1] * rb[1])
-                .and_then(|d| d.checked_add(ra[2] * rb[2]));
-            let got = i128::from(a3.angle_to(b3).to_bits());
-            let ok = match (checked_sum_sq(&c), dot) {
-                (None, _) | (_, None) => true,
-                (Some(c2), Some(dot)) if c2 == 0 && dot >= 0 => got == 0,
-                (Some(c2), Some(dot)) => {
-                    let m = floor_sqrt(c2).max(dot.unsigned_abs());
-                    let bits = 128 - m.leading_zeros();
-                    let up = 62u32.saturating_sub(bits);
-                    let n = if 2 * up + 128 - c2.leading_zeros() <= 127 {
-                        floor_sqrt(c2 << (2 * up))
-                    } else {
-                        floor_sqrt(c2) << up
-                    };
-                    angle_within_ulp(got, false, n, dot < 0, dot.unsigned_abs() << up, 2, $f)
-                }
-            };
-            assert!(ok, "angle_to3 {}", ctx());
-        }
+        let got = i128::from(a3.angle_to(b3).to_bits());
+        assert!(angle3_ok(ra, rb, got, $f), "angle_to3 {}", ctx());
     }};
 }
 
@@ -367,4 +380,244 @@ fn worked_examples() {
     let r = Vec2f64::X.rotate(h);
     assert_eq!(r.x, r.y);
     assert_eq!(r.x, FixedFloat64::SQRT_2 / ff64!(2));
+}
+
+/// Asserts that `got` is `try_normalize` of the raw components `x` with `f`
+/// fractional bits: `None` exactly for the zero vector, otherwise every
+/// component correctly rounded.
+fn check_unit(x: &[i128], got: Option<&[i128]>, f: u32) {
+    let s = sum_sq(x);
+    match got {
+        None => assert_eq!(s, 0, "try_normalize {x:?} None"),
+        Some(u) => {
+            for (i, (&ui, &xi)) in u.iter().zip(x).enumerate() {
+                assert_eq!(
+                    is_scaled(ui, xi, 1 << f, s),
+                    Some(true),
+                    "normalize {x:?} [{i}] = {u:?}"
+                );
+            }
+        }
+    }
+}
+
+/// Asserts that `got` is `clamp_length(min, max)` of the raw components
+/// `x`: negative bounds count as `0`, `min` is checked first, the zero
+/// vector stays zero, a scaled component is correctly rounded.
+fn check_clamp(x: &[i128], got: &[i128], min: i128, max: i128) {
+    let s = sum_sq(x);
+    let (lo, hi) = (min.max(0) as u128, max.max(0) as u128);
+    let k = if s == 0 {
+        None
+    } else if s < lo * lo {
+        Some(lo)
+    } else if s > hi * hi {
+        Some(hi)
+    } else {
+        None
+    };
+    match k {
+        None => assert_eq!(got, x, "clamp_length {x:?} {min} {max} unchanged"),
+        Some(k) => {
+            for (i, (&gi, &xi)) in got.iter().zip(x).enumerate() {
+                assert_eq!(
+                    is_scaled(gi, xi, k, s),
+                    Some(true),
+                    "clamp_length {x:?} {min} {max} [{i}] = {got:?}"
+                );
+            }
+        }
+    }
+}
+
+fn raw2<T: FixedFloat>(v: Vec2<T>) -> [i128; 2]
+where
+    T::Bits: Into<i128>,
+{
+    [v.x.to_bits().into(), v.y.to_bits().into()]
+}
+
+fn raw3<T: FixedFloat>(v: Vec3<T>) -> [i128; 3]
+where
+    T::Bits: Into<i128>,
+{
+    [
+        v.x.to_bits().into(),
+        v.y.to_bits().into(),
+        v.z.to_bits().into(),
+    ]
+}
+
+fn v2_8(x: i64, y: i64) -> Vec2<FixedFloat8> {
+    Vec2::new(
+        FixedFloat8::from_bits(x as i8),
+        FixedFloat8::from_bits(y as i8),
+    )
+}
+
+fn v3_8(x: i64, y: i64, z: i64) -> Vec3<FixedFloat8> {
+    Vec3::new(
+        FixedFloat8::from_bits(x as i8),
+        FixedFloat8::from_bits(y as i8),
+        FixedFloat8::from_bits(z as i8),
+    )
+}
+
+const I8: core::ops::RangeInclusive<i64> = -128..=127;
+
+/// Every `Vec2` of `FixedFloat8`: `try_normalize` correctly rounded.
+#[test]
+fn fixed8_vec2_normalize_all() {
+    for x in I8 {
+        for y in I8 {
+            let v = v2_8(x, y);
+            check_unit(
+                &raw2(v),
+                v.try_normalize().map(raw2).as_ref().map(|u| &u[..]),
+                4,
+            );
+        }
+    }
+}
+
+/// Every pair of `Vec3` of `FixedFloat16` with components in
+/// `{MIN, -1, 0, 1, MAX}`, where the products are largest: `angle_to`
+/// within 1 ulp.
+#[test]
+fn fixed16_vec3_angle_to_extremes() {
+    let e = [i16::MIN, -1, 0, 1, i16::MAX];
+    let mut all = Vec::new();
+    for &x in &e {
+        for &y in &e {
+            for &z in &e {
+                all.push([x, y, z]);
+            }
+        }
+    }
+    let v = |c: [i16; 3]| {
+        Vec3::new(
+            FixedFloat16::from_bits(c[0]),
+            FixedFloat16::from_bits(c[1]),
+            FixedFloat16::from_bits(c[2]),
+        )
+    };
+    for &a in &all {
+        for &b in &all {
+            let got = i128::from(v(a).angle_to(v(b)).to_bits());
+            assert!(angle3_ok(raw3(v(a)), raw3(v(b)), got, 8), "{a:?} {b:?}");
+        }
+    }
+}
+
+/// Every `Vec3` of `FixedFloat8`: `try_normalize` correctly rounded.
+#[test]
+#[ignore = "2^24 vectors: run with --ignored --release"]
+fn fixed8_vec3_normalize_all() {
+    parallel(-128, 128, |x| {
+        for y in I8 {
+            for z in I8 {
+                let v = v3_8(x, y, z);
+                check_unit(
+                    &raw3(v),
+                    v.try_normalize().map(raw3).as_ref().map(|u| &u[..]),
+                    4,
+                );
+            }
+        }
+    });
+}
+
+/// Every `Vec2` of `FixedFloat16`: `try_normalize` correctly rounded.
+#[test]
+#[ignore = "2^32 vectors: run with --ignored --release"]
+fn fixed16_vec2_normalize_all() {
+    parallel(i64::from(i16::MIN), i64::from(i16::MAX) + 1, |x| {
+        for y in i16::MIN..=i16::MAX {
+            let v = Vec2::new(
+                FixedFloat16::from_bits(x as i16),
+                FixedFloat16::from_bits(y),
+            );
+            check_unit(
+                &raw2(v),
+                v.try_normalize().map(raw2).as_ref().map(|u| &u[..]),
+                8,
+            );
+        }
+    });
+}
+
+/// Every `Vec2` of `FixedFloat8` with every pair of bounds:
+/// `clamp_length(min, max)` by its definition.
+#[test]
+#[ignore = "2^32 cases: run with --ignored --release"]
+fn fixed8_vec2_clamp_length_all() {
+    parallel(0, 1 << 16, |xy| {
+        let v = v2_8((xy >> 8) - 128, (xy & 255) - 128);
+        for min in I8 {
+            for max in I8 {
+                let (lo, hi) = (
+                    FixedFloat8::from_bits(min as i8),
+                    FixedFloat8::from_bits(max as i8),
+                );
+                check_clamp(
+                    &raw2(v),
+                    &raw2(v.clamp_length(lo, hi)),
+                    min.into(),
+                    max.into(),
+                );
+            }
+        }
+    });
+}
+
+/// Every `Vec3` of `FixedFloat8` with every bound `k`: `clamp_length_max(k)`
+/// and `clamp_length(k, MAX)` by their definition, so each bound is
+/// checked as the upper and as the lower one.
+#[test]
+#[ignore = "2^33 cases: run with --ignored --release"]
+fn fixed8_vec3_clamp_length_all() {
+    parallel(-128, 128, |x| {
+        for y in I8 {
+            for z in I8 {
+                let v = v3_8(x, y, z);
+                for k in I8 {
+                    let b = FixedFloat8::from_bits(k as i8);
+                    check_clamp(&raw3(v), &raw3(v.clamp_length_max(b)), 0, k.into());
+                    check_clamp(
+                        &raw3(v),
+                        &raw3(v.clamp_length(b, FixedFloat8::MAX)),
+                        k.into(),
+                        127,
+                    );
+                }
+            }
+        }
+    });
+}
+
+/// Every `Vec3` of `FixedFloat8` against every `Vec3` with components in
+/// `{MIN, 0, MAX}`: `angle_to` both ways within 1 ulp.
+#[test]
+#[ignore = "2^24 · 27 pairs: run with --ignored --release"]
+fn fixed8_vec3_angle_to_extremes() {
+    let e = [-128i64, 0, 127];
+    parallel(-128, 128, move |x| {
+        for y in I8 {
+            for z in I8 {
+                let a = v3_8(x, y, z);
+                for &bx in &e {
+                    for &by in &e {
+                        for &bz in &e {
+                            let b = v3_8(bx, by, bz);
+                            let (ra, rb) = (raw3(a), raw3(b));
+                            let a_to_b = i128::from(a.angle_to(b).to_bits());
+                            let b_to_a = i128::from(b.angle_to(a).to_bits());
+                            assert!(angle3_ok(ra, rb, a_to_b, 4), "{a:?} {b:?}");
+                            assert!(angle3_ok(rb, ra, b_to_a, 4), "{b:?} {a:?}");
+                        }
+                    }
+                }
+            }
+        }
+    });
 }

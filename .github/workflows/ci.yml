@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: [trig, radians, inverse, angle, roots, exhaustive]
+        test: [trig, radians, inverse, angle, roots, exhaustive, vec_geometry]
     runs-on: ubuntu-latest
     env:
       CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
@@ -346,7 +346,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        harness: [length8, normalize8, clamp_length8, rotate8, vec2_angle8, vec3_angle8, length16, normalize16, clamp_length16, rotate16, vec2_angle16, vec3_angle16]
+        harness: [length8, rotate8, rotate16, vec2_angle8, vec2_angle16]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
