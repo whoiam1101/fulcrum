@@ -3,7 +3,10 @@
 //! rational oracle; `sin`, `cos`, `tan` (clamped to the range), `atan`,
 //! `atan2`, `asin`, `acos` and `sin`, `cos` of the angle type are within 1
 //! ulp of the interval oracle, its `to_radians` and `from_radians` equal it
-//! where it decides the rounding; `+`, `-` saturate exactly; `%` is exact.
+//! where it decides the rounding; `exp2` (clamped to the range) and `log2`
+//! are within 1 ulp of the interval oracle, `MAX` and `MIN` with `checked_*`
+//! `None` outside it; `+`, `-` saturate exactly; `%`
+//! is exact.
 
 #![no_main]
 
@@ -108,6 +111,32 @@ macro_rules! check {
                     <<$T as FixedFloat>::Angle>::from_radians(y).to_bits() as u64,
                     r
                 );
+            }
+            if a > 0 {
+                let exact = fulcrum_oracle::log2(a as i128, $frac);
+                assert!(within_ulp(
+                    exact,
+                    x.log2().to_bits() as i128,
+                    $frac,
+                    min,
+                    max
+                ));
+                assert_eq!(x.checked_log2(), Some(x.log2()));
+            } else {
+                assert_eq!((x.log2(), x.checked_log2()), ($T::MIN, None));
+            }
+            if (a as i128) >> $frac < $frac - 1 {
+                let exact = fulcrum_oracle::exp2(a as i128, $frac);
+                assert!(within_ulp(
+                    exact,
+                    x.exp2().to_bits() as i128,
+                    $frac,
+                    min,
+                    max
+                ));
+                assert_eq!(x.checked_exp2().unwrap_or($T::MAX), x.exp2());
+            } else {
+                assert_eq!((x.exp2(), x.checked_exp2()), ($T::MAX, None));
             }
             assert_eq!((x + y).to_bits(), a.saturating_add(b));
             assert_eq!((x - y).to_bits(), a.saturating_sub(b));

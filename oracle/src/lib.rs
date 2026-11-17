@@ -477,3 +477,78 @@ pub fn angle_from_radians(raw: i128, frac: u32, n: u32) -> Option<u64> {
     let modulus = BigInt::one() << n;
     ra.mod_floor(&modulus).to_u64()
 }
+
+/// `ln 2 = 2·atanh(1/3)` as an interval `[lo, hi] · 2^-TRIG_SCALE`.
+pub fn ln2_interval() -> (BigInt, BigInt) {
+    let (lo, hi) = atanh_ratio(&BigInt::one(), &BigInt::from(3));
+    (lo * 2, hi * 2)
+}
+
+/// `atanh(p/q)` for `0 ≤ p ≤ q/3` as an interval `[lo, hi] · 2^-TRIG_SCALE`:
+/// `Σ (p/q)^(2k+1) / (2k+1)`, every term positive and floored, so the sum
+/// is a lower bound; each floored power is low by less than `9/8`, and the
+/// tail after the power that floors to zero is below `2`.
+fn atanh_ratio(p: &BigInt, q: &BigInt) -> (BigInt, BigInt) {
+    let (p2, q2) = (p * p, q * q);
+    let mut power = (p << TRIG_SCALE) / q;
+    let mut sum = BigInt::zero();
+    let mut k = 0u64;
+    while !power.is_zero() {
+        sum += &power / BigInt::from(2 * k + 1);
+        power = power * &p2 / &q2;
+        k += 1;
+    }
+    let hi = &sum + 3 * k + 2;
+    (sum, hi)
+}
+
+/// `2^(raw / 2^frac)` as an interval `[lo, hi] · 2^-TRIG_SCALE`: `x = n + t`
+/// with `t ∈ [0, 1)`, the Taylor series of `e^(t·ln 2)` at both ends of the
+/// interval of `t·ln 2` (every term positive: floored terms give a lower
+/// bound, and each is low by less than `2`, the tail below `4`), shifted by
+/// `n`. `raw / 2^frac < 128`. Shares no code with fulcrum or
+/// `tests/common/exp.rs`.
+pub fn exp2(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    let raw = BigInt::from(raw);
+    let n = raw.div_floor(&(BigInt::one() << frac)).to_i64().unwrap();
+    assert!(n < 128, "2^{} is beyond the oracle", n);
+    let t = raw.mod_floor(&(BigInt::one() << frac));
+    let (llo, lhi) = ln2_interval();
+    let series = |v: &BigInt| {
+        let mut term = BigInt::one() << TRIG_SCALE;
+        let mut sum = BigInt::zero();
+        let mut k = 1u64;
+        while !term.is_zero() {
+            sum += &term;
+            term = ((term * v) >> TRIG_SCALE) / BigInt::from(k);
+            k += 1;
+        }
+        (sum, k)
+    };
+    let (lo, _) = series(&((&t * &llo) >> frac));
+    let (hi, terms) = series(&(((&t * &lhi) >> frac) + 1));
+    let hi = hi + 2 * terms + 4;
+    if n >= 0 {
+        (lo << n as usize, hi << n as usize)
+    } else {
+        let s = n.unsigned_abs() as usize;
+        (lo >> s, (hi >> s) + 1)
+    }
+}
+
+/// `log₂(raw / 2^frac)` for `raw > 0` as an interval
+/// `[lo, hi] · 2^-TRIG_SCALE`: the exponent `e` of `raw`, and
+/// `ln(raw / 2^e) = 2·atanh((raw - 2^e)/(raw + 2^e))` divided by the interval
+/// of `ln 2`. Shares no code with fulcrum or `tests/common/exp.rs`.
+pub fn log2(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    assert!(raw > 0);
+    let a = BigInt::from(raw);
+    let e = a.bits() - 1;
+    let power = BigInt::one() << e as usize;
+    let (slo, shi) = atanh_ratio(&(&a - &power), &(&a + &power));
+    let (llo, lhi) = ln2_interval();
+    let lo = ((slo * 2) << TRIG_SCALE) / lhi;
+    let hi = ((shi * 2) << TRIG_SCALE) / llo + 1;
+    let whole = BigInt::from(e as i64 - i64::from(frac)) << TRIG_SCALE;
+    (&whole + lo, whole + hi)
+}
