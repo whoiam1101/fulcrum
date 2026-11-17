@@ -16,4 +16,5 @@ macro_rules! define_consts {
 
 mod consts;
 
+pub(crate) mod exp;
 pub(crate) mod trig;

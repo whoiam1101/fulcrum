@@ -677,6 +677,47 @@ macro_rules! define_fixed {
                 }
             }
 
+            /// `2^self`, correctly rounded to nearest on every
+            /// `FixedFloat8`, `FixedFloat16` and `FixedFloat32` and within 1
+            /// ulp on `FixedFloat64`, saturated to `MAX` above the range;
+            /// exact on integers `≥ -FRAC_BITS`, and `0` below `-FRAC_BITS - 1`. The split
+            /// into the integer and the fraction is exact, so nothing is lost
+            /// on any input.
+            #[inline]
+            #[must_use]
+            pub const fn exp2(self) -> Self {
+                Self::saturate(crate::exp::exp2(self.raw as i64, $F) as crate::kernel::$k::Wide)
+            }
+
+            /// `2^self` as [`Self::exp2`], or `None` when the rounded result
+            /// is out of range.
+            #[inline]
+            pub const fn checked_exp2(self) -> Option<Self> {
+                Self::checked(crate::exp::exp2(self.raw as i64, $F) as crate::kernel::$k::Wide)
+            }
+
+            /// `log₂(self)`, correctly rounded to nearest on every
+            /// `FixedFloat8`, `FixedFloat16` and `FixedFloat32` and within 1
+            /// ulp on `FixedFloat64`; never overflows, exact on powers of
+            /// two. `self ≤ 0` gives `MIN`, the saturation of `-∞`.
+            #[inline]
+            #[must_use]
+            pub const fn log2(self) -> Self {
+                match self.checked_log2() {
+                    Some(v) => v,
+                    None => Self::MIN,
+                }
+            }
+
+            /// `log₂(self)` as [`Self::log2`], or `None` when `self ≤ 0`.
+            #[inline]
+            pub const fn checked_log2(self) -> Option<Self> {
+                if self.raw <= 0 {
+                    return None;
+                }
+                Some(Self { raw: crate::exp::log2(self.raw as i64, $F) as $Bits })
+            }
+
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
             #[must_use]
