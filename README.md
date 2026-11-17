@@ -9,7 +9,7 @@ Deterministic fixed-point math for Rust: bit-identical results on every platform
 
 Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32); vectors `Vec2<T>`, `Vec3<T>` over any of them.
 
-> **Status:** stages 1–4 of the [roadmap](ROADMAP.md) are done and stage 5 is written and tested, its Kani proofs and cross-platform checks pending: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, correctly rounded `sqrt`, `rsqrt`, `hypot`; trigonometry within 1 ulp (`sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, `atan`, `atan2`, `asin`, `acos`) and the wrapping angle types `Angle8` … `Angle64`; the vectors `Vec2` and `Vec3` (`dot`, `cross`, lengths rounded once, correctly rounded `normalize`, `rotate`, `angle_to`); optional `serde`, `bytemuck` and `num-traits` support. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
+> **Status:** stages 1–5 of the [roadmap](ROADMAP.md) are done: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, correctly rounded `sqrt`, `rsqrt`, `hypot`; trigonometry within 1 ulp (`sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, `atan`, `atan2`, `asin`, `acos`) and the wrapping angle types `Angle8` … `Angle64`; the vectors `Vec2` and `Vec3` (`dot`, `cross`, lengths rounded once, correctly rounded `normalize`, `rotate`, `angle_to`); optional `serde`, `bytemuck` and `num-traits` support. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
 
 ```toml
 [dependencies]

@@ -8,7 +8,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 2 | `FixedFloat64` complete: `mul_add`, `mul_div`, `lerp`, `add_product` | `v0.2.0` | ✅ done |
 | 3 | `sqrt`, `rsqrt`, `hypot` | `v0.3.0` | ✅ done |
 | 4 | Trigonometry and angle types | `v0.4.0` | ✅ done |
-| 5 | `Vec2`, `Vec3` | `v0.5.0` | code done, verification pending |
+| 5 | `Vec2`, `Vec3` | `v0.5.0` | ✅ done |
 | 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | |
 | 7 | Batch operations, optimizations | `v0.7.0` | |
 | 8 | Lean proofs of the kernel, API freeze | `v1.0.0` | |
@@ -113,7 +113,7 @@ Quality gates:
 **Verified by:** the error bounds derived in INTERNALS §3.11–3.14 (below `2^-59`, a margin of `2^26` over the `2^-33` that 1 ulp of `FixedFloat64` needs); exhaustive check of every value of 8, 16 and 32 bits for every function, all correctly rounded; the 256-bit interval oracle and fuzzing on every width; Kani "no panic". The formal proof of the bounds is part of stage 8.
 **Benchmarks against:** `libm`, `cordic`; a demonstration that `f64::sin` from `std` differs between x86 and ARM while fulcrum does not.
 
-## 5. Vectors `v0.5.0`
+## 5. Vectors ✅ `v0.5.0`
 
 - [x] `Vec2<T>`, `Vec3<T>` with public fields, `#[repr(C)]`, aliases `Vec2f8` … `Vec2f64`, `Vec3f8` … `Vec3f64` (`src/vec.rs`).
 - [x] `new`, `splat`, `ZERO`, `X`/`Y`/`Z`; `+ -`, unary `-`, `*` by a scalar on either side, `/` by a scalar, component-wise `*` of two vectors (an operator, as in `glam`), `min`, `max`, `abs`, `lerp`; all saturate per component like the scalar operators.
@@ -128,10 +128,10 @@ Quality gates:
 **Verified by:** the integer reference of `tests/common/reference.rs` (`tests/vec.rs`, `tests/vec_geometry.rs`): every `length` of `Vec2` and `Vec3` on `FixedFloat8`, edge-biased random vectors on every width, `normalize` and `clamp_length` by the definition of rounding, `rotate` and `angle_to` against the independent sine and `atan2` of `tests/common/trig.rs`; the rational oracle on every width (`oracle/tests/vec.rs`), including the 64-bit sums beyond `i128` and `clamp_length` with `min > max` and negative bounds; the fuzz target `vec`; a golden hash of the vectors next to the one of the scalars; Kani "no panic": the operators, `dot`, `cross`, `perp_dot` and `distance_sq` on every width (`vec_no_panic_*`), `length` and `distance` on 8 bits, `rotate` and `angle_to` of `Vec2` on 8 and 16 bits (`proofs_geometry`, one CI job each), and `isqrt` on the widened domain for `k8` and `k16` (`isqrt_spec_8/16`). Kani does not converge on the rest: `normalize` and `clamp_length` (the 256-by-128-bit division) exhaust the memory of a CI runner within a minute, `length` of 16 bits and `angle_to` of `Vec3` run past five hours, and every root, `normalize`, `rotate` and `angle_to` of 32 and 64 bits divides `u64` and `u128` in loops (as for `sqrt` in stage 3). In their place, exhaustive tests in release with overflow checks, which prove "no panic" on their domain: `normalize` of every `Vec2` and `Vec3` of `FixedFloat8` and every `Vec2` of `FixedFloat16`, `clamp_length` of every `Vec2` of `FixedFloat8` with every pair of bounds and every `Vec3` with every bound, `angle_to` of every `Vec3` of `FixedFloat8` against the vectors with components in `{MIN, 0, MAX}`; `length` of `Vec2` on 16 bits is `hypot`, checked on every pair, and of `Vec3` the root of an exact sum of squares (`isqrt_spec_16`). Beyond these domains the oracle, fuzzing and the bounds of INTERNALS §3.15 stand in.
 **Benchmarks against:** `glam` (`dot`, `length`, `normalize`, `distance_sq`, `rotate`, `angle_to`, `clamp_length` of `Vec2`; `cross`, `length`, `normalize` of `Vec3`), and the "one tick" macro benchmark of `bench/src/tick.rs`, each tick from the same starting state. Result on x86-64: the tick takes 105 ns per unit on `FixedFloat32` and 159 ns on `FixedFloat64`, against 150 and 616 ns for `fixed` `I16F16` and `I32F32` with `cordic` and 52 ns for `glam`; the vector functions are 2–94× slower than `glam` on hardware floats.
 
-Before the tag `v0.5.0`:
-- [ ] Every Kani harness of the stage passes (`vec_no_panic_8/16/32/64`, the five of `proofs_geometry`, `isqrt_spec_8/16`), run outside the developer machine; the exhaustive tests of `tests/vec_geometry.rs` pass with `--ignored` in release with overflow checks.
-- [ ] The bench workflow puts the vector and tick tables into the README.
-- [ ] The golden hash of the vectors is the same on x86-64, ARM64 and 32-bit x86 in debug and release.
+Checked before the tag `v0.5.0`:
+- [x] Every Kani harness of the stage passes (`vec_no_panic_8/16/32/64`, the five of `proofs_geometry`, `isqrt_spec_8/16`), run outside the developer machine; the exhaustive tests of `tests/vec_geometry.rs` pass with `--ignored` in release with overflow checks.
+- [x] The bench workflow puts the vector and tick tables into the README.
+- [x] The golden hash of the vectors is the same on x86-64, ARM64 and 32-bit x86 in debug and release.
 
 ### Between 5 and 6 (`v0.5.x`)
 
