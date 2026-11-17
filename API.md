@@ -252,6 +252,31 @@ assert_eq!(ff32!(2).checked_asin(), None);
 
 `atan2` is also in the `FixedFloat` trait.
 
+### Binary logarithm and exponential: `log2`, `exp2`
+
+Within 1 ulp of the exact value; on `FixedFloat8`, `FixedFloat16` and `FixedFloat32` every result is checked to be correctly rounded, and both functions are checked to be monotone.
+
+| Method | Value | Out of the domain or range |
+|---|---|---|
+| `x.log2()` | `log₂ x`, exact on powers of two; never overflows | `x ≤ 0` gives `MIN`, the saturation of `-∞` |
+| `x.checked_log2()` | the same | `None` for `x ≤ 0` |
+| `x.exp2()` | `2^x`, exact on integers `≥ -FRAC_BITS`; `0` below `-FRAC_BITS - 1` | saturates to `MAX` |
+| `x.checked_exp2()` | the same | `None` when the rounded result is out of range |
+
+The split of `x` into its integer part and its fraction is exact, so `exp2` loses nothing on any input; `2^(-FRAC_BITS - 1)`, exactly half an ulp, rounds up to `DELTA` by the rule of `*` and `/`.
+
+```rust
+use fulcrum::{ff32, FixedFloat32};
+
+assert_eq!(ff32!(8).log2(), ff32!(3));
+assert_eq!(ff32!(0.5).log2(), ff32!(-1));
+assert_eq!(ff32!(0).log2(), FixedFloat32::MIN);
+assert_eq!(ff32!(0.5).exp2(), FixedFloat32::SQRT_2);
+assert_eq!(ff32!(-17).exp2(), FixedFloat32::DELTA);
+assert_eq!(ff32!(15).exp2(), FixedFloat32::MAX);
+assert_eq!(ff32!(15).checked_exp2(), None);
+```
+
 ### Angles: `Angle8` … `Angle64`
 
 An angle kept as every bit of an unsigned integer, the fraction `raw / 2^BITS` of a turn: `Angle8` has 256 steps per turn, `Angle16` 65 536, `Angle32` and `Angle64` steps of `1.46·10⁻⁹` and `3.4·10⁻¹⁹` radians. `+`, `-` and unary `-` wrap modulo a turn, so an angle that keeps turning never needs a range reduction, never saturates, and a sum of rotations does not depend on the order. Each `AngleN` goes with `FixedFloatN`: its sine and cosine are `FixedFloatN`, within 1 ulp (on `Angle8`, `Angle16` and `Angle32` every result is checked to be correctly rounded and equal to `sin_turns` of the same angle).
@@ -486,7 +511,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin` and `acos` are within 1 ulp.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, `log2` and `exp2` are within 1 ulp.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 

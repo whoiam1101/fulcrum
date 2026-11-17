@@ -9,7 +9,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 3 | `sqrt`, `rsqrt`, `hypot` | `v0.3.0` | ✅ done |
 | 4 | Trigonometry and angle types | `v0.4.0` | ✅ done |
 | 5 | `Vec2`, `Vec3` | `v0.5.0` | ✅ done |
-| 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | |
+| 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | in progress |
 | 7 | Batch operations, optimizations | `v0.7.0` | |
 | 8 | Lean proofs of the kernel, API freeze | `v1.0.0` | |
 | — | `FixedFloat128`, `FixedFloat256`, only on demand | after `1.0` | deferred |
@@ -142,7 +142,12 @@ Speed:
 
 ## 6. Exponentials and logarithms `v0.6.0`
 
-- `exp2`, `log2`, `exp`, `ln`, `powi`, `pow`.
+- [x] `log2`, `checked_log2` (`x ≤ 0`: `MIN`, `None`): the exponent of the argument, `log₂ c` of a table of `log₂(1 + k/256)` (256 points, 62 bits, `src/tables/exp.rs`) at the point just below the mantissa, and three terms of `2·log₂ e · atanh s` of the exact `s = (u - c)/(u + c) < 2^-9`, rounded once; error below `2^-59`, so within `½ + 2^-27` ulp (INTERNALS §3.16).
+- [x] `exp2`, `checked_exp2` (saturating to `MAX`): `x = n + t` by a mask, `2^(k/256)` of a table at 126 bits times `e^y` of the remainder, `y < 2^-8.5`, by seven terms at 72 bits, shifted by `n` and rounded once; within `½ + 2^-7.5` ulp on `FixedFloat64`, `½ + 2^-39` up to `FixedFloat32`. Exact on integers `≥ -FRAC_BITS`.
+- Every result of `log2` and `exp2` of `FixedFloat8`, `FixedFloat16` and `FixedFloat32` is correctly rounded and both are monotone (exhaustive, against the reference of `tests/common/exp.rs`: the full series without tables, the bound checked by the oracle); the 256-bit interval oracle on every width (`oracle/tests/exp.rs`); the fuzz target `ops`; the golden hash `GOLDEN_EXP`; Kani `exp2_no_panic_64`, `log2_no_panic_64`.
+- [ ] `exp`, `ln`, `powi`, `pow`.
+- [ ] `log2`, `exp2` and the rest in the `FixedFloat` trait.
+- [ ] Benchmarks against `libm`, the `std` floats and `fixed`; accuracy table; determinism table.
 
 **Done when:** ≤ 2 ulp on every type against a high-precision reference.
 **Verified by:** exhaustive check of all 2³² `FixedFloat32` values for `exp2` and `log2`, the interval oracle, error bounds derived in INTERNALS and proven in Lean in stage 8. Sollya may be used once by hand to choose minimax coefficients: a design tool, not a check.
