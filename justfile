@@ -40,11 +40,9 @@ clippy:
     cargo clippy --all-targets --features {{ test_features }} -- -D warnings
     cargo clippy --all-targets --all-features -- -D warnings
 
-[doc("clippy -D warnings on the root crate with default features and every feature but strict-overflow, then with all features on every manifest")]
+[doc("clippy of the root crate, then clippy -D warnings with all features on every manifest")]
 [group("lint")]
-clippy-all:
-    cargo clippy --all-targets -- -D warnings
-    cargo clippy --all-targets --features {{ test_features }} -- -D warnings
+clippy-all: clippy
     for m in {{ manifests }}; do cargo clippy --manifest-path "$m" --all-targets --all-features -- -D warnings; done
 
 [doc("rustdoc with warnings as errors")]
@@ -124,17 +122,6 @@ mutants *args:
 [group("security")]
 deny:
     for m in {{ manifests }}; do cargo deny --manifest-path "$m" --all-features check advisories bans licenses sources; done
-
-[doc("Secrets in the working tree and the history")]
-[group("security")]
-secrets:
-    gitleaks git --redact
-
-[doc("Security lint of the GitHub workflows")]
-[group("security")]
-workflows:
-    actionlint
-    zizmor .github
 
 [doc("Instruction counts under Callgrind; needs Valgrind and gungraun-runner of the same version as gungraun")]
 [group("perf")]

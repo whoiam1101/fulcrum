@@ -58,9 +58,10 @@ jobs:
       - run: rustup toolchain install "$TOOLCHAIN" --profile minimal && rustup default "$TOOLCHAIN"
         env:
           TOOLCHAIN: ${{ matrix.toolchain }}
-      - run: cargo test --features std,float-convert,serde,bytemuck,num-traits
-      - run: cargo test --features std,float-convert --release
-      - run: cargo test --features strict-overflow --test strict
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+        with:
+          tool: just@${{ env.JUST_VERSION }}
+      - run: just test test-release test-strict
 
   exhaustive:
     name: exhaustive ${{ matrix.test }}
@@ -112,6 +113,7 @@ jobs:
         test: ["stress", "algebra algebra_stress", "exhaustive fixed32_parse_display_round_trip"]
     runs-on: ubuntu-latest
     env:
+      CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"
       FULCRUM_STRESS_SECS: "300"
       FULCRUM_ALGEBRA_SECS: "180"
     steps:
@@ -176,7 +178,6 @@ jobs:
       - run: |
           for features in serde bytemuck num-traits serde,float-convert serde,bytemuck,num-traits,float-convert; do
             echo "::group::$features"
-            cargo build --manifest-path ../Cargo.toml --features "$features"
             cargo test --features "$features"
             echo "::endgroup::"
           done

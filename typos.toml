@@ -1,5 +1,8 @@
 [files]
 extend-exclude = ["bench/results/", "fuzz/corpus/", "fuzz/artifacts/"]
 
+[default]
+extend-ignore-re = ["commit `[0-9a-f]{7,40}`"]
+
 [default.extend-words]
 numer = "numer"
