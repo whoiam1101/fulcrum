@@ -696,6 +696,23 @@ macro_rules! define_fixed {
                 Self::checked(crate::exp::exp2(self.raw as i64, $F) as crate::kernel::$k::Wide)
             }
 
+            /// `e^self`, correctly rounded to nearest on every
+            /// `FixedFloat8`, `FixedFloat16` and `FixedFloat32` and within 1
+            /// ulp on `FixedFloat64`, saturated to `MAX` above the range and
+            /// `0` far below it; exact at `0`.
+            #[inline]
+            #[must_use]
+            pub const fn exp(self) -> Self {
+                Self::saturate(crate::exp::exp(self.raw as i64, $F) as crate::kernel::$k::Wide)
+            }
+
+            /// `e^self` as [`Self::exp`], or `None` when the rounded result
+            /// is out of range.
+            #[inline]
+            pub const fn checked_exp(self) -> Option<Self> {
+                Self::checked(crate::exp::exp(self.raw as i64, $F) as crate::kernel::$k::Wide)
+            }
+
             /// `log₂(self)`, correctly rounded to nearest on every
             /// `FixedFloat8`, `FixedFloat16` and `FixedFloat32` and within 1
             /// ulp on `FixedFloat64`; never overflows, exact on powers of
@@ -716,6 +733,29 @@ macro_rules! define_fixed {
                     return None;
                 }
                 Some(Self { raw: crate::exp::log2(self.raw as i64, $F) as $Bits })
+            }
+
+            /// `ln(self)`, the natural logarithm, correctly rounded to
+            /// nearest on every `FixedFloat8`, `FixedFloat16` and
+            /// `FixedFloat32` and within 1 ulp on `FixedFloat64`; never
+            /// overflows, exact at `1`. `self ≤ 0` gives `MIN`, the
+            /// saturation of `-∞`.
+            #[inline]
+            #[must_use]
+            pub const fn ln(self) -> Self {
+                match self.checked_ln() {
+                    Some(v) => v,
+                    None => Self::MIN,
+                }
+            }
+
+            /// `ln(self)` as [`Self::ln`], or `None` when `self ≤ 0`.
+            #[inline]
+            pub const fn checked_ln(self) -> Option<Self> {
+                if self.raw <= 0 {
+                    return None;
+                }
+                Some(Self { raw: crate::exp::ln(self.raw as i64, $F) as $Bits })
             }
 
             /// `-1`, `0` or `1` by the sign of `self`.

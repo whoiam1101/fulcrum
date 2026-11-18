@@ -67,6 +67,32 @@ pub fn exp2(raw: i128, f: u32) -> (u128, i128, u128) {
     (sum, i128::from(EXP2_SCALE) - i128::from(f) - n, error)
 }
 
+/// Bound on the error of the mantissa of [`exp`], in units of `2^-124`.
+pub const EXP_ERROR: u128 = 1 << 12;
+
+/// `e^(raw / 2^f)` as `m / 2^s`, in the form of [`exp2`]: `x = n · ln 2 + r`
+/// with `n = ⌊x / ln 2⌋` by one integer division at 120 fractional bits and
+/// `r ∈ [0, ln 2)`, then the full Taylor series of `e^r` at 124 fractional
+/// bits, instead of the multiplication by `log₂ e` and the table of
+/// `2^(k/256)`. The error is `0` at `x = 0`, where `m = 2^124` is exact.
+/// `|raw / 2^f| ≤ 32`, `f ≤ 32`.
+pub fn exp(raw: i128, f: u32) -> (u128, i128, u128) {
+    let ln2 = (LN_2 >> 8) as i128;
+    let x = raw << (120 - f);
+    let n = x.div_euclid(ln2);
+    let r = ((x - n * ln2) as u128) << 4;
+    let mut term = 1u128 << EXP2_SCALE;
+    let mut sum = 0u128;
+    let mut k = 1u128;
+    while term != 0 {
+        sum += term;
+        term = mul_shr(term, r, EXP2_SCALE) / k;
+        k += 1;
+    }
+    let error = if raw == 0 { 0 } else { EXP_ERROR };
+    (sum, i128::from(EXP2_SCALE) - i128::from(f) - n, error)
+}
+
 /// `⌊m / 2^s⌋` for `s ≥ 0`.
 fn shr(m: u128, s: i128) -> u128 {
     if s >= 128 {
@@ -103,9 +129,10 @@ fn mul(a: u128, b: u128) -> u128 {
     (a * b) >> 64
 }
 
-/// `log₂(raw / 2^f) · 2^64`, within [`LOG2_ERROR`]. `0 < raw < 2^64`,
-/// `f ≤ 32`.
-pub fn log2(raw: i128, f: u32) -> i128 {
+/// The exponent `e` of `0 < raw < 2^64` and `atanh((u - 1)/(u + 1)) · 2^64`
+/// of its mantissa `u = raw / 2^e ∈ [1, 2)`, half of `ln u`: the full
+/// series, every term truncated.
+fn atanh_mantissa(raw: i128) -> (u32, u128) {
     let a = raw as u128;
     let e = 127 - a.leading_zeros();
     let u = a << (64 - e);
@@ -119,8 +146,27 @@ pub fn log2(raw: i128, f: u32) -> i128 {
         power = mul(power, s2);
         k += 2;
     }
+    (e, sum)
+}
+
+/// `log₂(raw / 2^f) · 2^64`, within [`LOG2_ERROR`]. `0 < raw < 2^64`,
+/// `f ≤ 32`.
+pub fn log2(raw: i128, f: u32) -> i128 {
+    let (e, sum) = atanh_mantissa(raw);
     let l = ((sum * LOG2_E) >> 63) as i128;
     ((i128::from(e) - i128::from(f)) << 64) + l
+}
+
+/// Bound on the error of [`ln`], in units of `2^-64`.
+pub const LN_ERROR: i128 = 1 << 8;
+
+/// `ln(raw / 2^f) · 2^64`, within [`LN_ERROR`]: `2·atanh` of the mantissa
+/// plus `(e - f) · ln 2`, without the binary logarithm. `0 < raw < 2^64`,
+/// `f ≤ 32`.
+pub fn ln(raw: i128, f: u32) -> i128 {
+    let (e, sum) = atanh_mantissa(raw);
+    let whole = (i128::from(e) - i128::from(f)) * (LN_2 >> 32) as i128;
+    (whole >> 32) + 2 * sum as i128
 }
 
 /// The value with `f` fractional bits nearest to `r / 2^64`, if every value
