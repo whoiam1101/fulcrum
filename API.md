@@ -325,6 +325,8 @@ assert_eq!(ff32!(0).powi(-1), FixedFloat32::MAX);
 assert_eq!(ff32!(10).checked_powi(5), None);
 ```
 
+`log2`, `exp2`, `ln`, `exp`, `pow` and `powi` are also in the `FixedFloat` trait.
+
 ### Angles: `Angle8` … `Angle64`
 
 An angle kept as every bit of an unsigned integer, the fraction `raw / 2^BITS` of a turn: `Angle8` has 256 steps per turn, `Angle16` 65 536, `Angle32` and `Angle64` steps of `1.46·10⁻⁹` and `3.4·10⁻¹⁹` radians. `+`, `-` and unary `-` wrap modulo a turn, so an angle that keeps turning never needs a range reduction, never saturates, and a sum of rotations does not depend on the order. Each `AngleN` goes with `FixedFloatN`: its sine and cosine are `FixedFloatN`, within 1 ulp (on `Angle8`, `Angle16` and `Angle32` every result is checked to be correctly rounded and equal to `sin_turns` of the same angle).
@@ -514,7 +516,7 @@ Sealed: only fulcrum's types implement it. It requires `Copy + Default + Ord + H
 Contents:
 - `type Bits`;
 - constants `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `hypot`, `lerp`, `sin_cos`, `atan2`, and the associated type `Angle` (the angle type of the same width, with the trait `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, the constants, wrapping `+ - neg` and `* x`).
+- methods `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `hypot`, `lerp`, `sin_cos`, `atan2`, `log2`, `exp2`, `ln`, `exp`, `pow`, `powi`, and the associated type `Angle` (the angle type of the same width, with the trait `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, the constants, wrapping `+ - neg` and `* x`).
 
 ```rust
 use fulcrum::FixedFloat;

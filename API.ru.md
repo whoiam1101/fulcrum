@@ -325,6 +325,8 @@ assert_eq!(ff32!(0).powi(-1), FixedFloat32::MAX);
 assert_eq!(ff32!(10).checked_powi(5), None);
 ```
 
+`log2`, `exp2`, `ln`, `exp`, `pow` и `powi` есть и в трейте `FixedFloat`.
+
 ### Углы: `Angle8` … `Angle64`
 
 Угол хранится всеми битами беззнакового целого как доля оборота `raw / 2^BITS`: у `Angle8` 256 шагов на оборот, у `Angle16` 65 536, у `Angle32` и `Angle64` шаг `1.46·10⁻⁹` и `3.4·10⁻¹⁹` радиана. `+`, `-` и унарный `-` заворачиваются по модулю оборота, поэтому угол, который всё время поворачивается, не нуждается в приведении, никогда не насыщается, а сумма поворотов не зависит от порядка. Каждый `AngleN` идёт в паре с `FixedFloatN`: синус и косинус — `FixedFloatN`, в пределах 1 ulp (у `Angle8`, `Angle16` и `Angle32` перебором проверено, что каждый результат правильно округлён и равен `sin_turns` того же угла).
@@ -514,7 +516,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 Состав трейта:
 - `type Bits`;
 - константы `FRAC_BITS`, `INT_BITS`, `ZERO`, `ONE`, `NEG_ONE`, `HALF`, `MIN`, `MAX`, `DELTA`, `PI`, `TAU`, `FRAC_PI_2`, `E`, `SQRT_2`;
-- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `hypot`, `lerp`, `sin_cos`, `atan2` и ассоциированный тип `Angle` (тип угла той же ширины с трейтом `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, константы, заворачивающиеся `+ - neg` и `* x`).
+- методы `from_bits`, `to_bits`, `saturating_from_int`, `checked_from_int`, `checked_add/sub/mul/div`, `wrapping_add/sub/mul`, `abs`, `is_negative`, `floor`, `ceil`, `round`, `sqrt`, `hypot`, `lerp`, `sin_cos`, `atan2`, `log2`, `exp2`, `ln`, `exp`, `pow`, `powi` и ассоциированный тип `Angle` (тип угла той же ширины с трейтом `FixedAngle`: `from_turns`, `to_turns`, `from_radians`, `to_radians`, `sin`, `cos`, `sin_cos`, `scale`, `from_bits`, `to_bits`, константы, заворачивающиеся `+ - neg` и `* x`).
 
 ```rust
 use fulcrum::FixedFloat;
