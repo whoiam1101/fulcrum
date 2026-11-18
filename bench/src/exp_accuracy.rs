@@ -10,8 +10,9 @@
 //! `std` floats call their `powi` with the integer, `libm`, which has none,
 //! its `pow` with the integer as a float.
 
+use crate::accuracy::round_float;
 use crate::inputs;
-use crate::trig_accuracy::{operands, round_float, Exact, Tally};
+use crate::trig_accuracy::{cells, huge, operands, Exact};
 use fixed::types::{I16F16, I32F32};
 use fulcrum::{FixedFloat32, FixedFloat64};
 use fulcrum_oracle as oracle;
@@ -22,16 +23,6 @@ pub use crate::trig_accuracy::Row;
 
 /// The functions of the table, in order.
 pub const OPS: [&str; 6] = ["log2", "exp2", "ln", "exp", "pow", "powi"];
-
-/// The implementations of the table, in order; `cordic` has only `exp`.
-const IMPS: [&str; 4] = ["fulcrum", "std", "libm", "cordic"];
-
-/// An interval far above the range of a format with `bits` bits, clamped
-/// to `MAX` by [`Exact`].
-fn huge(bits: u32) -> (BigInt, BigInt) {
-    let big = BigInt::one() << (oracle::TRIG_SCALE + bits);
-    (big.clone(), big)
-}
 
 /// The exact value of `op` at raw operands `a` and `b` (the integer of
 /// `powi`).
@@ -98,29 +89,19 @@ fn row(samples: usize, op: &'static str, format: &'static str, frac: u32, bits: 
         .collect();
     let scale = (1u64 << frac) as f64;
     let f = |raw: i128| raw as f64 / scale;
-    let mut cells = [None, None, None, None];
-    for (k, imp) in IMPS.iter().enumerate() {
-        if *imp == "cordic" && op != "exp" {
-            continue;
-        }
-        let mut t = Tally::new();
-        for (&(a, b), e) in args.iter().zip(&exact) {
-            let r = match *imp {
-                "fulcrum" => fulcrum(op, a, b, bits),
-                "cordic" => cordic(a, bits),
-                _ => {
-                    let y = if op == "powi" {
-                        float(op, f(a), b as f64, *imp == "std", bits)
-                    } else {
-                        float(op, f(a), f(b), *imp == "std", bits)
-                    };
-                    round_float(y, frac, bits)
-                }
+    let has = |imp: &str| imp != "cordic" || op == "exp";
+    let cells = cells(&args, &exact, has, |imp, a, b| match imp {
+        "fulcrum" => fulcrum(op, a, b, bits),
+        "cordic" => cordic(a, bits),
+        _ => {
+            let y = if op == "powi" {
+                float(op, f(a), b as f64, imp == "std", bits)
+            } else {
+                float(op, f(a), f(b), imp == "std", bits)
             };
-            t.add(r, e);
+            round_float(y, frac, bits)
         }
-        cells[k] = Some(t.done());
-    }
+    });
     Row { op, format, cells }
 }
 

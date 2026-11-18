@@ -44,7 +44,8 @@ fn exact(num: u128, num_shift: u32, den: u128) -> BigUint {
     n.sqrt()
 }
 
-struct Tally {
+/// Running errors of one implementation of one function.
+pub(crate) struct Tally {
     max: f64,
     sum: f64,
     correct: usize,
@@ -52,13 +53,21 @@ struct Tally {
 }
 
 impl Tally {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             max: 0.0,
             sum: 0.0,
             correct: 0,
             n: 0,
         }
+    }
+
+    /// One result with error `err` in ulps, correctly rounded or not.
+    pub(crate) fn record(&mut self, err: f64, correct: bool) {
+        self.max = self.max.max(err);
+        self.sum += err;
+        self.correct += usize::from(correct);
+        self.n += 1;
     }
 
     fn add(&mut self, r: i128, e: &BigUint) {
@@ -70,13 +79,10 @@ impl Tally {
         };
         let err = u128::try_from(&diff).map_or(f64::INFINITY, |d| d as f64) / (1u64 << K) as f64;
         let nearest = (e + (BigUint::from(1u8) << (K - 1))) >> K;
-        self.max = self.max.max(err);
-        self.sum += err;
-        self.correct += usize::from(r >= 0 && nearest == BigUint::from(r as u128));
-        self.n += 1;
+        self.record(err, r >= 0 && nearest == BigUint::from(r as u128));
     }
 
-    fn done(&self) -> Accuracy {
+    pub(crate) fn done(&self) -> Accuracy {
         Accuracy {
             max: self.max,
             mean: self.sum / self.n as f64,
@@ -103,12 +109,14 @@ fn positives(n: usize, seed: u64, bits: u32) -> Vec<u64> {
         .collect()
 }
 
-fn round_f64(y: f64, frac: u32, max: i64) -> i128 {
+/// A float result rounded to nearest into a format with `frac` fractional
+/// bits and `bits` bits, saturated; `NaN` gives `0`.
+pub(crate) fn round_float(y: f64, frac: u32, bits: u32) -> i128 {
     let r = (y * (1u64 << frac) as f64).round();
-    if r >= max as f64 {
-        max as i128
+    if r.is_nan() {
+        0
     } else {
-        r as i128
+        (r as i128).clamp(-(1i128 << (bits - 1)), (1i128 << (bits - 1)) - 1)
     }
 }
 
@@ -178,7 +186,7 @@ pub fn table(samples: usize) -> Vec<Row> {
                     "rsqrt" => 1.0 / sqrt(f(q16[i])),
                     _ => hypot(f(pairs16[i].0), f(pairs16[i].1)),
                 };
-                t.add(round_f64(y as f64, 16, i32::MAX as i64), e);
+                t.add(round_float(y as f64, 16, 32), e);
             }
             rows.push(Row {
                 op,
@@ -222,7 +230,7 @@ pub fn table(samples: usize) -> Vec<Row> {
                     "rsqrt" => 1.0 / sqrt(f(q32[i])),
                     _ => hypot(f(pairs32[i].0), f(pairs32[i].1)),
                 };
-                t.add(round_f64(y, 32, i64::MAX), e);
+                t.add(round_float(y, 32, 64), e);
             }
             rows.push(Row {
                 op,

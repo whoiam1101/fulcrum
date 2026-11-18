@@ -21,6 +21,7 @@ use num_traits::{One, Signed, ToPrimitive};
 use std::f64::consts::TAU;
 
 pub use crate::accuracy::Accuracy;
+use crate::accuracy::{round_float, Tally};
 
 /// The functions of the table, in order.
 pub const OPS: [&str; 9] = [
@@ -48,44 +49,6 @@ pub struct Row {
     pub format: &'static str,
     /// One entry per implementation of [`IMPS`], `None` where it is absent.
     pub cells: [Option<Accuracy>; 4],
-}
-
-pub(crate) struct Tally {
-    max: f64,
-    sum: f64,
-    correct: usize,
-    n: usize,
-}
-
-impl Tally {
-    pub(crate) fn new() -> Self {
-        Self {
-            max: 0.0,
-            sum: 0.0,
-            correct: 0,
-            n: 0,
-        }
-    }
-
-    pub(crate) fn add(&mut self, r: i128, exact: &Exact) {
-        let shift = oracle::TRIG_SCALE - exact.frac;
-        let got = BigInt::from(r) << shift;
-        let mid: BigInt = (&exact.lo + &exact.hi) >> 1u32;
-        let diff = (&got - &mid).abs() >> (shift - 32);
-        let err = diff.to_f64().unwrap_or(f64::INFINITY) / 4_294_967_296.0;
-        self.max = self.max.max(err);
-        self.sum += err;
-        self.correct += usize::from(exact.nearest.contains(&r));
-        self.n += 1;
-    }
-
-    pub(crate) fn done(&self) -> Accuracy {
-        Accuracy {
-            max: self.max,
-            mean: self.sum / self.n as f64,
-            correct: self.correct as f64 / self.n as f64,
-        }
-    }
 }
 
 /// The oracle interval of one result, clamped to the format, and the values
@@ -117,38 +80,63 @@ impl Exact {
             nearest,
         }
     }
+
+    /// The error of the raw result `r` in ulps, its distance to the middle
+    /// of the interval, and whether `r` is correctly rounded.
+    fn error(&self, r: i128) -> (f64, bool) {
+        let shift = oracle::TRIG_SCALE - self.frac;
+        let got = BigInt::from(r) << shift;
+        let mid: BigInt = (&self.lo + &self.hi) >> 1u32;
+        let diff = (&got - &mid).abs() >> (shift - 32);
+        let err = diff.to_f64().unwrap_or(f64::INFINITY) / 4_294_967_296.0;
+        (err, self.nearest.contains(&r))
+    }
+}
+
+/// An interval far above the range of a format with `bits` bits, clamped
+/// to `MAX` by [`Exact`].
+pub(crate) fn huge(bits: u32) -> (BigInt, BigInt) {
+    let big = BigInt::one() << (oracle::TRIG_SCALE + bits);
+    (big.clone(), big)
+}
+
+/// The accuracy of each implementation of [`IMPS`] that `has` the function,
+/// where `eval(imp, a, b)` is its raw result at the operands `(a, b)`.
+pub(crate) fn cells(
+    args: &[(i128, i128)],
+    exact: &[Exact],
+    has: impl Fn(&str) -> bool,
+    eval: impl Fn(&str, i128, i128) -> i128,
+) -> [Option<Accuracy>; 4] {
+    let mut cells = [None, None, None, None];
+    for (k, imp) in IMPS.iter().enumerate() {
+        if !has(imp) {
+            continue;
+        }
+        let mut t = Tally::new();
+        for (&(a, b), e) in args.iter().zip(exact) {
+            let (err, correct) = e.error(eval(imp, a, b));
+            t.record(err, correct);
+        }
+        cells[k] = Some(t.done());
+    }
+    cells
 }
 
 /// The exact value of `op` at raw operands `a` (and `b` for `atan2`).
 fn exact(op: &str, a: i128, b: i128, frac: u32, bits: u32) -> Exact {
-    let huge = || {
-        let big = BigInt::one() << (oracle::TRIG_SCALE + bits);
-        (big.clone(), big)
-    };
     let v = match op {
         "sin_turns" => oracle::sin_turns(a, frac),
         "cos_turns" => oracle::sin_turns(a + (1 << (frac - 2)), frac),
         "sin" => oracle::sin(a, frac),
         "cos" => oracle::cos(a, frac),
-        "tan" => oracle::tan(a, frac).unwrap_or_else(huge),
+        "tan" => oracle::tan(a, frac).unwrap_or_else(|| huge(bits)),
         "atan" => oracle::atan(a, frac),
         "atan2" => oracle::atan2(a, b),
         "asin" => oracle::asin(a, frac),
         _ => oracle::acos(a, frac),
     };
     Exact::new(v, frac, bits)
-}
-
-/// A float result rounded to nearest into a format with `frac` fractional
-/// bits and `bits` bits, saturated.
-pub(crate) fn round_float(y: f64, frac: u32, bits: u32) -> i128 {
-    let max = ((1i128 << (bits - 1)) - 1) as f64;
-    let r = (y * (1u64 << frac) as f64).round();
-    if r.is_nan() {
-        0
-    } else {
-        r.max(-max - 1.0).min(max) as i128
-    }
 }
 
 /// Raw operands of a format with `frac` fractional bits in `[-2^k, 2^k)`.
@@ -176,25 +164,12 @@ fn row(samples: usize, op: &'static str, format: &'static str, frac: u32, bits: 
             .iter()
             .map(|&(a, b)| exact(op, a, b, frac, bits))
             .collect();
-        let mut cells = [None, None, None, None];
-        for (k, imp) in IMPS.iter().enumerate() {
-            if *imp == "cordic" && (op == "sin_turns" || op == "cos_turns") {
-                continue;
-            }
-            let mut t = Tally::new();
-            for (&(a, b), e) in args.iter().zip(&exact) {
-                let r = match *imp {
-                    "fulcrum" => fulcrum(op, a, b, bits),
-                    "cordic" => cordic(op, a, b, bits),
-                    _ => {
-                        let y = float(op, f(a), f(b), *imp == "std", bits);
-                        round_float(y, frac, bits)
-                    }
-                };
-                t.add(r, e);
-            }
-            cells[k] = Some(t.done());
-        }
+        let has = |imp: &str| imp != "cordic" || (op != "sin_turns" && op != "cos_turns");
+        let cells = cells(&args, &exact, has, |imp, a, b| match imp {
+            "fulcrum" => fulcrum(op, a, b, bits),
+            "cordic" => cordic(op, a, b, bits),
+            _ => round_float(float(op, f(a), f(b), imp == "std", bits), frac, bits),
+        });
         Row { op, format, cells }
     }
 }
