@@ -302,6 +302,29 @@ assert_eq!(ff32!(11).exp(), FixedFloat32::MAX);
 assert_eq!(ff32!(11).checked_exp(), None);
 ```
 
+### Powers: `pow`, `powi`
+
+`x.pow(y)` is `2^(y · log₂ x)` with a logarithm of 120 fractional bits, so the error of the exponent stays far below an ulp for every `y` of the type; `x.powi(n)` is the same for an integer `n: i32`. Both are within 1 ulp on every width (within `½ + 2^-5.7` ulp on `FixedFloat64`, `½ + 2^-37` up to `FixedFloat32`). Every pair of `FixedFloat8` and `FixedFloat16` is checked to be correctly rounded, except where the exact power falls exactly halfway between two values (such as `(3/8)³` on `FixedFloat16`): such a tie may round either way, not always toward `+∞`. On `FixedFloat64` a result within `2^-5.7` ulp of a halfway point, which occurs near `MAX`, may also round the wrong way. A result that is exactly representable comes out exactly.
+
+| Method | Value | Out of the domain or range |
+|---|---|---|
+| `x.pow(y)` | `x^y`; `x^0 = 1` for every `x`; `0^y = 0` for `y > 0`; a negative `x` takes the sign of an odd integer `y` | `0^y` for `y < 0` gives `MAX`; a negative `x` with a non-integer `y` gives `0`; saturates to `MAX` or `MIN` by the sign |
+| `x.checked_pow(y)` | the same | `None` in each of these cases |
+| `x.powi(n)` | `x^n`, `n: i32` | as `pow` |
+| `x.checked_powi(n)` | the same | `None` when the rounded result is out of range or `x = 0`, `n < 0` |
+
+```rust
+use fulcrum::{ff32, FixedFloat32};
+
+assert_eq!(ff32!(4).pow(ff32!(0.5)), ff32!(2));
+assert_eq!(ff32!(2).pow(ff32!(0.5)), FixedFloat32::SQRT_2);
+assert_eq!(ff32!(-2).powi(3), ff32!(-8));
+assert_eq!(ff32!(-2).pow(ff32!(0.5)), ff32!(0));
+assert_eq!(ff32!(-2).checked_pow(ff32!(0.5)), None);
+assert_eq!(ff32!(0).powi(-1), FixedFloat32::MAX);
+assert_eq!(ff32!(10).checked_powi(5), None);
+```
+
 ### Angles: `Angle8` … `Angle64`
 
 An angle kept as every bit of an unsigned integer, the fraction `raw / 2^BITS` of a turn: `Angle8` has 256 steps per turn, `Angle16` 65 536, `Angle32` and `Angle64` steps of `1.46·10⁻⁹` and `3.4·10⁻¹⁹` radians. `+`, `-` and unary `-` wrap modulo a turn, so an angle that keeps turning never needs a range reduction, never saturates, and a sum of rotations does not depend on the order. Each `AngleN` goes with `FixedFloatN`: its sine and cosine are `FixedFloatN`, within 1 ulp (on `Angle8`, `Angle16` and `Angle32` every result is checked to be correctly rounded and equal to `sin_turns` of the same angle).
@@ -536,7 +559,7 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
-- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, `log2`, `exp2`, `ln` and `exp` are within 1 ulp.
+- **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, `log2`, `exp2`, `ln`, `exp`, `pow` and `powi` are within 1 ulp.
 - **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
 - **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
 
