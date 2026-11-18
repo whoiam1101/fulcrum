@@ -653,7 +653,7 @@ flowchart TB
 
 - `define_fixed!` генерирует тип по параметрам `bits`, `ubits`, `int`, `frac`, `frac_bits`, `bytes`, `kernel`, списки `From`/`TryFrom`; всё, что не зависит от ширины, написано один раз в `impl_*!` соседних модулей.
 - Ядро написано в подмножестве Rust, которое понимает Aeneas (свободные функции над примитивами, без трейтов и замыканий), — для Lean-доказательств ядра на последнем этапе плана (L1–L3, ROADMAP).
-- Никаких `asm!`, `target_arch`, `target_pointer_width`, `target_endian` и `f32`/`f64` вне `float.rs` (проверяет `tests/source_rules.rs` и clippy `float_arithmetic = "deny"`); `unsafe` запрещён `#![deny(unsafe_code)]`, кроме двух `unsafe impl` (`Pod`, `Zeroable`) в `pod.rs` за фичей `bytemuck` (тоже проверяет `tests/source_rules.rs`). `usize` есть только в `parse` и `fmt`: счётчики и индексы цифр, ширина и точность из `core::fmt`; на значения он не влияет. Отсюда детерминизм: результат — функция только входных битов.
+- Никаких `asm!`, `target_arch`, `target_pointer_width`, `target_endian` и `f32`/`f64` вне `float.rs` (проверяет `tests/source_rules.rs` и clippy `float_arithmetic = "deny"`); `unsafe` запрещён `#![deny(unsafe_code)]`, кроме `unsafe impl` трейтов `Pod` и `Zeroable` в `pod.rs` за фичей `bytemuck` (тоже проверяет `tests/source_rules.rs`). `usize` — только счётчики и индексы: цифры в `parse` и `fmt`, ширина и точность из `core::fmt`, индексы таблиц в `kernel`, `trig` и `exp` (номер точки меньше 257); на значения он не влияет. Отсюда детерминизм: результат — функция только входных битов.
 
 ---
 

@@ -15,12 +15,11 @@ fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.6.0" }
 
 | Фича | Что даёт |
 |---|---|
-| `alloc` | ничего публичного в 0.1, задел |
-| `std` | `std::error::Error` для `ParseError` и `OverflowError` (включает `alloc`) |
+| `std` | `std::error::Error` для `ParseError` и `OverflowError` |
 | `float-convert` | `to_f64`, `checked_from_f64`, `saturating_from_f64` — для отладки и рендера |
 | `strict-overflow` | операторы паникуют вместо насыщения — только для тестов и CI движка |
 | `serde` | `Serialize`, `Deserialize`: десятичная строка в текстовых форматах, сырое целое в двоичных (§14) |
-| `bytemuck` | `Pod`, `Zeroable` — приведение срезов к байтам; единственный `unsafe` крейта (две реализации трейтов) |
+| `bytemuck` | `Pod`, `Zeroable` — приведение срезов к байтам; единственный `unsafe` крейта (реализации этих двух трейтов) |
 | `num-traits` | `Zero`, `One`, `Bounded`, `Num`, `Signed` |
 
 Всё публичное лежит в корне: `use fulcrum::{ff32, FixedFloat32, FixedFloat};`.
@@ -526,7 +525,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошли `sin_cos` и `atan2`, на этапе 5 — `hypot` и `lerp` для обобщённых векторов.
+Всё остальное (`saturating_*`, `overflowing_*`, `to_int_*`, байты, аккумуляторы, остальные константы) есть только как собственные методы конкретных типов (`const` там, где сказано в §15). Трейт расширяется по мере этапов: на этапе 4 в него вошли `sin_cos` и `atan2`, на этапе 5 — `hypot` и `lerp` для обобщённых векторов, на этапе 6 — `log2`, `exp2`, `ln`, `exp`, `pow` и `powi`.
 
 ## 12. `strict-overflow`
 

@@ -15,12 +15,11 @@ The crate is `no_std`, has no required dependencies, MSRV 1.60, and no `unsafe` 
 
 | Feature | What it adds |
 |---|---|
-| `alloc` | nothing public in 0.1, reserved |
-| `std` | `std::error::Error` for `ParseError` and `OverflowError` (enables `alloc`) |
+| `std` | `std::error::Error` for `ParseError` and `OverflowError` |
 | `float-convert` | `to_f64`, `checked_from_f64`, `saturating_from_f64`, for debugging and rendering |
 | `strict-overflow` | operators panic instead of saturating, for tests and CI of an engine only |
 | `serde` | `Serialize`, `Deserialize`: a decimal string in human-readable formats, the raw integer in binary ones (§14) |
-| `bytemuck` | `Pod`, `Zeroable`, for casting slices to bytes; the only `unsafe` of the crate (two trait impls) |
+| `bytemuck` | `Pod`, `Zeroable`, for casting slices to bytes; the only `unsafe` of the crate (the impls of these two traits) |
 | `num-traits` | `Zero`, `One`, `Bounded`, `Num`, `Signed` |
 
 Everything public is at the crate root: `use fulcrum::{ff32, FixedFloat32, FixedFloat};`.
@@ -526,7 +525,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` and `atan2` joined in stage 4, `hypot` and `lerp` in stage 5 for the generic vectors.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` and `atan2` joined in stage 4, `hypot` and `lerp` in stage 5 for the generic vectors, `log2`, `exp2`, `ln`, `exp`, `pow` and `powi` in stage 6.
 
 ## 12. `strict-overflow`
 
