@@ -9,7 +9,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 3 | `sqrt`, `rsqrt`, `hypot` | `v0.3.0` | ✅ done |
 | 4 | Trigonometry and angle types | `v0.4.0` | ✅ done |
 | 5 | `Vec2`, `Vec3` | `v0.5.0` | ✅ done |
-| 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | in progress |
+| 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | ✅ done |
 | 7 | Batch operations, optimizations | `v0.7.0` | |
 | 8 | Lean proofs of the kernel, API freeze | `v1.0.0` | |
 | — | `FixedFloat128`, `FixedFloat256`, only on demand | after `1.0` | deferred |
@@ -140,7 +140,7 @@ Speed:
 - [ ] `length` and `rotate`: the roots and the 62-bit sine dominate; measure against an `isqrt` without division (the item of [Between 3 and 4](#between-3-and-4-v03x)).
 - [ ] Vector operations in the instruction-count gate (`bench/benches/instr.rs`).
 
-## 6. Exponentials and logarithms `v0.6.0`
+## 6. Exponentials and logarithms ✅ `v0.6.0`
 
 - [x] `log2`, `checked_log2` (`x ≤ 0`: `MIN`, `None`): the exponent of the argument, `log₂ c` of a table of `log₂(1 + k/256)` (256 points, 62 bits, `src/tables/exp.rs`) at the point just below the mantissa, and three terms of `2·log₂ e · atanh s` of the exact `s = (u - c)/(u + c) < 2^-9`, rounded once; error below `2^-59`, so within `½ + 2^-27` ulp (INTERNALS §3.16).
 - [x] `exp2`, `checked_exp2` (saturating to `MAX`): `x = n + t` by a mask, `2^(k/256)` of a table at 126 bits times `e^y` of the remainder, `y < 2^-8.5`, by seven terms at 72 bits, shifted by `n` and rounded once; within `½ + 2^-7.5` ulp on `FixedFloat64`, `½ + 2^-39` up to `FixedFloat32`. Exact on integers `≥ -FRAC_BITS`.
@@ -149,18 +149,18 @@ Speed:
 - [x] `exp`, `checked_exp` (saturating to `MAX`, `0` from `x ≤ -2·FRAC_BITS`): an exact reduction `x = j · ln 2/256 + y` at 112 bits, `j` from the product with `2·log₂ e` and one correction, then the table `2^(k/256)` and the series of `exp2`; the same bound as `exp2`, exact at `0` (INTERNALS §3.16).
 - Every result of `ln` and `exp` of `FixedFloat8`, `FixedFloat16` and `FixedFloat32` is correctly rounded and both are monotone (exhaustive, against `tests/common/exp.rs`: `ln` without the binary logarithm, `exp` reduced by a division by `ln 2` with the full series); the interval oracle on every width (its `exp` is the series of the whole argument, without a reduction); the fuzz target `ops`; `GOLDEN_EXP` extended; Kani `exp_no_panic_64`, `ln_no_panic_64`.
 - [x] `pow`, `checked_pow`, `powi`, `checked_powi`: `2^(y · log₂ x)` with a wide `log₂ x` of 120 fractional bits (a 126-bit table of `log₂(1 + k/256)`, `s` at 128 bits, seven terms, error below `1.05 · 2^-120`), the product with `y` exact up to `2^-120`, then the tail of `exp2`; within `½ + 2^-5.7` ulp on `FixedFloat64`, `½ + 2^-37` up to `FixedFloat32`. `x^0 = 1`, `0^(y<0)` saturates, a negative base takes the sign of an odd integer exponent and gives `0`/`None` for a non-integer one; an exact power halfway between two values may round either way (INTERNALS §3.16).
-- `pow` and `powi` within 1 ulp, and correctly rounded wherever the reference of `tests/common/exp.rs` decides (not on `FixedFloat64`, where results within `2^-5.7` ulp of a halfway point near `MAX` may round the wrong way); `powi` against exact integer powers on `i128` on 16, 32 and 64 bits: every pair of `FixedFloat8` and (weekly) of `FixedFloat16`, `powi` on every value of 8 and 16 bits, random pairs of 16 and 32 bits; the interval oracle on every width; the fuzz target `ops`; `GOLDEN_EXP` extended; Kani `pow_no_panic_64` (convergence not yet seen: two `u128` divisions and a chain of 256-bit products).
+- `pow` and `powi` within 1 ulp, and correctly rounded wherever the reference of `tests/common/exp.rs` decides (not on `FixedFloat64`, where results within `2^-5.7` ulp of a halfway point near `MAX` may round the wrong way); `powi` against exact integer powers on `i128` on 16, 32 and 64 bits: every pair of `FixedFloat8` and (weekly) of `FixedFloat16`, `powi` on every value of 8 and 16 bits, random pairs of 16 and 32 bits; the interval oracle on every width; the fuzz target `ops`; `GOLDEN_EXP` extended; Kani `pow_no_panic_64`.
 - [x] `log2`, `exp2`, `ln`, `exp`, `pow`, `powi` in the `FixedFloat` trait (the saturating forms, as `sqrt` and `atan2`).
-- [x] Benchmarks of `log2`, `exp2`, `ln`, `exp`, `pow`, `powi` on `FixedFloat32` and `FixedFloat64` against `libm` and the `std` floats, and of `exp` against `cordic`, its only function of the group (`fixed` has only integer logarithms, `int_log2` and `int_log10`; `bench/benches/ops.rs`); the accuracy table against the 256-bit oracle (`bench/src/exp_accuracy.rs`); `exp`, `ln` and `pow` in the determinism table (`bench/src/bin/determinism.rs`). A local run on x86-64: 5–9 ns for `log2`, `exp2`, `ln`, `exp`, 1.2–3.8× slower than `libm` except `log2` of `FixedFloat64` (1.19× faster), `exp` 1.25× and 14× faster than `cordic`; `pow` and `powi` 46–47 ns, 1.1–1.6× slower than `libm`, dominated by the two `u128` divisions of the wide logarithm; fulcrum correctly rounded on every sample of the accuracy table, the floats up to thousands of ulps off (`powi` of `std`: 1148 ulps on `Q16.16`, 6660 on `Q32.32`).
+- [x] Benchmarks of `log2`, `exp2`, `ln`, `exp`, `pow`, `powi` on `FixedFloat32` and `FixedFloat64` against `libm` and the `std` floats, and of `exp` against `cordic`, its only function of the group (`fixed` has only integer logarithms, `int_log2` and `int_log10`; `bench/benches/ops.rs`); the accuracy table against the 256-bit oracle (`bench/src/exp_accuracy.rs`); `exp`, `ln` and `pow` in the determinism table (`bench/src/bin/determinism.rs`). Result on the CI runner (x86-64): 8–12 ns for `log2`, `exp2`, `ln`, `exp`, 1.08–5.7× slower than `libm`, `exp` 1.16× and 10.4× faster than `cordic`; `pow` and `powi` 50–53 ns, 1.5–1.9× slower than `libm`, dominated by the two `u128` divisions of the wide logarithm; fulcrum correctly rounded on every sample of the accuracy table, the floats up to thousands of ulps off (`powi` of `std`: 1148 ulps on `Q16.16`, 6660 on `Q32.32`); `exp`, `ln` and `pow` of fulcrum and `libm` bit for bit the same on Linux ARM64, macOS and Windows, of `std` not.
 
 **Done when:** ≤ 2 ulp on every type against a high-precision reference.
 **Verified by:** exhaustive check of all 2³² `FixedFloat32` values for `exp2` and `log2`, the interval oracle, error bounds derived in INTERNALS and proven in Lean in stage 8. Sollya may be used once by hand to choose minimax coefficients: a design tool, not a check.
 
 Checked before the tag `v0.6.0`:
-- [ ] Every Kani harness of the stage passes in the weekly shard `_64` (`exp2_no_panic_64`, `log2_no_panic_64`, `exp_no_panic_64`, `ln_no_panic_64`, `pow_no_panic_64`), run outside the developer machine; a harness that does not converge is removed and recorded (ARCHITECTURE §10).
-- [ ] The weekly exhaustive jobs `exp` (every `FixedFloat32` value of the four functions) and `pow` (every pair of `FixedFloat16`) pass in release with overflow checks.
-- [ ] `GOLDEN_EXP` is the same on x86-64, ARM64 and 32-bit x86 in debug and release.
-- [ ] The bench workflow puts the speed, accuracy and determinism tables of the stage into the README.
+- [x] Every Kani harness of the stage passes in the weekly shard `_64` (`exp2_no_panic_64`, `log2_no_panic_64`, `exp_no_panic_64`, `ln_no_panic_64`, `pow_no_panic_64`), run outside the developer machine; a harness that does not converge is removed and recorded (ARCHITECTURE §10).
+- [x] The weekly exhaustive jobs `exp` (every `FixedFloat32` value of the four functions) and `pow` (every pair of `FixedFloat16`) pass in release with overflow checks.
+- [x] `GOLDEN_EXP` is the same on x86-64, ARM64 and 32-bit x86 in debug and release.
+- [x] The bench workflow puts the speed, accuracy and determinism tables of the stage into the README.
 - Moved to stage 7: `pow` without the two `u128` divisions of the wide logarithm (a reciprocal of `u + c` by multiplication, or a table of `1/c`), the gap to `libm` above.
 
 ## 7. Batch operations `v0.7.0`
