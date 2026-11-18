@@ -1,7 +1,9 @@
 //! Shared inputs for the benchmarks: deterministic pseudo-random operands,
-//! and the accuracy tables of the square roots and of trigonometry.
+//! and the accuracy tables of the square roots, of trigonometry and of the
+//! exponentials and logarithms.
 
 pub mod accuracy;
+pub mod exp_accuracy;
 pub mod tick;
 pub mod trig_accuracy;
 

@@ -30,6 +30,13 @@
 //! `sin(τ·x)` for the functions in turns) and the `cordic` crate on the
 //! `fixed` types of the same format (it has no functions in turns).
 //!
+//! Exponentials and logarithms are measured for throughput: `log2` and `ln`
+//! on `(0, 256)`, `exp2` and `exp` on `[-2, 2)`, `pow` of a base in
+//! `(0, 4)` to an exponent in `[-2, 2)`, `powi` of a base in `[-2, 2)` to an
+//! integer in `[-8, 8]`, against `libm` (its `pow` for `powi`), the `std`
+//! floats and the `exp` of the `cordic` crate, its only function of the
+//! group; `fixed` has only integer logarithms.
+//!
 //! Vectors: `dot`, `length`, `normalize`, `distance_sq`, `rotate`,
 //! `angle_to` and `clamp_length` of `Vec2` and `cross`, `length`,
 //! `normalize` of `Vec3` for throughput, coordinates in `[-2, 2)`, against
@@ -477,13 +484,13 @@ fn roots(c: &mut Criterion) {
 }
 
 /// One benchmark of a function of one or two operands over 4096 values.
-fn bench_trig_one<T: Copy, R: Clone + Default>(
+fn bench_trig_one<T: Copy, U: Copy, R: Clone + Default>(
     g: &mut criterion::BenchmarkGroup<criterion::measurement::WallTime>,
     op: &str,
     name: &str,
     a: &[T],
-    b: &[T],
-    f: impl Fn(T, T) -> R,
+    b: &[U],
+    f: impl Fn(T, U) -> R,
 ) {
     let mut out: Vec<R> = vec![R::default(); a.len()];
     g.bench_function(BenchmarkId::new(op, name), |bn| {
@@ -574,6 +581,70 @@ fn trig(c: &mut Criterion) {
         sin: cordic::sin::<I32F32>, cos: cordic::cos::<I32F32>, tan: cordic::tan::<I32F32>,
         atan: cordic::atan::<I32F32>, atan2: cordic::atan2::<I32F32>,
         asin: cordic::asin::<I32F32>, acos: cordic::acos::<I32F32>);
+}
+
+/// The exponentials and logarithms of one implementation; `cordic` has only
+/// `exp`.
+macro_rules! bench_exp_log {
+    ($c:expr, $name:literal, $T:ty, $make:expr,
+     $(log2: $log2:expr, exp2: $exp2:expr, ln: $ln:expr,)?
+     exp: $exp:expr
+     $(, pow: $pow:expr, powi: $powi:expr)?) => {{
+        let make = $make;
+        let a: Vec<$T> = inputs(N, 14).into_iter().map(|x| make(operand(x))).collect();
+        let mut gr = $c.benchmark_group("throughput");
+        gr.throughput(Throughput::Elements(N as u64));
+        $(
+            let p: Vec<$T> = inputs(N, 15).into_iter().map(|x| make(radicand(x))).collect();
+            let (log2, exp2, ln) = ($log2, $exp2, $ln);
+            bench_trig_one(&mut gr, "log2", $name, &p, &a, |x: $T, _| log2(x));
+            bench_trig_one(&mut gr, "exp2", $name, &a, &a, |x: $T, _| exp2(x));
+            bench_trig_one(&mut gr, "ln", $name, &p, &a, |x: $T, _| ln(x));
+        )?
+        let exp = $exp;
+        bench_trig_one(&mut gr, "exp", $name, &a, &a, |x: $T, _| exp(x));
+        $(
+            let g: Vec<$T> = inputs(N, 16).into_iter().map(|x| make((radicand(x) >> 6) | 1)).collect();
+            let n: Vec<i32> = inputs(N, 17).into_iter().map(|x| (x % 17) as i32 - 8).collect();
+            let (pow, powi) = ($pow, $powi);
+            bench_trig_one(&mut gr, "pow", $name, &g, &a, |x: $T, y: $T| pow(x, y));
+            bench_trig_one(&mut gr, "powi", $name, &a, &n, |x: $T, k: i32| powi(x, k));
+        )?
+        gr.finish();
+    }};
+}
+
+fn exp_log(c: &mut Criterion) {
+    use fixed::types::{I16F16, I32F32};
+    bench_exp_log!(c, "fulcrum/FixedFloat32", FixedFloat32, ff32,
+        log2: |x: FixedFloat32| x.log2(), exp2: |x: FixedFloat32| x.exp2(), ln: |x: FixedFloat32| x.ln(),
+        exp: |x: FixedFloat32| x.exp(),
+        pow: |x: FixedFloat32, y| x.pow(y), powi: |x: FixedFloat32, n| x.powi(n));
+    bench_exp_log!(c, "fulcrum/FixedFloat64", FixedFloat64, ff64,
+        log2: |x: FixedFloat64| x.log2(), exp2: |x: FixedFloat64| x.exp2(), ln: |x: FixedFloat64| x.ln(),
+        exp: |x: FixedFloat64| x.exp(),
+        pow: |x: FixedFloat64, y| x.pow(y), powi: |x: FixedFloat64, n| x.powi(n));
+    let n32 = |q: i64| to_f64(q) as f32;
+    bench_exp_log!(c, "libm/f32", f32, n32,
+        log2: libm::log2f, exp2: libm::exp2f, ln: libm::logf,
+        exp: libm::expf,
+        pow: libm::powf, powi: |x: f32, n: i32| libm::powf(x, n as f32));
+    bench_exp_log!(c, "libm/f64", f64, to_f64,
+        log2: libm::log2, exp2: libm::exp2, ln: libm::log,
+        exp: libm::exp,
+        pow: libm::pow, powi: |x: f64, n: i32| libm::pow(x, f64::from(n)));
+    bench_exp_log!(c, "native/f32", f32, n32,
+        log2: |x: f32| x.log2(), exp2: |x: f32| x.exp2(), ln: |x: f32| x.ln(),
+        exp: |x: f32| x.exp(),
+        pow: |x: f32, y| x.powf(y), powi: |x: f32, n| x.powi(n));
+    bench_exp_log!(c, "native/f64", f64, to_f64,
+        log2: |x: f64| x.log2(), exp2: |x: f64| x.exp2(), ln: |x: f64| x.ln(),
+        exp: |x: f64| x.exp(),
+        pow: |x: f64, y| x.powf(y), powi: |x: f64, n| x.powi(n));
+    bench_exp_log!(c, "cordic/I16F16", I16F16, |q: i64| I16F16::from_bits(q as i32),
+        exp: cordic::exp::<I16F16>);
+    bench_exp_log!(c, "cordic/I32F32", I32F32, |q: i64| I32F32::from_bits(q32_32(q)),
+        exp: cordic::exp::<I32F32>);
 }
 
 /// The vector functions of one implementation over 4096 pairs of vectors:
@@ -723,5 +794,5 @@ fn tick(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, ops, combined, roots, trig, vectors, tick);
+criterion_group!(benches, ops, combined, roots, trig, exp_log, vectors, tick);
 criterion_main!(benches);

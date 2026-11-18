@@ -50,7 +50,7 @@ pub struct Row {
     pub cells: [Option<Accuracy>; 4],
 }
 
-struct Tally {
+pub(crate) struct Tally {
     max: f64,
     sum: f64,
     correct: usize,
@@ -58,7 +58,7 @@ struct Tally {
 }
 
 impl Tally {
-    fn new() -> Self {
+    pub(crate) fn new() -> Self {
         Self {
             max: 0.0,
             sum: 0.0,
@@ -67,7 +67,7 @@ impl Tally {
         }
     }
 
-    fn add(&mut self, r: i128, exact: &Exact) {
+    pub(crate) fn add(&mut self, r: i128, exact: &Exact) {
         let shift = oracle::TRIG_SCALE - exact.frac;
         let got = BigInt::from(r) << shift;
         let mid: BigInt = (&exact.lo + &exact.hi) >> 1u32;
@@ -79,7 +79,7 @@ impl Tally {
         self.n += 1;
     }
 
-    fn done(&self) -> Accuracy {
+    pub(crate) fn done(&self) -> Accuracy {
         Accuracy {
             max: self.max,
             mean: self.sum / self.n as f64,
@@ -90,7 +90,7 @@ impl Tally {
 
 /// The oracle interval of one result, clamped to the format, and the values
 /// of the format that round it: one when the interval decides the rounding.
-struct Exact {
+pub(crate) struct Exact {
     lo: BigInt,
     hi: BigInt,
     frac: u32,
@@ -98,7 +98,7 @@ struct Exact {
 }
 
 impl Exact {
-    fn new((lo, hi): (BigInt, BigInt), frac: u32, bits: u32) -> Self {
+    pub(crate) fn new((lo, hi): (BigInt, BigInt), frac: u32, bits: u32) -> Self {
         let shift = oracle::TRIG_SCALE - frac;
         let max: BigInt = ((BigInt::one() << (bits - 1)) - 1) << shift;
         let min: BigInt = -(BigInt::one() << (bits - 1)) << shift;
@@ -141,7 +141,7 @@ fn exact(op: &str, a: i128, b: i128, frac: u32, bits: u32) -> Exact {
 
 /// A float result rounded to nearest into a format with `frac` fractional
 /// bits and `bits` bits, saturated.
-fn round_float(y: f64, frac: u32, bits: u32) -> i128 {
+pub(crate) fn round_float(y: f64, frac: u32, bits: u32) -> i128 {
     let max = ((1i128 << (bits - 1)) - 1) as f64;
     let r = (y * (1u64 << frac) as f64).round();
     if r.is_nan() {
@@ -152,7 +152,7 @@ fn round_float(y: f64, frac: u32, bits: u32) -> i128 {
 }
 
 /// Raw operands of a format with `frac` fractional bits in `[-2^k, 2^k)`.
-fn operands(n: usize, seed: u64, frac: u32, k: u32) -> Vec<i128> {
+pub(crate) fn operands(n: usize, seed: u64, frac: u32, k: u32) -> Vec<i128> {
     inputs(n, seed)
         .into_iter()
         .map(|x| ((x as i64) >> (63 - frac - k)) as i128)

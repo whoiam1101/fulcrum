@@ -71,6 +71,17 @@ const TRIG: [(&str, &str, bool); 9] = [
     ("acos", "`acos`", true),
 ];
 
+/// Exponentials, logarithms and powers: id, label, and whether `cordic` has
+/// it.
+const EXP_LOG: [(&str, &str, bool); 6] = [
+    ("log2", "`log2`", false),
+    ("exp2", "`exp2`", false),
+    ("ln", "`ln`", false),
+    ("exp", "`exp`", true),
+    ("pow", "`pow`", false),
+    ("powi", "`powi`", false),
+];
+
 /// fulcrum type, its float, its `fixed` type for `cordic`, and the format.
 const TRIG_GROUPS: [(&str, &str, &str, &str); 2] = [
     ("FixedFloat32", "f32", "I16F16", "Q16.16"),
@@ -107,6 +118,10 @@ const TICK: [(&str, &str, &str); 5] = [
 /// Operands per function and implementation in the trigonometry accuracy
 /// table; each needs the 256-bit oracle.
 const TRIG_ACCURACY_SAMPLES: usize = 20_000;
+
+/// Operands per function and implementation in the accuracy table of the
+/// exponentials and logarithms; each needs the 256-bit oracle.
+const EXP_ACCURACY_SAMPLES: usize = 20_000;
 
 /// Operands per function and implementation in the accuracy table.
 const ACCURACY_SAMPLES: usize = 100_000;
@@ -152,7 +167,7 @@ fn expected() -> Vec<String> {
             ids.push(id("throughput", op, "native", float));
         }
     }
-    for (op, _, cordic) in TRIG {
+    for (op, _, cordic) in TRIG.iter().chain(EXP_LOG.iter()).copied() {
         for (ours, float, fixed, _) in TRIG_GROUPS {
             ids.push(id("throughput", op, "fulcrum", ours));
             ids.push(id("throughput", op, "libm", float));
@@ -507,14 +522,19 @@ impl Report {
         }
     }
 
-    fn trig_table(&self, s: &mut String, group: (&str, &str, &str, &str)) {
+    fn float_table(
+        &self,
+        s: &mut String,
+        group: (&str, &str, &str, &str),
+        ops: &[(&str, &str, bool)],
+    ) {
         let (ours, float, fixed, format) = group;
         let _ = writeln!(
             s,
             "| {} | `{}` | `libm` `{}` | `std` `{}` | `cordic` `{}` | `{}` vs `libm` | `{}` vs `cordic` |\n|---|---:|---:|---:|---:|---|---|",
             format, ours, float, float, fixed, ours, ours
         );
-        for (op, label, cordic) in TRIG {
+        for &(op, label, cordic) in ops {
             let theirs = if cordic {
                 ns(self.get("throughput", op, "cordic", fixed).ns)
             } else {
@@ -713,8 +733,8 @@ impl Report {
         }
 
         for (ours, float, fixed, _) in TRIG_GROUPS {
-            let count = |imp: &str, ty: &str| {
-                let v: Vec<Verdict> = TRIG
+            let count = |ops: &[(&str, &str, bool)], imp: &str, ty: &str| {
+                let v: Vec<Verdict> = ops
                     .iter()
                     .filter(|&&(_, _, cordic)| imp != "cordic" || cordic)
                     .map(|&(op, _, _)| self.vs_float(op, ours, imp, ty))
@@ -734,9 +754,18 @@ impl Report {
                 "- **Trigonometry**, `{}`: against `libm` `{}` {}; against `cordic` `{}` {} (fulcrum within 1 ulp, see the accuracy table).",
                 ours,
                 float,
-                count("libm", float),
+                count(&TRIG, "libm", float),
                 fixed,
-                count("cordic", fixed)
+                count(&TRIG, "cordic", fixed)
+            );
+            let _ = writeln!(
+                s,
+                "- **Exponentials and logarithms**, `{}`: against `libm` `{}` {}; `exp` against `cordic` `{}` {} (fulcrum within 1 ulp, see the accuracy table).",
+                ours,
+                float,
+                count(&EXP_LOG, "libm", float),
+                fixed,
+                verdict_text(self.vs_float("exp", ours, "cordic", fixed))
             );
         }
 
@@ -801,7 +830,17 @@ impl Report {
              fulcrum is within 1 ulp everywhere; `cordic` is the CORDIC crate on the `fixed` types of the same format.\n\n",
         );
         for group in TRIG_GROUPS {
-            self.trig_table(&mut s, group);
+            self.float_table(&mut s, group, &TRIG);
+            s.push('\n');
+        }
+        s.push_str("### Exponentials and logarithms, ns per operation (throughput)\n\n");
+        s.push_str(
+            "`log2` and `ln` on `(0, 256)`, `exp2` and `exp` on `[-2, 2)`, `pow` of a base in `(0, 4)` to an exponent in `[-2, 2)`, \
+             `powi` of a base in `[-2, 2)` to an integer in `[-8, 8]`. fulcrum is within 1 ulp everywhere. \
+             `libm` has no `powi` and computes `pow` with the integer as a float; `cordic` has only `exp`, `fixed` only integer logarithms.\n\n",
+        );
+        for group in TRIG_GROUPS {
+            self.float_table(&mut s, group, &EXP_LOG);
             s.push('\n');
         }
         s.push_str("### Vectors, ns per operation (throughput)\n\n");
@@ -825,6 +864,8 @@ impl Report {
         accuracy_table(&mut s);
         s.push_str("\n### Accuracy of trigonometry\n\n");
         trig_accuracy_table(&mut s);
+        s.push_str("\n### Accuracy of exponentials and logarithms\n\n");
+        exp_accuracy_table(&mut s);
         if let Some(table) = determinism {
             s.push('\n');
             s.push_str(DETERMINISM_HEADING);
@@ -889,9 +930,28 @@ fn accuracy_table(s: &mut String) {
     }
 }
 
+/// The rows of an accuracy table against the interval oracle: the largest
+/// error and the share of correctly rounded results of fulcrum, `std`,
+/// `libm` and `cordic`, `—` where an implementation lacks the function.
+fn float_accuracy_rows(s: &mut String, rows: &[fulcrum_bench::trig_accuracy::Row]) {
+    s.push_str("| Function | Format | fulcrum | `std` | `libm` | `cordic` |\n|---|---|---:|---:|---:|---:|\n");
+    for row in rows {
+        let _ = write!(s, "| `{}` | {}", row.op, row.format);
+        for cell in &row.cells {
+            match cell {
+                Some(a) => {
+                    let _ = write!(s, " | {:.3}, {:.2}%", a.max, 100.0 * a.correct);
+                }
+                None => s.push_str(" | —"),
+            }
+        }
+        s.push_str(" |\n");
+    }
+}
+
 /// The accuracy table of `fulcrum_bench::trig_accuracy`.
 fn trig_accuracy_table(s: &mut String) {
-    use fulcrum_bench::trig_accuracy::{table, IMPS};
+    use fulcrum_bench::trig_accuracy::table;
     let _ = writeln!(
         s,
         "Error in ulps of the fixed-point format against the 256-bit interval oracle, clamped to the range, over {} operands per row; \
@@ -902,19 +962,24 @@ fn trig_accuracy_table(s: &mut String) {
          Generated by [`bench/src/trig_accuracy.rs`](bench/src/trig_accuracy.rs).\n",
         TRIG_ACCURACY_SAMPLES
     );
-    s.push_str("| Function | Format | fulcrum | `std` | `libm` | `cordic` |\n|---|---|---:|---:|---:|---:|\n");
-    for row in table(TRIG_ACCURACY_SAMPLES) {
-        let _ = write!(s, "| `{}` | {}", row.op, row.format);
-        for (k, _) in IMPS.iter().enumerate() {
-            match row.cells[k] {
-                Some(a) => {
-                    let _ = write!(s, " | {:.3}, {:.2}%", a.max, 100.0 * a.correct);
-                }
-                None => s.push_str(" | —"),
-            }
-        }
-        s.push_str(" |\n");
-    }
+    float_accuracy_rows(s, &table(TRIG_ACCURACY_SAMPLES));
+}
+
+/// The accuracy table of `fulcrum_bench::exp_accuracy`.
+fn exp_accuracy_table(s: &mut String) {
+    use fulcrum_bench::exp_accuracy::table;
+    let _ = writeln!(
+        s,
+        "Error in ulps of the fixed-point format against the 256-bit interval oracle, clamped to the range, over {} operands per row; \
+         each cell is the largest error and the share of correctly rounded results (an exact power halfway between two values counts with either). \
+         `log2` and `ln` on `(0, 256)`, `exp2` and `exp` on `[-8, 8)`, `pow` of a base in `(0, 4)` to an exponent in `[-4, 4)`, \
+         `powi` of a base in `[-2, 2)` to an integer in `[-16, 16]`. \
+         Floats (`f32` for Q16.16, `f64` for Q32.32) get the operand exactly and their result rounded to nearest into the format; \
+         `libm` computes `powi` as `pow`. `cordic` is the CORDIC crate on `I16F16` and `I32F32`, which has only `exp`. \
+         Generated by [`bench/src/exp_accuracy.rs`](bench/src/exp_accuracy.rs).\n",
+        EXP_ACCURACY_SAMPLES
+    );
+    float_accuracy_rows(s, &table(EXP_ACCURACY_SAMPLES));
 }
 
 /// The determinism table of the current README section, so that a run
