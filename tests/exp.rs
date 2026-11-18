@@ -515,3 +515,30 @@ mod exp_random {
     use super::*;
     for_each_width!(exp_random_values!());
 }
+
+/// The six functions of stage 6 through the `FixedFloat` trait.
+fn generic_exp_log<T: FixedFloat>(x: T, y: T, n: i32) -> [T; 6] {
+    [x.log2(), x.exp2(), x.ln(), x.exp(), x.pow(y), x.powi(n)]
+}
+
+macro_rules! trait_equals_inherent {
+    ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
+        #[test]
+        fn $module() {
+            let mut rng = Pcg32::new(83, $bits);
+            for _ in 0..20_000 {
+                let x = $T::from_bits(rng.edge_bits($bits, $f) as $Raw);
+                let y =
+                    $T::from_bits((rng.edge_bits($bits, $f) as $Raw) >> (rng.next_u32() % $bits));
+                let n = (rng.next_u32() % 64) as i32 - 32;
+                let inherent = [x.log2(), x.exp2(), x.ln(), x.exp(), x.pow(y), x.powi(n)];
+                assert_eq!(generic_exp_log(x, y, n), inherent, "{:?} {:?} {}", x, y, n);
+            }
+        }
+    };
+}
+
+mod trait_exp_log {
+    use super::*;
+    for_each_width!(trait_equals_inherent!());
+}

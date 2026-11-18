@@ -1054,6 +1054,30 @@ macro_rules! define_fixed {
                 Self::lerp(self, other, t)
             }
             #[inline]
+            fn log2(self) -> Self {
+                Self::log2(self)
+            }
+            #[inline]
+            fn exp2(self) -> Self {
+                Self::exp2(self)
+            }
+            #[inline]
+            fn ln(self) -> Self {
+                Self::ln(self)
+            }
+            #[inline]
+            fn exp(self) -> Self {
+                Self::exp(self)
+            }
+            #[inline]
+            fn pow(self, y: Self) -> Self {
+                Self::pow(self, y)
+            }
+            #[inline]
+            fn powi(self, n: i32) -> Self {
+                Self::powi(self, n)
+            }
+            #[inline]
             fn __det(a: Self, b: Self, c: Self, d: Self) -> Self {
                 Self::saturate(crate::kernel::$k::det(a.raw, b.raw, c.raw, d.raw))
             }

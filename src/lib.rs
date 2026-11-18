@@ -251,6 +251,25 @@ pub trait FixedFloat:
     /// `self + (other - self) · t`, rounded once and saturated.
     #[must_use]
     fn lerp(self, other: Self, t: Self) -> Self;
+    /// `log₂(self)` within 1 ulp; `self ≤ 0` gives `MIN`.
+    #[must_use]
+    fn log2(self) -> Self;
+    /// `2^self` within 1 ulp, saturated.
+    #[must_use]
+    fn exp2(self) -> Self;
+    /// `ln(self)` within 1 ulp; `self ≤ 0` gives `MIN`.
+    #[must_use]
+    fn ln(self) -> Self;
+    /// `e^self` within 1 ulp, saturated.
+    #[must_use]
+    fn exp(self) -> Self;
+    /// `self^y` within 1 ulp, saturated; a negative `self` with a `y` that
+    /// is not an integer gives `0`.
+    #[must_use]
+    fn pow(self, y: Self) -> Self;
+    /// `self^n` within 1 ulp, saturated.
+    #[must_use]
+    fn powi(self, n: i32) -> Self;
     #[doc(hidden)]
     fn __dot(a: &[Self], b: &[Self]) -> Self;
     #[doc(hidden)]
