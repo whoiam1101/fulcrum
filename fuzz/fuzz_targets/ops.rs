@@ -5,8 +5,11 @@
 //! ulp of the interval oracle, its `to_radians` and `from_radians` equal it
 //! where it decides the rounding; `exp2`, `exp` (clamped to the range),
 //! `log2` and `ln` are within 1 ulp of the interval oracle, `MAX` and `MIN`
-//! with `checked_*` `None` outside it, `exp` far below the range `0`; `+`,
-//! `-` saturate exactly; `%` is exact.
+//! with `checked_*` `None` outside it, `exp` far below the range `0`; `pow`
+//! and `powi` of a positive base (clamped to the range) are within 1 ulp of
+//! the interval oracle, `MAX` beyond it, and of a negative base `±|x|^y` by
+//! the parity of an integer `y`, `0` and `None` for any other `y`; `+`, `-` saturate exactly; `%` is
+//! exact.
 
 #![no_main]
 
@@ -159,6 +162,37 @@ macro_rules! check {
                     max
                 ));
                 assert_eq!(x.checked_exp().unwrap_or($T::MAX), x.exp());
+            }
+            if a < 0 && a != <$Bits>::MIN {
+                let (p, q) = ($T::from_bits(-a), $T::from_bits(b & !((1 << $frac) - 1)));
+                let odd = (b >> $frac) & 1 == 1;
+                let sign = |v: $T| if odd { -v } else { v };
+                if b & ((1 << $frac) - 1) != 0 {
+                    assert_eq!((x.pow(y), x.checked_pow(y)), ($T::ZERO, None));
+                }
+                if b != 0 && p.pow(q) != $T::MAX {
+                    assert_eq!(x.pow(q), sign(p.pow(q)));
+                }
+            }
+            if a > 0 {
+                let n = (b as i64 % 70) as i32;
+                let cases = [
+                    (b as i128, $frac, x.pow(y), x.checked_pow(y)),
+                    (i128::from(n), 0, x.powi(n), x.checked_powi(n)),
+                ];
+                for (e, frac_e, got, checked) in cases {
+                    if e == 0 {
+                        assert_eq!((got, checked), ($T::ONE, Some($T::ONE)));
+                        continue;
+                    }
+                    match fulcrum_oracle::pow(a as i128, $frac, e, frac_e) {
+                        Some(exact) => {
+                            assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+                            assert_eq!(checked.unwrap_or($T::MAX), got);
+                        }
+                        None => assert_eq!((got, checked), ($T::MAX, None)),
+                    }
+                }
             }
             assert_eq!((x + y).to_bits(), a.saturating_add(b));
             assert_eq!((x - y).to_bits(), a.saturating_sub(b));

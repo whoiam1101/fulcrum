@@ -15,7 +15,7 @@ use fulcrum::*;
 const ROUNDS: usize = 250_000;
 const GOLDEN: u64 = 0x268a_4fee_8564_c727;
 const GOLDEN_VECTORS: u64 = 0x86e8_db5a_35e6_ed72;
-const GOLDEN_EXP: u64 = 0xf22e_0162_b921_d7b3;
+const GOLDEN_EXP: u64 = 0xc0c4_e60f_220a_31c3;
 
 macro_rules! mix {
     ($h:ident, $rng:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
@@ -181,6 +181,14 @@ macro_rules! mix_exp {
         ] {
             $h.write(&v.to_le_bytes());
         }
+        let b = $T::from_bits(
+            ($rng.edge_bits($bits, $T::FRAC_BITS) >> ($rng.next_u32() % $bits))
+                as <$T as fulcrum::FixedFloat>::Bits,
+        );
+        let n = ($rng.next_u32() % 64) as i32 - 32;
+        for v in [a.pow(b), a.abs().pow(b), a.powi(n), (a % $T::ONE).pow(b)] {
+            $h.write(&v.to_le_bytes());
+        }
     }};
 }
 
@@ -201,6 +209,6 @@ fn golden_hash_exp() {
     let hash = compute_exp();
     assert_eq!(
         hash, GOLDEN_EXP,
-        "determinism hash of exp2, log2, exp and ln changed: got {hash:#018x}, expected {GOLDEN_EXP:#018x}"
+        "determinism hash of exp2, log2, exp, ln, pow and powi changed: got {hash:#018x}, expected {GOLDEN_EXP:#018x}"
     );
 }

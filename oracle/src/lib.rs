@@ -607,3 +607,61 @@ pub fn exp(raw: i128, frac: u32) -> (BigInt, BigInt) {
         (&one / &hi, &one / &lo + 1)
     }
 }
+
+/// A lower (`upper = false`) or upper bound of `2^(w · 2^-TRIG_SCALE)` at
+/// `2^-TRIG_SCALE`, as [`exp2`] does it: `w = n + t`, the Taylor series of
+/// `e^(t·ln 2)` at the lower or upper end of the interval of `t·ln 2`,
+/// shifted by `n < 128`.
+fn exp2_bound(w: &BigInt, upper: bool) -> BigInt {
+    let scale = BigInt::one() << TRIG_SCALE;
+    let n = w.div_floor(&scale).to_i64().unwrap();
+    assert!(n < 128, "2^{} is beyond the oracle", n);
+    let t = w.mod_floor(&scale);
+    let (llo, lhi) = ln2_interval();
+    let v = if upper {
+        ((&t * &lhi) >> TRIG_SCALE) + 1
+    } else {
+        (&t * &llo) >> TRIG_SCALE
+    };
+    let mut term = BigInt::one() << TRIG_SCALE;
+    let mut sum = BigInt::zero();
+    let mut k = 1u64;
+    while !term.is_zero() {
+        sum += &term;
+        term = ((term * &v) >> TRIG_SCALE) / BigInt::from(k);
+        k += 1;
+    }
+    if upper {
+        sum += 2 * k + 4;
+    }
+    if n >= 0 {
+        sum << n as usize
+    } else {
+        let s = n.unsigned_abs() as usize;
+        if upper {
+            (sum >> s) + 1
+        } else {
+            sum >> s
+        }
+    }
+}
+
+/// `x^y` for `x = raw / 2^frac > 0` and `y = y / 2^frac_y` as an interval
+/// `[lo, hi] · 2^-TRIG_SCALE`: the interval of `w = y · log₂ x` from
+/// [`log2`], its lower end floored and its upper end ceiled, and the bounds
+/// of `2^w` at its ends. `None` when `w ≥ 64`, beyond every type.
+pub fn pow(raw: i128, frac: u32, y: i128, frac_y: u32) -> Option<(BigInt, BigInt)> {
+    let (llo, lhi) = log2(raw, frac);
+    let y = BigInt::from(y);
+    let (a, b) = if y.is_negative() {
+        (&y * &lhi, &y * &llo)
+    } else {
+        (&y * &llo, &y * &lhi)
+    };
+    let d = BigInt::one() << frac_y as usize;
+    let (wlo, whi) = (a.div_floor(&d), div_ceil(&b, &d));
+    if wlo >= BigInt::from(64) << TRIG_SCALE {
+        return None;
+    }
+    Some((exp2_bound(&wlo, false), exp2_bound(&whi, true)))
+}
