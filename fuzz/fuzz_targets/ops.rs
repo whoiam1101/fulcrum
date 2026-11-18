@@ -3,10 +3,10 @@
 //! rational oracle; `sin`, `cos`, `tan` (clamped to the range), `atan`,
 //! `atan2`, `asin`, `acos` and `sin`, `cos` of the angle type are within 1
 //! ulp of the interval oracle, its `to_radians` and `from_radians` equal it
-//! where it decides the rounding; `exp2` (clamped to the range) and `log2`
-//! are within 1 ulp of the interval oracle, `MAX` and `MIN` with `checked_*`
-//! `None` outside it; `+`, `-` saturate exactly; `%`
-//! is exact.
+//! where it decides the rounding; `exp2`, `exp` (clamped to the range),
+//! `log2` and `ln` are within 1 ulp of the interval oracle, `MAX` and `MIN`
+//! with `checked_*` `None` outside it, `exp` far below the range `0`; `+`,
+//! `-` saturate exactly; `%` is exact.
 
 #![no_main]
 
@@ -137,6 +137,28 @@ macro_rules! check {
                 assert_eq!(x.checked_exp2().unwrap_or($T::MAX), x.exp2());
             } else {
                 assert_eq!((x.exp2(), x.checked_exp2()), ($T::MAX, None));
+            }
+            if a > 0 {
+                let exact = fulcrum_oracle::ln(a as i128, $frac);
+                assert!(within_ulp(exact, x.ln().to_bits() as i128, $frac, min, max));
+                assert_eq!(x.checked_ln(), Some(x.ln()));
+            } else {
+                assert_eq!((x.ln(), x.checked_ln()), ($T::MIN, None));
+            }
+            if (a as i128) >= $frac << $frac {
+                assert_eq!((x.exp(), x.checked_exp()), ($T::MAX, None));
+            } else if (a as i128) <= -(2 * $frac) << $frac {
+                assert_eq!((x.exp(), x.checked_exp()), ($T::ZERO, Some($T::ZERO)));
+            } else {
+                let exact = fulcrum_oracle::exp(a as i128, $frac);
+                assert!(within_ulp(
+                    exact,
+                    x.exp().to_bits() as i128,
+                    $frac,
+                    min,
+                    max
+                ));
+                assert_eq!(x.checked_exp().unwrap_or($T::MAX), x.exp());
             }
             assert_eq!((x + y).to_bits(), a.saturating_add(b));
             assert_eq!((x - y).to_bits(), a.saturating_sub(b));

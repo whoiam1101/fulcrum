@@ -552,3 +552,58 @@ pub fn log2(raw: i128, frac: u32) -> (BigInt, BigInt) {
     let whole = BigInt::from(e as i64 - i64::from(frac)) << TRIG_SCALE;
     (&whole + lo, whole + hi)
 }
+
+/// `ln(raw / 2^frac)` for `raw > 0` as an interval `[lo, hi] · 2^-TRIG_SCALE`:
+/// `(e - frac) · ln 2` of the interval of `ln 2` and
+/// `2·atanh((raw - 2^e)/(raw + 2^e))` of the mantissa, without the binary
+/// logarithm. Shares no code with fulcrum or `tests/common/exp.rs`.
+pub fn ln(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    assert!(raw > 0);
+    let a = BigInt::from(raw);
+    let e = a.bits() - 1;
+    let power = BigInt::one() << e as usize;
+    let (slo, shi) = atanh_ratio(&(&a - &power), &(&a + &power));
+    let (llo, lhi) = ln2_interval();
+    let w = BigInt::from(e as i64 - i64::from(frac));
+    let (wlo, whi) = if w.is_negative() {
+        (&w * &lhi, &w * &llo)
+    } else {
+        (&w * &llo, &w * &lhi)
+    };
+    (wlo + slo * 2, whi + shi * 2)
+}
+
+/// `e^(raw / 2^frac)` as an interval `[lo, hi] · 2^-TRIG_SCALE`: the Taylor
+/// series of `e^|x|` on the whole argument, without a reduction by `ln 2`,
+/// each term `⌊|raw|^k · 2^TRIG_SCALE / (k! · 2^(frac·k))⌋` floored from the
+/// exact rational, so each is low by less than `1`; summed until a term is
+/// zero past `k > 2|x|`, where the ratio of the terms is below `½` and the
+/// tail below `2`. A negative `x` takes the reciprocal. `|raw / 2^frac| < 64`.
+/// Shares no code with fulcrum or `tests/common/exp.rs`.
+pub fn exp(raw: i128, frac: u32) -> (BigInt, BigInt) {
+    let magnitude = BigInt::from(raw.unsigned_abs());
+    assert!(magnitude < BigInt::from(64u32) << frac as usize);
+    let twice = (&magnitude * 2) >> frac as usize;
+    let mut num = BigInt::one();
+    let mut den = BigInt::one();
+    let mut sum = BigInt::zero();
+    let mut k = 0u64;
+    loop {
+        let term = (&num << TRIG_SCALE as usize) / &den;
+        let done = term.is_zero() && BigInt::from(k) > twice;
+        sum += term;
+        if done {
+            break;
+        }
+        k += 1;
+        num *= &magnitude;
+        den = (den * BigInt::from(k)) << frac as usize;
+    }
+    let (lo, hi) = (sum.clone(), sum + k + 3);
+    if raw >= 0 {
+        (lo, hi)
+    } else {
+        let one = BigInt::one() << (2 * TRIG_SCALE) as usize;
+        (&one / &hi, &one / &lo + 1)
+    }
+}

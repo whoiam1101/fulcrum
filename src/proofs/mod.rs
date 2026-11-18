@@ -810,3 +810,38 @@ macro_rules! log2_no_panic {
 }
 
 log2_no_panic!(log2_no_panic_64, FixedFloat64);
+
+macro_rules! exp_no_panic {
+    ($name:ident, $T:ident) => {
+        /// `exp` and `checked_exp` never panic: outside `(-2f, f)` the
+        /// function returns before the reduction; inside it the product with
+        /// `2·log₂ e` stays below `2^102`, the remainder below `2^119`, the
+        /// one correction keeps the multiple of `ln 2 / 256` in range, and the
+        /// final shift is below 128. On 8, 16 and 32 bits the exhaustive
+        /// tests of `tests/exp.rs` run every input instead.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let _ = (x.exp(), x.checked_exp());
+        }
+    };
+}
+
+exp_no_panic!(exp_no_panic_64, FixedFloat64);
+
+macro_rules! ln_no_panic {
+    ($name:ident, $T:ident) => {
+        /// `ln` and `checked_ln` never panic: the steps of `log2`, then the
+        /// integer part times `ln 2` below `2^110` and the mantissa part
+        /// below `2^126` before its shift, also for `x ≤ 0`. On 8, 16 and 32
+        /// bits the exhaustive tests of `tests/exp.rs` run every input
+        /// instead.
+        #[kani::proof]
+        fn $name() {
+            let x = $T::from_bits(kani::any());
+            let _ = (x.ln(), x.checked_ln());
+        }
+    };
+}
+
+ln_no_panic!(ln_no_panic_64, FixedFloat64);
