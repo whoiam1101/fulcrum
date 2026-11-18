@@ -172,10 +172,14 @@ Vectorized loops:
 
 Speedups found by the benchmarks of stages 1–6:
 - [ ] `pow` without the two `u128` divisions of the wide logarithm (a reciprocal of `u + c` by multiplication, or a table of `1/c`); today 50–53 ns, 1.5–1.9× slower than `libm` (from stage 6).
-- [ ] Square roots without division: `isqrt` through a Newton iteration for `1/√x` (multiplications only) with the same exact descent; today 5–26 ns, 3.3–16× slower than `libm` (from [Between 3 and 4](#between-3-and-4-v03x)).
+- [ ] Square roots without division: `isqrt` through a Newton iteration for `1/√x` (multiplications only) with the same exact descent; was 5–26 ns, 3.3–16× slower than `libm` (from [Between 3 and 4](#between-3-and-4-v03x)). Done for `FixedFloat32` (`sqrt` 4.65 → 3.68 ns, `rsqrt` 6.96 → 4.94 ns, ARCHITECTURE §10); `FixedFloat64` still takes one `u128` division after the 32-bit start (`sqrt` 17.8 ns).
 - [ ] `length` and `rotate` of the vectors measured against the new `isqrt`; `normalize` and `clamp_length` of `FixedFloat32` (41 and 27 ns) with a division narrower than `u128`, the quotient has at most 33 bits (from [Between 5 and 6](#between-5-and-6-v05x)).
 - [ ] Division: `/` 1.08–1.17× slower than `fixed` on 16 bits and in the latency of 32 bits; `mul_div` of `FixedFloat64` on aarch64, the `u128` division against `divlu` (from [Between 3 and 4](#between-3-and-4-v03x)).
 - [ ] Vector operations in the instruction-count gate (from [Between 5 and 6](#between-5-and-6-v05x)).
+
+Speedups found while working on stage 7:
+- [x] `lerp` and `det` round as `mul` does, adding the half before the shift on 8–32 bits: loops of `lerp` 7–17 % and `perp_dot` 7–16 % faster (ARCHITECTURE §10).
+- [x] `Display` on `u64` with the digits in one buffer: 1.8–3.4× faster (ARCHITECTURE §10).
 
 **Done when:** every item above is done or rejected by a benchmark, with the reason recorded (ARCHITECTURE §10); the loops of the first group vectorize on 8–32 bits; the result bits are unchanged.
 **Verified by:** the golden hashes on x86-64, ARM64 and 32-bit x86, the exhaustive tests and the oracle on every rewritten function, its Kani harnesses; the instruction-count gate and the README benchmarks for the speed.
