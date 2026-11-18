@@ -145,8 +145,11 @@ Speed:
 - [x] `log2`, `checked_log2` (`x ≤ 0`: `MIN`, `None`): the exponent of the argument, `log₂ c` of a table of `log₂(1 + k/256)` (256 points, 62 bits, `src/tables/exp.rs`) at the point just below the mantissa, and three terms of `2·log₂ e · atanh s` of the exact `s = (u - c)/(u + c) < 2^-9`, rounded once; error below `2^-59`, so within `½ + 2^-27` ulp (INTERNALS §3.16).
 - [x] `exp2`, `checked_exp2` (saturating to `MAX`): `x = n + t` by a mask, `2^(k/256)` of a table at 126 bits times `e^y` of the remainder, `y < 2^-8.5`, by seven terms at 72 bits, shifted by `n` and rounded once; within `½ + 2^-7.5` ulp on `FixedFloat64`, `½ + 2^-39` up to `FixedFloat32`. Exact on integers `≥ -FRAC_BITS`.
 - Every result of `log2` and `exp2` of `FixedFloat8`, `FixedFloat16` and `FixedFloat32` is correctly rounded and both are monotone (exhaustive, against the reference of `tests/common/exp.rs`: the full series without tables, the bound checked by the oracle); the 256-bit interval oracle on every width (`oracle/tests/exp.rs`); the fuzz target `ops`; the golden hash `GOLDEN_EXP`; Kani `exp2_no_panic_64`, `log2_no_panic_64`.
-- [ ] `exp`, `ln`, `powi`, `pow`.
-- [ ] `log2`, `exp2` and the rest in the `FixedFloat` trait.
+- [x] `ln`, `checked_ln` (`x ≤ 0`: `MIN`, `None`): `(e - f) · ln 2 + log₂ u · ln 2` from the same unrounded 62-bit `log₂ u` as `log2`, summed at 104 bits and rounded once; error below `2^-59.5`, within `½ + 2^-27` ulp, exact at `1`.
+- [x] `exp`, `checked_exp` (saturating to `MAX`, `0` from `x ≤ -2·FRAC_BITS`): an exact reduction `x = j · ln 2/256 + y` at 112 bits, `j` from the product with `2·log₂ e` and one correction, then the table `2^(k/256)` and the series of `exp2`; the same bound as `exp2`, exact at `0` (INTERNALS §3.16).
+- Every result of `ln` and `exp` of `FixedFloat8`, `FixedFloat16` and `FixedFloat32` is correctly rounded and both are monotone (exhaustive, against `tests/common/exp.rs`: `ln` without the binary logarithm, `exp` reduced by a division by `ln 2` with the full series); the interval oracle on every width (its `exp` is the series of the whole argument, without a reduction); the fuzz target `ops`; `GOLDEN_EXP` extended; Kani `exp_no_panic_64`, `ln_no_panic_64`.
+- [ ] `powi`, `pow`: `2^(y · log₂ x)` needs `log₂ x` with an error near `2^-70`, not the `2^-59` of `log2` (an error `δ` of the exponent is a relative error `δ · ln 2` of a result up to `2^31` with 32 fractional bits): a 126-bit table of `log₂(1 + k/256)` and the series on `u128`.
+- [ ] `log2`, `exp2`, `ln`, `exp` and the rest in the `FixedFloat` trait.
 - [ ] Benchmarks against `libm`, the `std` floats and `fixed`; accuracy table; determinism table.
 
 **Done when:** ≤ 2 ulp on every type against a high-precision reference.
