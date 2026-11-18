@@ -156,6 +156,22 @@ macro_rules! div_kernel {
 /// `2^-(BITS/4 - 2)` of it, so one Newton step on the wide type leaves an
 /// error of a few units. Most divisions then run on the narrower type, in
 /// hardware, instead of a software routine for `u128`.
+///
+/// `rsqrt`, for `u64` and no Newton steps after it: no division. `n` shifted
+/// left by an even `z` is `m ∈ [2^62, 2^64)`, and `a = ⌊m / 2^32⌋`.
+/// `RSQRT_START` at the leading byte of `m` is `y ≈ 2^47 / √a`, within about
+/// `2^-8`; one Newton step for the reciprocal root,
+/// `y ← y · (3 − a · y² / 2^94) / 2`, leaves about `2^-16`. The exact step
+/// never goes above `2^47 / √a`, and the floor of `y² / 2^32` adds at most
+/// `2^-31` of it, so `s = a · y / 2^31 ≤ √m + 2`. One Karp–Markstein step
+/// `s ← s + y · (m − s²) / 2^64` then moves `s` toward `√m` and leaves it at
+/// most `√m + 2`, so `x = s / 2^(z/2) ≤ ⌊√n⌋ + 2` and `(x + 1)²` fits `u64` for
+/// `n ≤ 3 · 2^62`. `s²` may pass `2^64`, so `m − s²` is taken modulo `2^64`
+/// as an `i64`: `s` is within `2^-15` of `√m`, so its magnitude is below
+/// `2^50`. `x` is within two of `⌊√n⌋` (measured on every `n < 2^28` and on
+/// `3 · 10^8` samples up to `3 · 2^62`); steps up while `(x + 1)² ≤ n` make
+/// it at least `⌊√n⌋`, which the descent of `isqrt` needs. Every other
+/// product fits `u64`; `y · (m − s²)` is taken on `i128`.
 macro_rules! sqrt_start {
     (table, $UWide:ty, $n:ident) => {{
         let bits = <$UWide>::BITS - $n.leading_zeros();
@@ -166,6 +182,24 @@ macro_rules! sqrt_start {
         } else {
             t >> (8 - j)
         }
+    }};
+    (rsqrt, $UWide:ty, $n:ident) => {{
+        let z = $n.leading_zeros() & !1;
+        let m = $n << z;
+        let a = m >> 32;
+        let y = super::RSQRT_START[(m >> 56) as usize - 64] as u64;
+        let y = (y * (((3 << 62) - a * ((y * y) >> 32)) >> 32)) >> 31;
+        let s = (a * y) >> 31;
+        let e = m.wrapping_sub(s.wrapping_mul(s)) as i64;
+        let s = (s as i64 + ((y as i128 * e as i128) >> 64) as i64) as u64;
+        let mut x = s >> (z / 2);
+        if (x + 1) * (x + 1) <= $n {
+            x += 1;
+            while (x + 1) * (x + 1) <= $n {
+                x += 1;
+            }
+        }
+        x
     }};
     ($half:ident, $UWide:ty, $n:ident) => {{
         let bits = <$UWide>::BITS - $n.leading_zeros();
@@ -243,19 +277,25 @@ macro_rules! kernel {
                 ((int as $Wide) << $F) + frac as $Wide
             }
 
-            /// `round(a · b / 2^F)` for raw operands, equal to
-            /// `shr_round(a · b, F)`. For an `i128` product it is written as the
-            /// floor plus the first dropped bit, which keeps the carry of the
-            /// half off the critical path; narrower products add the half
+            /// `shr_round(p, F)` of an exact wide product `p` with
+            /// `p + 2^(F - 1)` inside the wide type. For `i128` it is written
+            /// as the floor plus the first dropped bit, which keeps the carry
+            /// of the half off the critical path; narrower types add the half
             /// before the shift, which vectorizes better.
             #[inline]
-            pub(crate) const fn mul(a: $Bits, b: $Bits) -> $Wide {
-                let p = (a as $Wide) * (b as $Wide);
+            const fn round_frac(p: $Wide) -> $Wide {
                 if <$Wide>::BITS == 128 {
                     (p >> $F) + ((p >> ($F - 1)) & 1)
                 } else {
                     (p + HALF) >> $F
                 }
+            }
+
+            /// `round(a · b / 2^F)` for raw operands, equal to
+            /// `shr_round(a · b, F)`.
+            #[inline]
+            pub(crate) const fn mul(a: $Bits, b: $Bits) -> $Wide {
+                round_frac((a as $Wide) * (b as $Wide))
             }
 
             /// `round((a · b + c · 2^F) / 2^F)`: the product plus a raw value,
@@ -288,12 +328,12 @@ macro_rules! kernel {
             }
 
             /// `a + round((b - a) · t / 2^F)`: linear interpolation rounded
-            /// once. `|b - a| < 2^(2N)` and `|t| ≤ 2^(2N - 1)`, so the product
-            /// fits the wide type.
+            /// once. `|b - a| < 2^(2N)` and `|t| ≤ 2^(2N - 1)`, so
+            /// `|p| ≤ 2^(4N - 1) - 2^(2N - 1)` and `p` plus the half fits the
+            /// wide type.
             #[inline]
             pub(crate) const fn lerp(a: $Bits, b: $Bits, t: $Bits) -> $Wide {
-                let p = ((b as $Wide) - (a as $Wide)) * (t as $Wide);
-                (a as $Wide) + (p >> $F) + ((p >> ($F - 1)) & 1)
+                (a as $Wide) + round_frac(((b as $Wide) - (a as $Wide)) * (t as $Wide))
             }
 
             div_kernel!($div, $Bits, $Wide, $UWide, $F);
@@ -313,15 +353,17 @@ macro_rules! kernel {
                 }
             }
 
-            /// `⌊√n⌋` for `n ≤ 3 · 2^(BITS - 2)`: a start from [`sqrt_start!`],
-            /// a fixed number of Newton steps `x ← ⌊(x + ⌊n / x⌋) / 2⌋`,
-            /// then `x ← x - 1` while `x² > n`.
+            /// `⌊√n⌋` for `n ≤ 3 · 2^(BITS - 2)`: a start from [`sqrt_start!`]
+            /// at or above `⌊√n⌋` after a fixed number of Newton steps
+            /// `x ← ⌊(x + ⌊n / x⌋) / 2⌋` (none for the `rsqrt` start), then
+            /// `x ← x - 1` while `x² > n`.
             ///
             /// The result does not depend on the start or on the number of
             /// steps: one step from any `x > 0` gives `x ≥ ⌊√n⌋` (the mean of
             /// `x` and `n / x` is at least `√n`, and flooring keeps it at
             /// least `⌊√n⌋`), every later step keeps that bound, and the
-            /// final loop stops exactly at `⌊√n⌋`. The steps only make the
+            /// final loop stops exactly at `⌊√n⌋`; the `rsqrt` start takes no
+            /// steps and ends at or above `⌊√n⌋` itself. The steps only make the
             /// loop short: each step squares the relative error of the
             /// start, and `NEWTON_STEPS` steps leave at most one correction
             /// (measured on every 16- and 32-bit argument and on samples of
@@ -329,7 +371,7 @@ macro_rules! kernel {
             /// `2^-16` for large `n` and by a unit or two for small `n`, so
             /// `x²` fits the type for `n ≤ 3 · 2^(BITS - 2)`, the sum of three
             /// squares of raw values; Kani checks that the squares fit and the
-            /// loops stop on 16- and 32-bit arguments.
+            /// loops stop on the `u16` and `u32` arguments of `k8` and `k16`.
             ///
             /// With the `half` start, an `n` below `2^(BITS/2 - 1)` returns
             /// the exact `isqrt` of the narrower kernel before any step.
@@ -344,8 +386,11 @@ macro_rules! kernel {
                     x = (x + n / x) >> 1;
                     i += 1;
                 }
-                while x * x > n {
+                if x * x > n {
                     x -= 1;
+                    while x * x > n {
+                        x -= 1;
+                    }
                 }
                 x
             }
@@ -396,12 +441,11 @@ macro_rules! kernel {
             /// a 2×2 determinant, the `perp_dot` and each component of the
             /// `cross` of vectors. Each product lies in
             /// `[-(2^(2N - 2) - 2^(N - 1)), 2^(2N - 2)]` for `N`-bit storage, so
-            /// the exact difference is within `2^(2N - 1) - 2^(N - 1)` and fits
-            /// the wide type.
+            /// the exact difference is within `2^(2N - 1) - 2^(N - 1)`, and with
+            /// the half added it fits the wide type.
             #[inline]
             pub(crate) const fn det(a: $Bits, b: $Bits, c: $Bits, d: $Bits) -> $Wide {
-                let p = (a as $Wide) * (d as $Wide) - (b as $Wide) * (c as $Wide);
-                (p >> $F) + ((p >> ($F - 1)) & 1)
+                round_frac((a as $Wide) * (d as $Wide) - (b as $Wide) * (c as $Wide))
             }
 
             /// `a² + b² + c²` of raw operands, exactly: at most `3 · 2^126`.
@@ -556,7 +600,7 @@ macro_rules! kernel {
 
 kernel!(k8, i8, i16, u16, i8, u8, 4, magnitude, false, 1, table);
 kernel!(k16, i16, i32, u32, i8, u8, 8, signed, true, 1, table);
-kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false, 2, table);
+kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false, 0, rsqrt);
 kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false, 1, k32);
 
 /// `⌊256 · √(t + ½)⌋` for `t < 256`: the start of `isqrt` for an argument
@@ -565,6 +609,33 @@ kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false, 1, k32);
 /// compiler from the definition: the largest `s` with `s² ≤ (2t + 1) · 2^15`,
 /// searched upward from the previous entry, since the entries grow with `t`.
 const SQRT_START: [u16; 256] = sqrt_start();
+
+/// `⌊2^35 / √(t + ½)⌋` for `64 ≤ t < 256`, at `t - 64`: the start of the
+/// `rsqrt` form of `isqrt` for an argument whose leading byte, after an even
+/// shift to `[2^62, 2^64)`, is `t`. Computed by the compiler from the
+/// definition: the largest `y` with `y² · (2t + 1) ≤ 2^71`, by bisection.
+const RSQRT_START: [u32; 192] = rsqrt_start();
+
+const fn rsqrt_start() -> [u32; 192] {
+    let mut table = [0u32; 192];
+    let mut t = 64;
+    while t < 256 {
+        let d = (2 * t + 1) as u128;
+        let mut lo = 0u128;
+        let mut hi = 1u128 << 33;
+        while hi - lo > 1 {
+            let mid = (lo + hi) / 2;
+            if mid * mid * d <= 1 << 71 {
+                lo = mid;
+            } else {
+                hi = mid;
+            }
+        }
+        table[t - 64] = lo as u32;
+        t += 1;
+    }
+    table
+}
 
 const fn sqrt_start() -> [u16; 256] {
     let mut table = [0u16; 256];
