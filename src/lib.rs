@@ -63,15 +63,11 @@
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::exit,
-    clippy::std_instead_of_core,
-    clippy::std_instead_of_alloc,
-    clippy::alloc_instead_of_core
+    clippy::std_instead_of_core
 )]
 #![warn(clippy::missing_inline_in_public_items)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
-#[cfg(feature = "alloc")]
-extern crate alloc;
 #[cfg(any(feature = "std", test))]
 extern crate std;
 
