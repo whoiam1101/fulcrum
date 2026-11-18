@@ -11,7 +11,7 @@
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::{atan2_int, sin_turns, Format, TRIG_SCALE};
+use fulcrum_oracle::{atan2_int, sin_turns, within_ulp_of_interval, Format, TRIG_SCALE};
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{One, Signed, Zero};
@@ -34,14 +34,6 @@ fn edge(bits: u32, frac: u32) -> impl Strategy<Value = i128> {
         2 => -4 * one..=4 * one,
         8 => min..=max,
     ]
-}
-
-/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
-fn within_ulp(got: i128, (lo, hi): (BigInt, BigInt), frac: u32) -> bool {
-    let shift = TRIG_SCALE - frac;
-    let got = BigInt::from(got) << shift;
-    let ulp = BigInt::one() << shift;
-    &got - &lo < ulp && &hi - &got < ulp
 }
 
 /// Whether `r` is `x · k / √s` rounded to nearest, ties toward `+∞`:
@@ -204,7 +196,7 @@ macro_rules! vec_suite {
                     let big = |i: usize, r: &[i128]| BigInt::from(r[i]);
                     let cross2 = big(0, &a) * big(1, &b) - big(1, &a) * big(0, &b);
                     let dot2 = big(0, &a) * big(0, &b) + big(1, &a) * big(1, &b);
-                    prop_assert!(within_ulp(raw(a2.angle_to(b2)), atan2_int(&cross2, &dot2), $frac), "angle2 {:?} {:?}", a2, b2);
+                    prop_assert!(within_ulp_of_interval(raw(a2.angle_to(b2)), &atan2_int(&cross2, &dot2), $frac), "angle2 {:?} {:?}", a2, b2);
 
                     let c = [
                         big(1, &a) * big(2, &b) - big(2, &a) * big(1, &b),
@@ -222,7 +214,7 @@ macro_rules! vec_suite {
                         let d = dot3 << sh;
                         let (lo, _) = atan2_int(&n, &d);
                         let (_, hi) = atan2_int(&(n + 1), &d);
-                        prop_assert!(within_ulp(got, (lo, hi), $frac), "angle3 {:?} {:?}", a3, b3);
+                        prop_assert!(within_ulp_of_interval(got, &(lo, hi), $frac), "angle3 {:?} {:?}", a3, b3);
                     }
                 }
             }

@@ -14,18 +14,12 @@ mod trig;
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::{cos, pi_interval, sin, sin_turns, tan, TRIG_SCALE};
+use fulcrum_oracle::{
+    cos, pi_interval, rounded, sin, sin_turns, tan, within_ulp_of_interval, TRIG_SCALE,
+};
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive};
 use proptest::prelude::*;
-
-/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
-fn within_ulp_of_interval(got: i128, (lo, hi): (BigInt, BigInt), frac: u32) -> bool {
-    let shift = TRIG_SCALE - frac;
-    let got = BigInt::from(got) << shift;
-    let ulp = BigInt::one() << shift;
-    &got - &lo < ulp && &hi - &got < ulp
-}
 
 fn turn(frac: u32) -> impl Strategy<Value = i128> {
     let one = 1i128 << frac;
@@ -56,19 +50,6 @@ fn clamp((lo, hi): (BigInt, BigInt), bits: u32, frac: u32) -> (BigInt, BigInt) {
     let min: BigInt = -(BigInt::one() << (bits - 1)) << shift;
     let c = |v: BigInt| v.max(min.clone()).min(max.clone());
     (c(lo), c(hi))
-}
-
-/// The value with `frac` fractional bits nearest to every value of the
-/// interval, if there is one.
-fn rounded((lo, hi): &(BigInt, BigInt), frac: u32) -> Option<BigInt> {
-    let shift = TRIG_SCALE - frac;
-    let half = BigInt::one() << (shift - 1);
-    let (a, b) = ((lo + &half) >> shift, (hi + &half) >> shift);
-    if a == b {
-        Some(a)
-    } else {
-        None
-    }
 }
 
 #[test]
@@ -159,10 +140,10 @@ macro_rules! trig_suite {
                     let x = $T::from_bits(a as $Bits);
                     let a = x.to_bits() as i128;
                     let s = x.sin_turns().to_bits() as i128;
-                    prop_assert!(within_ulp_of_interval(s, sin_turns(a, $frac), $frac), "sin_turns {:?} = {}", x, s);
+                    prop_assert!(within_ulp_of_interval(s, &sin_turns(a, $frac), $frac), "sin_turns {:?} = {}", x, s);
                     let c = x.cos_turns().to_bits() as i128;
                     let quarter = 1i128 << ($frac - 2);
-                    prop_assert!(within_ulp_of_interval(c, sin_turns(a + quarter, $frac), $frac), "cos_turns {:?} = {}", x, c);
+                    prop_assert!(within_ulp_of_interval(c, &sin_turns(a + quarter, $frac), $frac), "cos_turns {:?} = {}", x, c);
                 }
 
                 #[test]
@@ -171,11 +152,11 @@ macro_rules! trig_suite {
                         let a = x.to_bits() as i128;
                         let (s, c) = x.sin_cos();
                         prop_assert_eq!((s, c), (x.sin(), x.cos()));
-                        prop_assert!(within_ulp_of_interval(s.to_bits() as i128, sin(a, $frac), $frac), "sin {:?} = {:?}", x, s);
-                        prop_assert!(within_ulp_of_interval(c.to_bits() as i128, cos(a, $frac), $frac), "cos {:?} = {:?}", x, c);
+                        prop_assert!(within_ulp_of_interval(s.to_bits() as i128, &sin(a, $frac), $frac), "sin {:?} = {:?}", x, s);
+                        prop_assert!(within_ulp_of_interval(c.to_bits() as i128, &cos(a, $frac), $frac), "cos {:?} = {:?}", x, c);
                         let exact = tan(a, $frac).unwrap();
                         let t = x.tan().to_bits() as i128;
-                        prop_assert!(within_ulp_of_interval(t, clamp(exact.clone(), $bits, $frac), $frac), "tan {:?} = {}", x, t);
+                        prop_assert!(within_ulp_of_interval(t, &clamp(exact.clone(), $bits, $frac), $frac), "tan {:?} = {}", x, t);
                         if let Some(r) = rounded(&exact, $frac) {
                             let fits = BigInt::from(<$Bits>::MIN) <= r && r <= BigInt::from(<$Bits>::MAX);
                             prop_assert_eq!(x.checked_tan().is_some(), fits, "checked_tan {:?}", x);

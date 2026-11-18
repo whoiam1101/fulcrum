@@ -229,6 +229,27 @@ impl Format {
 /// Bits of the intervals of [`sin_turns`].
 pub const TRIG_SCALE: u32 = 256;
 
+/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
+pub fn within_ulp_of_interval(got: i128, (lo, hi): &(BigInt, BigInt), frac: u32) -> bool {
+    let shift = TRIG_SCALE - frac;
+    let got = BigInt::from(got) << shift;
+    let ulp = BigInt::one() << shift;
+    &got - lo < ulp && hi - &got < ulp
+}
+
+/// The value with `frac` fractional bits nearest to every value of the
+/// interval `[lo, hi] / 2^TRIG_SCALE`, if there is one.
+pub fn rounded((lo, hi): &(BigInt, BigInt), frac: u32) -> Option<BigInt> {
+    let shift = TRIG_SCALE - frac;
+    let half = BigInt::one() << (shift - 1);
+    let (a, b) = ((lo + &half) >> shift, (hi + &half) >> shift);
+    if a == b {
+        Some(a)
+    } else {
+        None
+    }
+}
+
 /// π as an interval `[lo, hi] · 2^-TRIG_SCALE`: Machin's formula
 /// `π = 16·atan(1/5) - 4·atan(1/239)` with floored terms.
 pub fn pi_interval() -> (BigInt, BigInt) {

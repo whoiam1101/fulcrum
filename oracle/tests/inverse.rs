@@ -12,18 +12,10 @@ mod trig;
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::{acos, asin, atan, atan2, pi_interval, TRIG_SCALE};
+use fulcrum_oracle::{acos, asin, atan, atan2, pi_interval, within_ulp_of_interval, TRIG_SCALE};
 use num_bigint::BigInt;
 use num_traits::One;
 use proptest::prelude::*;
-
-/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
-fn within_ulp_of_interval(got: i128, (lo, hi): (BigInt, BigInt), frac: u32) -> bool {
-    let shift = TRIG_SCALE - frac;
-    let got = BigInt::from(got) << shift;
-    let ulp = BigInt::one() << shift;
-    &got - &lo < ulp && &hi - &got < ulp
-}
 
 /// `[lo, hi]` contains `v` and is narrower than `2^-200`.
 fn holds((lo, hi): &(BigInt, BigInt), v: &BigInt) -> bool {
@@ -101,9 +93,9 @@ macro_rules! inverse_suite {
                         let (y, x) = ($T::from_bits(y), $T::from_bits(x));
                         let (ry, rx) = (y.to_bits() as i128, x.to_bits() as i128);
                         let t = y.atan().to_bits() as i128;
-                        prop_assert!(within_ulp_of_interval(t, atan(ry, $frac), $frac), "atan {:?} = {}", y, t);
+                        prop_assert!(within_ulp_of_interval(t, &atan(ry, $frac), $frac), "atan {:?} = {}", y, t);
                         let t = y.atan2(x).to_bits() as i128;
-                        prop_assert!(within_ulp_of_interval(t, atan2(ry, rx), $frac), "atan2 {:?} {:?} = {}", y, x, t);
+                        prop_assert!(within_ulp_of_interval(t, &atan2(ry, rx), $frac), "atan2 {:?} {:?} = {}", y, x, t);
                     }
                 }
 
@@ -111,9 +103,9 @@ macro_rules! inverse_suite {
                 fn asin_acos(a in unit($frac)) {
                     let x = $T::from_bits(a as $Bits);
                     let s = x.asin().to_bits() as i128;
-                    prop_assert!(within_ulp_of_interval(s, asin(a, $frac), $frac), "asin {:?} = {}", x, s);
+                    prop_assert!(within_ulp_of_interval(s, &asin(a, $frac), $frac), "asin {:?} = {}", x, s);
                     let c = x.acos().to_bits() as i128;
-                    prop_assert!(within_ulp_of_interval(c, acos(a, $frac), $frac), "acos {:?} = {}", x, c);
+                    prop_assert!(within_ulp_of_interval(c, &acos(a, $frac), $frac), "acos {:?} = {}", x, c);
                 }
             }
         }

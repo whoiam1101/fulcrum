@@ -15,31 +15,12 @@ mod exp;
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::{exp, exp2, ln, ln2_interval, log2, pow, TRIG_SCALE};
+use fulcrum_oracle::{
+    exp, exp2, ln, ln2_interval, log2, pow, rounded, within_ulp_of_interval, TRIG_SCALE,
+};
 use num_bigint::BigInt;
 use num_traits::{One, Zero};
 use proptest::prelude::*;
-
-/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
-fn within_ulp_of_interval(got: i128, (lo, hi): &(BigInt, BigInt), frac: u32) -> bool {
-    let shift = TRIG_SCALE - frac;
-    let got = BigInt::from(got) << shift;
-    let ulp = BigInt::one() << shift;
-    &got - lo < ulp && hi - &got < ulp
-}
-
-/// The value with `frac` fractional bits nearest to every value of the
-/// interval, if there is one.
-fn rounded((lo, hi): &(BigInt, BigInt), frac: u32) -> Option<BigInt> {
-    let shift = TRIG_SCALE - frac;
-    let half = BigInt::one() << (shift - 1);
-    let (a, b) = ((lo + &half) >> shift, (hi + &half) >> shift);
-    if a == b {
-        Some(a)
-    } else {
-        None
-    }
-}
 
 #[test]
 fn oracle_known_values() {

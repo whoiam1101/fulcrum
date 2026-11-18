@@ -5,18 +5,9 @@
 //! Taylor series.
 
 use fulcrum::*;
-use fulcrum_oracle::{angle_from_radians, angle_to_radians, sin_turns, TRIG_SCALE};
+use fulcrum_oracle::{angle_from_radians, angle_to_radians, sin_turns, within_ulp_of_interval};
 use num_bigint::BigInt;
-use num_traits::One;
 use proptest::prelude::*;
-
-/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
-fn within_ulp_of_interval(got: i128, (lo, hi): (BigInt, BigInt), frac: u32) -> bool {
-    let shift = TRIG_SCALE - frac;
-    let got = BigInt::from(got) << shift;
-    let ulp = BigInt::one() << shift;
-    &got - &lo < ulp && &hi - &got < ulp
-}
 
 macro_rules! check_radians {
     ($A:ident, $T:ident, $n:expr, $f:expr, $t:expr, $x:expr) => {{
@@ -86,8 +77,8 @@ proptest! {
     fn angle64_sin_cos(t in any::<u64>()) {
         let a = Angle64::from_bits(t);
         let (s, c) = a.sin_cos();
-        prop_assert!(within_ulp_of_interval(s.to_bits() as i128, sin_turns(t as i128, 64), 32), "sin {:?}", a);
+        prop_assert!(within_ulp_of_interval(s.to_bits() as i128, &sin_turns(t as i128, 64), 32), "sin {:?}", a);
         let quarter = (t as i128) + (1 << 62);
-        prop_assert!(within_ulp_of_interval(c.to_bits() as i128, sin_turns(quarter, 64), 32), "cos {:?}", a);
+        prop_assert!(within_ulp_of_interval(c.to_bits() as i128, &sin_turns(quarter, 64), 32), "cos {:?}", a);
     }
 }
