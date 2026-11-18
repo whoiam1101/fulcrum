@@ -455,7 +455,7 @@ macro_rules! try_from_ints {
 
 #[test]
 fn integers_convert_by_try_from() {
-    for_each_i128_width!(try_from_ints!());
+    for_each_width!(try_from_ints!());
     assert_eq!(FixedFloat8::try_from(8i32), Err(OverflowError));
     assert_eq!(
         FixedFloat8::try_from(-8i64).map(fulcrum::FixedFloat8::to_bits),

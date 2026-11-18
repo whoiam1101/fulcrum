@@ -140,7 +140,7 @@ fn exact_dot<T: Copy>(a: &[T], b: &[T], raw: impl Fn(T) -> i128, f: u32) -> i128
     (hi << (64 - f)) + spec::round_div(lo, 1i128 << f)
 }
 
-for_each_i128_width!(order_suite!());
+for_each_width!(order_suite!());
 
 #[test]
 fn accumulator64_holds_more_than_i128() {

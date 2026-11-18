@@ -1,8 +1,8 @@
 //! The one list of widths for tests, oracle tests and fuzz targets. A new
 //! width is one row here; every suite that runs on all widths picks it up.
 //! Beyond 64 bits the generators and references must first hold the width:
-//! `Pcg32::edge_bits` returns `i64`, and `Widest` in `tests/consts.rs` names
-//! the widest type.
+//! the reference of `tests/common` computes on `i128`, `Pcg32::edge_bits`
+//! returns `i64`, and `Widest` in `tests/consts.rs` names the widest type.
 //!
 //! Each row calls the given macro with the arguments it was passed first,
 //! then the fields of the width:
@@ -20,17 +20,10 @@
 
 #![allow(unused_macros)]
 
-/// Calls `$m!` once per width: every fixed-point type of the crate.
+/// Calls `$m!` once per width: every fixed-point type of the crate. The
+/// product of two raw values of each fits `i128`, so the `i128` reference of
+/// `tests/common` computes it exactly.
 macro_rules! for_each_width {
-    ($m:ident!($($arg:tt)*)) => {
-        for_each_i128_width!($m!($($arg)*));
-    };
-}
-
-/// Calls `$m!` once per width whose product of two raw values fits `i128`,
-/// so the `i128` reference of `tests/common` computes it exactly. Wider types
-/// are checked against the rational oracle instead.
-macro_rules! for_each_i128_width {
     ($m:ident!($($arg:tt)*)) => {
         $m!($($arg)* fixed8, FixedFloat8, ff8, Accumulator8, i8, 8, 4);
         $m!($($arg)* fixed16, FixedFloat16, ff16, Accumulator16, i16, 16, 8);

@@ -39,7 +39,7 @@ macro_rules! check_angle {
 
         let shift = $n - $f;
         let mask = (1u128 << $f) - 1;
-        let turns = (((u128::from($t)) + (1 << (shift - 1))) >> shift) & mask;
+        let turns = spec::round_shift(i128::from($t), shift) as u128 & mask;
         assert_eq!(
             a.to_turns().to_bits() as u128 & mask,
             turns,
@@ -74,7 +74,7 @@ macro_rules! check_angle {
         }
 
         let signed = (((u128::from($t)) << (128 - $n)) as i128) >> (128 - $n);
-        let scaled = ((signed * i128::from($x)) + (1 << ($f - 1))) >> $f;
+        let scaled = spec::round_shift(signed * i128::from($x), $f);
         let wrap = (1u128 << $n) - 1;
         assert_eq!(
             u128::from(a.scale(x).to_bits()),

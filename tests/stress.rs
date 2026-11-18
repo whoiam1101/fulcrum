@@ -46,7 +46,7 @@ macro_rules! stress_width {
 #[ignore = "long running: set FULCRUM_STRESS_* and run with --ignored --release"]
 fn stress_fixed32_fixed64() {
     let t = run_streams("stress", "FULCRUM_STRESS", 60, |rng| {
-        for_each_i128_width!(stress_width!(rng,));
+        for_each_width!(stress_width!(rng,));
         0
     });
     eprintln!(

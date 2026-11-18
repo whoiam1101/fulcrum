@@ -100,7 +100,7 @@ macro_rules! random_triples {
 
 #[test]
 fn random_triples_on_wider_types() {
-    for_each_i128_width!(random_triples!());
+    for_each_width!(random_triples!());
 }
 
 #[test]

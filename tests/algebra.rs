@@ -237,7 +237,7 @@ const MIN_MUL_PERCENT: u64 = 20;
 fn algebra_stress() {
     let t = run_streams("algebra", "FULCRUM_ALGEBRA", 60, |rng| {
         let mut mul = 0u64;
-        for_each_i128_width!(stress_width!(rng, mul,));
+        for_each_width!(stress_width!(rng, mul,));
         mul
     });
     let triples = t.items * 2 * 3;

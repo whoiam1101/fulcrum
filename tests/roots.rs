@@ -120,7 +120,7 @@ macro_rules! random_values {
 
 #[test]
 fn random_values_on_wider_types() {
-    for_each_i128_width!(random_values!());
+    for_each_width!(random_values!());
 }
 
 #[test]
