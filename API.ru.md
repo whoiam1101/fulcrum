@@ -1,4 +1,4 @@
-# fulcrum 0.5: руководство по API
+# fulcrum 0.6: руководство по API
 
 [English](API.md) · **Русский**
 
