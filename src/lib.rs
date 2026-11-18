@@ -20,8 +20,8 @@
 //!   exactly and never overflows before the root;
 //! - `sin_turns` and `cos_turns` take the angle in turns (1.0 = 360°), reduce
 //!   it exactly with a bit mask and are within 1 ulp;
-//! - `log2`, `exp2`, `ln` and `exp` are within 1 ulp, `log2` exact on
-//!   powers of two and `exp2` on integers `≥ -FRAC_BITS`;
+//! - `log2`, `exp2`, `ln`, `exp`, `pow` and `powi` are within 1 ulp, `log2`
+//!   exact on powers of two and `exp2` on integers `≥ -FRAC_BITS`;
 //! - [`Vec2`] and [`Vec3`] over any of these types: operators per component,
 //!   `dot`, `cross` and the squared lengths rounded once from exact products,
 //!   `length` and every component of `normalize` correctly rounded;

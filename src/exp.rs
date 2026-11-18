@@ -14,8 +14,17 @@
 //! `y = (t - k/256) · ln 2 < 2^-8.5`, a series of seven terms at 72
 //! fractional bits; the mantissa `2^t ∈ [1, 2)` is then shifted by `n` and
 //! rounded once.
+//!
+//! `pow` is `2^(y · log₂ x)`. The absolute error of the exponent becomes a
+//! relative error of the result, so `log₂ x` comes from a wide logarithm
+//! with an error below `2^-119`: the 126-bit table, `s` at 128 bits and
+//! seven terms of the series; the product with `y` is exact up to `2^-120`,
+//! and `2^w` is the tail of `exp2` with the remainder at 120 bits.
 
-use crate::tables::exp::{EXP2, EXP2_FRAC, FRAC, LN_2, LN_2_FRAC, LOG2, STEPS, TWO_LOG2_E};
+use crate::tables::exp::{
+    EXP2, EXP2_FRAC, FRAC, LN_2, LN_2_FRAC, LOG2, LOG2_WIDE, STEPS, TWO_LOG2_E, TWO_LOG2_E_WIDE,
+    WIDE_FRAC,
+};
 
 const ONE: u64 = 1 << FRAC;
 
@@ -112,7 +121,7 @@ const fn exp2_unit(k: u64, b: u64, f: u32) -> u128 {
 }
 
 /// `m · 2^n / 2^EXP2_FRAC` rounded to `f` fractional bits, for a mantissa
-/// `m < 2^127` and `n ≤ f - 2`: one rounding shift by at least 64 bits, `0`
+/// `m < 2^127` and `n ≤ f - 1`: one rounding shift by at least 63 bits, `0`
 /// when `m` is below half a unit.
 #[inline]
 const fn round_mantissa(m: u128, n: i64, f: u32) -> i128 {
@@ -121,9 +130,10 @@ const fn round_mantissa(m: u128, n: i64, f: u32) -> i128 {
     crate::kernel::shr_round(m as i128, s)
 }
 
-/// `2^(2f)`: the value [`exp2`] and [`exp`] return for a result out of range
-/// of every type with `f` fractional bits, which `saturate` turns into `MAX`
-/// and `checked` into `None`.
+/// `2^(2f)`: the value [`exp2`], [`exp`] and [`pow`] return for a result
+/// out of range of every type with `f` fractional bits (`pow` its negation
+/// for a negative one), which `saturate` turns into `MAX` or `MIN` and
+/// `checked` into `None`.
 #[inline]
 const fn overflow(f: u32) -> i128 {
     1 << (2 * f)
@@ -183,4 +193,101 @@ pub(crate) const fn exp(raw: i64, f: u32) -> i128 {
     let k = (j & ((1 << STEPS) - 1)) as u64;
     let m = exp_unit(k, (y >> (REDUCED_FRAC - EXPM1_FRAC)) as u64);
     round_mantissa(m, n, f)
+}
+
+/// Fractional bits of the wide logarithm and of the exponent of [`pow`].
+const W_FRAC: u32 = 120;
+
+/// `⌊a · b / 2^128⌋`.
+#[inline]
+const fn mul_hi(a: u128, b: u128) -> u128 {
+    crate::wide::widening_mul_u128(a, b).0
+}
+
+/// `log₂(a / 2^f) · 2^W_FRAC` for `0 < a ≤ 2^63`, `1 ≤ f ≤ 32`, with an
+/// error below `1.05` units (INTERNALS §3.16): `log₂ c` of [`LOG2_WIDE`]
+/// and `2·log₂ e · atanh s` of `s = (u - c)/(u + c) < 2^-9` at 128
+/// fractional bits, seven terms; exact `0` at `a = 2^f`.
+#[inline]
+const fn log2_wide(a: u64, f: u32) -> i128 {
+    let e = 63 - a.leading_zeros();
+    let u = if e > FRAC {
+        a >> (e - FRAC)
+    } else {
+        a << (FRAC - e)
+    };
+    let k = (u >> (FRAC - STEPS)) - (1 << STEPS);
+    let c = ONE + (k << (FRAC - STEPS));
+    let (d, r) = ((u + c) as u128, (u - c) as u128);
+    let high = (r << 64) / d;
+    let low = (((r << 64) % d) << 64) / d;
+    let s = (high << 64) | low;
+    let z = mul_hi(s, s);
+    let mut g = u128::MAX / 13;
+    g = u128::MAX / 11 + mul_hi(z, g);
+    g = u128::MAX / 9 + mul_hi(z, g);
+    g = u128::MAX / 7 + mul_hi(z, g);
+    g = u128::MAX / 5 + mul_hi(z, g);
+    g = u128::MAX / 3 + mul_hi(z, g);
+    let atanh = s + mul_hi(s, mul_hi(z, g));
+    let l = LOG2_WIDE[k as usize] + mul_hi(atanh, TWO_LOG2_E_WIDE);
+    ((e as i128 - f as i128) << W_FRAC) + (l >> (WIDE_FRAC - W_FRAC)) as i128
+}
+
+/// `2^(w / 2^W_FRAC)` rounded to `f` fractional bits, not yet saturated:
+/// below `2^(2f)`, and [`overflow`] from `w ≥ f`. `|w| < 2^127`.
+/// `1 ≤ f ≤ 32`.
+#[inline]
+const fn exp2_wide(w: i128, f: u32) -> i128 {
+    let n = (w >> W_FRAC) as i64;
+    if n >= f as i64 {
+        return overflow(f);
+    }
+    let t = w as u128 & ((1 << W_FRAC) - 1);
+    let rest = W_FRAC - STEPS;
+    let k = (t >> rest) as u64;
+    let r = t & ((1 << rest) - 1);
+    let y = (((r >> (W_FRAC - EXPM1_FRAC)) * (LN_2 >> (LN_2_FRAC - 64))) >> 64) as u64;
+    round_mantissa(exp_unit(k, y), n, f)
+}
+
+/// `|x|^y` for `|x| = a / 2^f > 0` and `y = y / 2^fy ≠ 0`, `fy ∈ {0, f}`,
+/// `|y| < 2^31` for `fy = 0`: `w = y · log₂ |x|` from two exact products of
+/// the halves of [`log2_wide`], truncated to [`W_FRAC`] bits, then
+/// [`exp2_wide`]. A product that is `64` or more in magnitude overflows or
+/// gives `0` without a shift.
+#[inline]
+const fn pow_magnitude(a: u64, f: u32, y: i64, fy: u32) -> i128 {
+    let l = log2_wide(a, f);
+    let negative = (l < 0) != (y < 0);
+    let (lm, ym) = (l.unsigned_abs(), y.unsigned_abs() as u128);
+    let high = ym * (lm >> 64);
+    if high >= 1 << (62 + fy) {
+        return if negative { 0 } else { overflow(f) };
+    }
+    let m = ((high << (64 - fy)) + ((ym * (lm as u64 as u128)) >> fy)) as i128;
+    exp2_wide(if negative { -m } else { m }, f)
+}
+
+/// `x^y` for `x = raw / 2^f` and `y = y / 2^fy`, `fy ∈ {0, f}`, rounded to
+/// `f` fractional bits, not yet saturated, with the [`overflow`] value and
+/// its negation for a negative result; `None` for `x < 0` and a `y` that is
+/// not an integer. `x^0 = 1`, `0^y` is `0` for `y > 0` and [`overflow`] for
+/// `y < 0`; a negative `x` with an odd `y` negates `|x|^y`. `1 ≤ f ≤ 32`.
+#[inline]
+pub(crate) const fn pow(raw: i64, f: u32, y: i64, fy: u32) -> Option<i128> {
+    if y == 0 {
+        return Some(1 << f);
+    }
+    if raw == 0 {
+        return Some(if y > 0 { 0 } else { overflow(f) });
+    }
+    let m = pow_magnitude(raw.unsigned_abs(), f, y, fy);
+    if raw > 0 {
+        return Some(m);
+    }
+    if fy > 0 && y & ((1 << fy) - 1) != 0 {
+        return None;
+    }
+    Some(if (y >> fy) & 1 == 1 { -m } else { m })
 }

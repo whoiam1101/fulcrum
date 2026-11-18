@@ -11,6 +11,9 @@
 //! the full Taylor series of `e^(t·ln 2)` at 124 fractional bits, with
 //! 256-bit products, instead of the table of `2^(k/256)` and the short
 //! series of the remainder.
+//!
+//! [`pow`] is [`exp2`] of `y · log2 x`, with the error of the product
+//! carried into the bound of the mantissa.
 
 /// Fractional bits of [`log2`].
 pub const SCALE: u32 = 64;
@@ -91,6 +94,20 @@ pub fn exp(raw: i128, f: u32) -> (u128, i128, u128) {
     }
     let error = if raw == 0 { 0 } else { EXP_ERROR };
     (sum, i128::from(EXP2_SCALE) - i128::from(f) - n, error)
+}
+
+/// `x^y = 2^(y · log₂ x)` for `x = raw / 2^f > 0` and `y = y / 2^fy` as
+/// `m / 2^s`, in the form of [`exp2`]: `w = y · log₂ x` from [`log2`] at 64
+/// fractional bits, then [`exp2`] of `w`. The error of `w`, at most
+/// `(|y| + 1) · LOG2_ERROR + 1` units of `2^-64`, is a relative error of the
+/// mantissa below `2^61` units per unit, added to [`EXP2_ERROR`]. `f`,
+/// `fy ≤ 32`, `|y · log₂ x| · 2^64 < 2^127`.
+pub fn pow(raw: i128, f: u32, y: i128, fy: u32) -> (u128, i128, u128) {
+    let l = log2(raw, f);
+    let w = (y * l) >> fy;
+    let (m, s, error) = exp2(w, SCALE);
+    let dw = ((y.unsigned_abs() >> fy) + 1) * LOG2_ERROR as u128 + 1;
+    (m, s + i128::from(SCALE) - i128::from(f), error + (dw << 61))
 }
 
 /// `⌊m / 2^s⌋` for `s ≥ 0`.

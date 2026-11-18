@@ -485,6 +485,10 @@ const EXP2_LN_2_FRAC: u32 = 104;
 /// `log2`.
 const LOG_FRAC: u32 = 62;
 
+/// Fractional bits of the wide logarithm table and of the wide `2·log₂ e`
+/// of `pow`: its exponent `y · log₂ x` needs `log₂ x` far below `2^-94`.
+const LOG_WIDE_FRAC: u32 = 126;
+
 /// `log₂` of the number of points of both tables: `2^(k/2^EXP_STEPS)` for
 /// `k/2^EXP_STEPS ∈ [0, 1)`, `log₂ c` for `c = 1 + k/2^EXP_STEPS ∈ [1, 2)`.
 const EXP_STEPS: u32 = 8;
@@ -586,6 +590,28 @@ fn render_exp() -> String {
     .unwrap();
     writeln!(
         out,
+        "/// Fractional bits of [`LOG2_WIDE`] and [`TWO_LOG2_E_WIDE`]."
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "pub(crate) const WIDE_FRAC: u32 = {};\n",
+        LOG_WIDE_FRAC
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "/// `2 · log₂ e` at [`WIDE_FRAC`] bits, correctly rounded: the factor of the\n/// `atanh` series of the wide logarithm of `pow`."
+    )
+    .unwrap();
+    writeln!(
+        out,
+        "pub(crate) const TWO_LOG2_E_WIDE: u128 = {};\n",
+        lit(&ln2.recip().mul_int(2).round_to(LOG_WIDE_FRAC))
+    )
+    .unwrap();
+    writeln!(
+        out,
         "/// `2^(k/2^STEPS)` for `k = 0 .. 2^STEPS`, correctly rounded."
     )
     .unwrap();
@@ -607,6 +633,21 @@ fn render_exp() -> String {
             ln_1p_ratio(k, steps).div(&ln2)
         };
         writeln!(out, "    {},", lit(&v.round_to(LOG_FRAC))).unwrap();
+    }
+    out.push_str("];\n\n");
+    writeln!(
+        out,
+        "/// `log₂(1 + k/2^STEPS)` for `k = 0 .. 2^STEPS` at [`WIDE_FRAC`] bits,\n/// correctly rounded: the table of the wide logarithm of `pow`."
+    )
+    .unwrap();
+    writeln!(out, "pub(crate) const LOG2_WIDE: [u128; {}] = [", steps).unwrap();
+    for k in 0..steps {
+        let v = if k == 0 {
+            Interval::exact(BigInt::zero())
+        } else {
+            ln_1p_ratio(k, steps).div(&ln2)
+        };
+        writeln!(out, "    {},", lit(&v.round_to(LOG_WIDE_FRAC))).unwrap();
     }
     out.push_str("];\n");
     out

@@ -758,6 +758,58 @@ macro_rules! define_fixed {
                 Some(Self { raw: crate::exp::ln(self.raw as i64, $F) as $Bits })
             }
 
+            /// `self^y` as `2^(y · log₂ self)`, within 1 ulp on every width:
+            /// correctly rounded on every pair of `FixedFloat8` and
+            /// `FixedFloat16` except an exact power halfway between two
+            /// values, which may round either way, and within
+            /// `½ + 2^-5.7` ulp on `FixedFloat64`; saturated to `MAX` or `MIN`
+            /// by the sign of the result. `x^0 = 1` for every `x`, `0^y` is `0` for `y > 0`
+            /// and `MAX` for `y < 0`; a negative `self` takes the sign of an
+            /// odd integer `y` and gives `0` for a `y` that is not an
+            /// integer. Exact when `y · log₂ self` is an exact integer, as for
+            /// powers of two.
+            #[inline]
+            #[must_use]
+            pub const fn pow(self, y: Self) -> Self {
+                match crate::exp::pow(self.raw as i64, $F, y.raw as i64, $F) {
+                    Some(v) => Self::saturate(v as crate::kernel::$k::Wide),
+                    None => Self::ZERO,
+                }
+            }
+
+            /// `self^y` as [`Self::pow`], or `None` when the rounded result
+            /// is out of range (also `0^y` for `y < 0`) or `self < 0` and `y`
+            /// is not an integer.
+            #[inline]
+            pub const fn checked_pow(self, y: Self) -> Option<Self> {
+                match crate::exp::pow(self.raw as i64, $F, y.raw as i64, $F) {
+                    Some(v) => Self::checked(v as crate::kernel::$k::Wide),
+                    None => None,
+                }
+            }
+
+            /// `self^n` for an integer `n`, as [`Self::pow`] of `n` without
+            /// the range of `Self` on the exponent: `x^0 = 1`, the sign of a
+            /// negative `self` for odd `n`, `0^n` is `MAX` for `n < 0`.
+            #[inline]
+            #[must_use]
+            pub const fn powi(self, n: i32) -> Self {
+                match crate::exp::pow(self.raw as i64, $F, n as i64, 0) {
+                    Some(v) => Self::saturate(v as crate::kernel::$k::Wide),
+                    None => Self::ZERO,
+                }
+            }
+
+            /// `self^n` as [`Self::powi`], or `None` when the rounded result
+            /// is out of range, also for `self = 0` and `n < 0`.
+            #[inline]
+            pub const fn checked_powi(self, n: i32) -> Option<Self> {
+                match crate::exp::pow(self.raw as i64, $F, n as i64, 0) {
+                    Some(v) => Self::checked(v as crate::kernel::$k::Wide),
+                    None => None,
+                }
+            }
+
             /// `-1`, `0` or `1` by the sign of `self`.
             #[inline]
             #[must_use]
