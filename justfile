@@ -5,7 +5,7 @@ test_features := "std,float-convert,serde,bytemuck,num-traits"
 release_features := "std,float-convert"
 optional_features := "serde bytemuck num-traits"
 msrv := "1.60"
-min_coverage := "80"
+min_coverage := "92"
 
 [doc("List the recipes")]
 default:
@@ -108,10 +108,17 @@ hack:
 miri toolchain="nightly":
     cd integrations && MIRIFLAGS=-Zmiri-strict-provenance cargo +{{ toolchain }} miri test --features bytemuck --test bytemuck
 
-[doc("Line coverage of the root tests with the CI floor")]
+[doc("Line coverage of src by the root tests and the tests of integrations/ together, with the CI floor; cargo llvm-cov reports only the binaries of one workspace, so llvm-cov of llvm-tools merges them")]
 [group("test")]
 cov min=min_coverage:
-    cargo llvm-cov --features {{ test_features }} --summary-only --fail-under-lines {{ min }}
+    cargo llvm-cov clean --workspace
+    cargo llvm-cov --no-report --features {{ test_features }}
+    CARGO_LLVM_COV_TARGET_DIR="$PWD/target/llvm-cov-target" cargo llvm-cov --no-report --manifest-path integrations/Cargo.toml --all-features --dep-coverage fulcrum
+    tools="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin" && d=target/llvm-cov-target \
+      && "$tools/llvm-profdata" merge -sparse "$d"/*.profraw -o "$d/merged.profdata" \
+      && "$tools/llvm-cov" report -instr-profile="$d/merged.profdata" $(find "$d/debug/deps" -maxdepth 1 -type f -perm -u+x | sed 's/^/-object=/') \
+        -ignore-filename-regex='/\.cargo/|/\.rustup/|/rustc/|/tests/|/integrations/|/target/' | tee "$d/report.txt" \
+      && awk -v min={{ min }} '$1 == "TOTAL" { found = 1; if ($10 + 0 < min) { print "line coverage " $10 " is below " min "%"; exit 1 } } END { if (!found) exit 1 }' "$d/report.txt"
 
 [doc("Mutation testing, hours; extra arguments go to cargo mutants, e.g. --jobs 4 --shard 0/8. The Kani harnesses (`src/proofs`, only under `cfg(kani)`) are not mutated. A build over 2 minutes (a mutant that loops in the const evaluation of `ff!`) is a timeout. A mutant that times out counts as caught: only exit code 3 (timeouts, nothing missed) passes")]
 [group("test")]
