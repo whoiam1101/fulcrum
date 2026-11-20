@@ -392,6 +392,43 @@ assert_eq!(pos, Vec3::new(ff32!(2), ff32!(3), ff32!(4)));
 
 With `serde`, a vector is a tuple of its components (`["1.5","-2"]` in JSON); with `bytemuck`, `Vec2<T>` and `Vec3<T>` are `Pod` when `T` is.
 
+### Arrays: a plain loop over slices
+
+There is no batch API: a plain loop over slices is the batch operation, and the compiler vectorizes it from the same scalar code, with the same bits.
+
+```rust
+use fulcrum::FixedFloat16;
+
+fn step(pos: &mut [FixedFloat16], vel: &[FixedFloat16], dt: FixedFloat16) {
+    for (p, v) in pos.iter_mut().zip(vel) {
+        *p = v.mul_add(dt, *p);
+    }
+}
+```
+
+Which loops vectorize, checked in CI on every change (`just asm sse2|avx2|neon`, the table of `bench/src/bin/asm.rs`): x86-64 with its SSE2 baseline, with AVX2 (`-C target-cpu=x86-64-v3` or `native`), and aarch64 (NEON).
+
+| Loop of | `FixedFloat8`, `FixedFloat16` | `FixedFloat32` |
+|---|---|---|
+| `+`, `-` | SSE2, AVX2, NEON | SSE2, AVX2, NEON |
+| `*`, `mul_add`, `lerp` | SSE2, AVX2, NEON | AVX2, NEON |
+| `mul_int` | SSE2, AVX2, NEON | AVX2 |
+
+On the SSE2 baseline a 32-bit product needs a 64-bit compare and a signed 32 × 32 → 64 multiply that SSE2 does not have, so `*`, `mul_add`, `lerp` and `mul_int` of `FixedFloat32` stay scalar; build with AVX2 for them. `FixedFloat64` does not vectorize: no SIMD set multiplies 64 × 64 → 128. `/` does not vectorize anywhere: there is no SIMD integer division.
+
+Nanoseconds per element over 4096 elements, x86-64 SSE2 baseline (Intel Core 7 240H); `fixed` with its saturating operations, which truncate, and plain wrapping integers without rounding as the floor:
+
+| | `FixedFloat8` | `fixed` I4F4 | `FixedFloat16` | `fixed` I8F8 | `i16` | `FixedFloat32` | `fixed` I16F16 | `i32` |
+|---|---:|---:|---:|---:|---:|---:|---:|---:|
+| `+` | 0.014 | 0.019 | 0.029 | 0.032 | 0.035 | 0.206 | 0.208 | 0.063 |
+| `-` | 0.014 | 0.017 | 0.030 | 0.032 | 0.034 | 0.206 | 0.207 | 0.063 |
+| `*` | 0.157 | 0.299 | 0.104 | 0.837 | 0.036 | 0.471 | 0.707 | 0.167 |
+| `mul_int` | 0.088 | 0.115 | 0.114 | 0.114 | 0.036 | 0.355 | 0.539 | 0.167 |
+| `mul_add` | 0.133 | 0.489 | 0.197 | 0.407 | 0.042 | 0.599 | 1.414 | 0.187 |
+| `lerp` | 0.145 | 0.309 | 0.590 | 0.621 | 0.047 | 0.601 | 1.198 | 0.209 |
+
+The README benchmarks repeat this table on the CI runner.
+
 ## 5. Rounding and integers
 
 | Method | Rule | Overflow |
