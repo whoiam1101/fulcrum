@@ -128,6 +128,11 @@ deny:
 perf *args:
     cd bench && cargo bench --bench instr -- {{ args }}
 
+[doc("Vectorization of the loops of bench/src/loops.rs against the table of bench/src/bin/asm.rs, no software routine in the scalar mul and div, no branch in saturating_add; isa is sse2, avx2 or neon (neon needs the aarch64-unknown-linux-gnu target)")]
+[group("perf")]
+asm isa:
+    cd bench && cargo run -q --release --bin asm -- {{ isa }}
+
 [doc("Speed against fixed, libm and std floats on one pinned core")]
 [group("perf")]
 bench *args:

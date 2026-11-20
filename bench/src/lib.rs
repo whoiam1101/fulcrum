@@ -4,6 +4,7 @@
 
 pub mod accuracy;
 pub mod exp_accuracy;
+pub mod loops;
 pub mod tick;
 pub mod trig_accuracy;
 

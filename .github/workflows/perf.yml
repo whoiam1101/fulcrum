@@ -29,6 +29,29 @@ env:
   INSTRUCTION_LIMIT: "ir=1%"
 
 jobs:
+  vectorization:
+    name: vectorization ${{ matrix.isa }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - isa: sse2
+            os: ubuntu-24.04
+          - isa: avx2
+            os: ubuntu-24.04
+          - isa: neon
+            os: ubuntu-24.04-arm
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        with:
+          persist-credentials: false
+      - name: the loops of bench/src/loops.rs against the table of bench/src/bin/asm.rs
+        working-directory: bench
+        env:
+          ISA: ${{ matrix.isa }}
+        run: cargo run -q --release --bin asm -- "$ISA"
+
   instructions:
     name: instruction counts against the base commit
     runs-on: ubuntu-24.04
