@@ -49,6 +49,23 @@ const COMBINED_PAIRS: [(&str, &str); 2] = [("FixedFloat32", "I16F16"), ("FixedFl
 
 const COMBINED_INTS: [&str; 2] = ["i32", "i64"];
 
+const LOOPS: [(&str, &str); 6] = [
+    ("add", "`+`"),
+    ("sub", "`-`"),
+    ("mul", "`*`"),
+    ("mul_int", "`mul_int`"),
+    ("mul_add", "`mul_add`"),
+    ("lerp", "`lerp`"),
+];
+
+const LOOP_PAIRS: [(&str, &str); 3] = [
+    ("FixedFloat8", "I4F4"),
+    ("FixedFloat16", "I8F8"),
+    ("FixedFloat32", "I16F16"),
+];
+
+const LOOP_INTS: [&str; 2] = ["i16", "i32"];
+
 const ROOTS: [(&str, &str); 3] = [
     ("sqrt", "`sqrt`"),
     ("rsqrt", "`rsqrt`"),
@@ -131,9 +148,9 @@ fn id(mode: &str, op: &str, imp: &str, ty: &str) -> String {
     format!("{}/{}/{}/{}", mode, op, imp, ty)
 }
 
-/// Integers run only the throughput loops, so their latency cells stay empty.
+/// Integers run no latency chains, so their latency cells stay empty.
 fn measured(mode: &str, imp: &str) -> bool {
-    imp != "int" || mode == "throughput"
+    imp != "int" || mode != "latency"
 }
 
 /// Every benchmark id the report reads; all must be present.
@@ -151,13 +168,23 @@ fn expected() -> Vec<String> {
             ids.push(id(mode, op, "int", int));
         }
     }
-    for (op, _) in COMBINED {
-        for (ours, theirs) in COMBINED_PAIRS {
-            ids.push(id("throughput", op, "fulcrum", ours));
-            ids.push(id("throughput", op, "fixed-sat", theirs));
-        }
-        for int in COMBINED_INTS {
-            ids.push(id("throughput", op, "int", int));
+    for (mode, ops, pairs, ints) in [
+        (
+            "throughput",
+            &COMBINED[..],
+            &COMBINED_PAIRS[..],
+            &COMBINED_INTS[..],
+        ),
+        ("loops", &LOOPS[..], &LOOP_PAIRS[..], &LOOP_INTS[..]),
+    ] {
+        for (op, _) in ops {
+            for (ours, theirs) in pairs {
+                ids.push(id(mode, op, "fulcrum", ours));
+                ids.push(id(mode, op, "fixed-sat", theirs));
+            }
+            for int in ints {
+                ids.push(id(mode, op, "int", int));
+            }
         }
     }
     for (op, _) in ROOTS {
@@ -381,32 +408,41 @@ impl Report {
         }
     }
 
-    fn combined_table(&self, s: &mut String) {
+    /// fulcrum against `fixed` in pairs of the same format, plus integer
+    /// columns, one row per operation of `ops` in the group `mode`.
+    fn pair_table(
+        &self,
+        s: &mut String,
+        mode: &str,
+        ops: &[(&str, &str)],
+        pairs: &[(&str, &str)],
+        ints: &[&str],
+    ) {
         s.push_str("| ");
-        for (ours, theirs) in COMBINED_PAIRS {
+        for (ours, theirs) in pairs {
             let _ = write!(
                 s,
                 "| `{}` | `fixed` {} | `{}` vs `{}` ",
                 ours, theirs, ours, theirs
             );
         }
-        for int in COMBINED_INTS {
+        for int in ints {
             let _ = write!(s, "| `{}` ", int);
         }
         s.push_str("|\n|---|");
-        for _ in 0..COMBINED_PAIRS.len() {
+        for _ in pairs {
             s.push_str("---:|---:|---|");
         }
-        for _ in 0..COMBINED_INTS.len() {
+        for _ in ints {
             s.push_str("---:|");
         }
         s.push('\n');
-        for (op, label) in COMBINED {
+        for (op, label) in ops {
             let _ = write!(s, "| {}", label);
-            for (ours, theirs) in COMBINED_PAIRS {
+            for (ours, theirs) in pairs {
                 let (a, b) = (
-                    self.get("throughput", op, "fulcrum", ours),
-                    self.get("throughput", op, "fixed-sat", theirs),
+                    self.get(mode, op, "fulcrum", ours),
+                    self.get(mode, op, "fixed-sat", theirs),
                 );
                 let v = compare(a, b);
                 let _ = write!(
@@ -417,11 +453,32 @@ impl Report {
                     verdict_text(v)
                 );
             }
-            for int in COMBINED_INTS {
-                let _ = write!(s, " | {}", self.cell("throughput", op, "int", int));
+            for int in ints {
+                let _ = write!(s, " | {}", self.cell(mode, op, "int", int));
             }
             s.push_str(" |\n");
         }
+    }
+
+    /// How many pairs of `pair_table` fulcrum wins and loses: faster, all,
+    /// slower.
+    fn tally(
+        &self,
+        mode: &str,
+        ops: &[(&str, &str)],
+        pairs: &[(&str, &str)],
+    ) -> (usize, usize, usize) {
+        let v: Vec<Verdict> = ops
+            .iter()
+            .flat_map(|&(op, _)| {
+                pairs
+                    .iter()
+                    .map(move |&(ours, theirs)| self.vs_fixed(mode, op, ours, theirs))
+            })
+            .collect();
+        let faster = v.iter().filter(|v| matches!(v, Verdict::Faster(_))).count();
+        let slower = v.iter().filter(|v| matches!(v, Verdict::Slower(_))).count();
+        (faster, v.len(), slower)
     }
 
     fn vs_float(&self, op: &str, ours: &str, imp: &str, float: &str) -> Verdict {
@@ -687,29 +744,23 @@ impl Report {
             );
         }
 
-        let combined: Vec<Verdict> = COMBINED
-            .iter()
-            .flat_map(|&(op, _)| {
-                COMBINED_PAIRS
-                    .iter()
-                    .map(move |&(ours, theirs)| self.vs_fixed("throughput", op, ours, theirs))
-            })
-            .collect();
-        let c_faster = combined
-            .iter()
-            .filter(|v| matches!(v, Verdict::Faster(_)))
-            .count();
-        let c_slower = combined
-            .iter()
-            .filter(|v| matches!(v, Verdict::Slower(_)))
-            .count();
+        let (faster, all, slower) = self.tally("throughput", &COMBINED, &COMBINED_PAIRS);
         let _ = writeln!(
             s,
             "- **Combined operations** (`mul_add`, `mul_div`, `lerp`, dot product) against `fixed`: faster in {} of {} cases, on par in {}, slower in {}.",
-            c_faster,
-            combined.len(),
-            combined.len() - c_faster - c_slower,
-            c_slower
+            faster,
+            all,
+            all - faster - slower,
+            slower
+        );
+        let (faster, all, slower) = self.tally("loops", &LOOPS, &LOOP_PAIRS);
+        let _ = writeln!(
+            s,
+            "- **Loops over slices** (`+`, `-`, `*`, `mul_int`, `mul_add`, `lerp` on 8, 16 and 32 bits) against `fixed`: faster in {} of {} cases, on par in {}, slower in {}.",
+            faster,
+            all,
+            all - faster - slower,
+            slower
         );
 
         for (ours, float) in ROOT_GROUPS {
@@ -816,7 +867,20 @@ impl Report {
              and a sum of saturating products, which truncates every term. \
              Integers run the same loops with wrapping `x * y + z`, `x * y / z`, `x + (y - x) * t` and a sum of products.\n\n",
         );
-        self.combined_table(&mut s);
+        self.pair_table(
+            &mut s,
+            "throughput",
+            &COMBINED,
+            &COMBINED_PAIRS,
+            &COMBINED_INTS,
+        );
+        s.push_str("\n### Loops over slices, ns per element\n\n");
+        s.push_str(
+            "A plain loop over slices is the batch operation; the table of `bench/src/bin/asm.rs` lists which of these loops vectorize, checked in CI. \
+             fulcrum rounds `*`, `mul_add` and `lerp` to nearest once; `fixed` uses saturating operators, `saturating_mul_int`, `saturating_mul_add` and `saturating_lerp`, which truncate. \
+             Integers run the same loops with wrapping arithmetic and no rounding: `x * y`, `x * n`, `x * y + z`, `x + (y - x) * t`. The factors of `mul_int` lie in `[-8, 8)`.\n\n",
+        );
+        self.pair_table(&mut s, "loops", &LOOPS, &LOOP_PAIRS, &LOOP_INTS);
         s.push_str("\n### Square roots, ns per operation (throughput)\n\n");
         s.push_str(
             "Operands in `(0, 256)`. fulcrum `sqrt`, `rsqrt` and `hypot` are correctly rounded to nearest. \

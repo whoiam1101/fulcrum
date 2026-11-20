@@ -20,6 +20,14 @@
 //! saturating products, truncated per term, while fulcrum rounds to nearest
 //! once (`add_product` for the dot product).
 //!
+//! `loops`: the batch operations of stage 7, `+`, `-`, `*`, `mul_int`,
+//! `mul_add` and `lerp` over 4096 operands, fulcrum through the loops of
+//! `fulcrum_bench::loops` that `bin/asm.rs` checks for vectorization, `fixed`
+//! with saturating arithmetic through the same loop shapes (`saturating_*`,
+//! `saturating_mul_int`, `saturating_mul_add`, `saturating_lerp`, which
+//! truncate), and `i16`, `i32` with wrapping arithmetic and no rounding. The
+//! integer factors of `mul_int` lie in `[-8, 8)`.
+//!
 //! Square roots (`sqrt`, `rsqrt`, `hypot`) are measured for throughput on
 //! operands in `(0, 256)`, against the software floats of `libm` and the
 //! hardware floats of `std` (`rsqrt` of a float is `1 / x.sqrt()`).
@@ -46,6 +54,7 @@
 
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+use fulcrum_bench::loops::{self, map2, map3, map_int};
 use fulcrum_bench::{divisor, ff16, ff32, ff64, ff8, inputs, operand, q32_32, radicand};
 use std::hint::black_box;
 
@@ -423,6 +432,100 @@ fn combined(c: &mut Criterion) {
     bench_int_combined!(c, "int/i64", i64, q32_32);
 }
 
+/// The six loops of stage 7 over 4096 operands for one implementation; each
+/// operation is a function over whole slices.
+macro_rules! bench_loops {
+    ($c:expr, $name:literal, $T:ty, $Int:ty, $make:expr, add: $add:expr, sub: $sub:expr, mul: $mul:expr, mul_int: $mul_int:expr, mul_add: $mul_add:expr, lerp: $lerp:expr) => {{
+        let values = |seed| -> Vec<$T> { inputs(N, seed).into_iter().map(|x| $make(operand(x))).collect() };
+        let (a, b, c) = (values(13), values(14), values(15));
+        let n: Vec<$Int> = inputs(N, 16).into_iter().map(|x| ((x >> 60) as i64 - 8) as $Int).collect();
+        let mut out = a.clone();
+        let mut g = $c.benchmark_group("loops");
+        g.throughput(Throughput::Elements(N as u64));
+        bench_loops!(@two g, out, "add", $name, $add, a, b);
+        bench_loops!(@two g, out, "sub", $name, $sub, a, b);
+        bench_loops!(@two g, out, "mul", $name, $mul, a, b);
+        bench_loops!(@two g, out, "mul_int", $name, $mul_int, a, n);
+        bench_loops!(@three g, out, "mul_add", $name, $mul_add, a, b, c);
+        bench_loops!(@three g, out, "lerp", $name, $lerp, a, b, c);
+        g.finish();
+    }};
+    (@two $g:ident, $out:ident, $op:literal, $name:literal, $f:expr, $xs:ident, $ys:ident) => {{
+        let f = $f;
+        $g.bench_function(BenchmarkId::new($op, $name), |bn| {
+            bn.iter(|| {
+                f(black_box(&$xs), black_box(&$ys), &mut $out);
+                black_box(&$out);
+            })
+        });
+    }};
+    (@three $g:ident, $out:ident, $op:literal, $name:literal, $f:expr, $xs:ident, $ys:ident, $zs:ident) => {{
+        let f = $f;
+        $g.bench_function(BenchmarkId::new($op, $name), |bn| {
+            bn.iter(|| {
+                f(black_box(&$xs), black_box(&$ys), black_box(&$zs), &mut $out);
+                black_box(&$out);
+            })
+        });
+    }};
+}
+
+/// `fixed` with saturating arithmetic in the loop shapes of fulcrum.
+macro_rules! bench_fixed_loops {
+    ($c:expr, $name:literal, $T:ident, $Int:ty, $make:expr) => {
+        bench_loops!(
+            $c,
+            $name,
+            $T,
+            $Int,
+            $make,
+            add: |a: &[$T], b: &[$T], o: &mut [$T]| map2(a, b, o, |x, y| x.saturating_add(y)),
+            sub: |a: &[$T], b: &[$T], o: &mut [$T]| map2(a, b, o, |x, y| x.saturating_sub(y)),
+            mul: |a: &[$T], b: &[$T], o: &mut [$T]| map2(a, b, o, |x, y| x.saturating_mul(y)),
+            mul_int: |a: &[$T], n: &[$Int], o: &mut [$T]| map_int(a, n, o, |x, k| x.saturating_mul_int(k)),
+            mul_add: |a: &[$T], b: &[$T], c: &[$T], o: &mut [$T]| map3(a, b, c, o, |x, y, z| x.saturating_mul_add(y, z)),
+            lerp: |a: &[$T], b: &[$T], t: &[$T], o: &mut [$T]| map3(a, b, t, o, |x, y, z: $T| z.saturating_lerp(x, y))
+        )
+    };
+}
+
+/// Plain integers with wrapping arithmetic and no rounding, the lower bound.
+macro_rules! bench_int_loops {
+    ($c:expr, $name:literal, $T:ident, $make:expr) => {
+        bench_loops!(
+            $c,
+            $name,
+            $T,
+            $T,
+            $make,
+            add: |a: &[$T], b: &[$T], o: &mut [$T]| map2(a, b, o, |x: $T, y| x.wrapping_add(y)),
+            sub: |a: &[$T], b: &[$T], o: &mut [$T]| map2(a, b, o, |x: $T, y| x.wrapping_sub(y)),
+            mul: |a: &[$T], b: &[$T], o: &mut [$T]| map2(a, b, o, |x: $T, y| x.wrapping_mul(y)),
+            mul_int: |a: &[$T], n: &[$T], o: &mut [$T]| map_int(a, n, o, |x: $T, k| x.wrapping_mul(k)),
+            mul_add: |a: &[$T], b: &[$T], c: &[$T], o: &mut [$T]| map3(a, b, c, o, |x: $T, y, z| x.wrapping_mul(y).wrapping_add(z)),
+            lerp: |a: &[$T], b: &[$T], t: &[$T], o: &mut [$T]| map3(a, b, t, o, |x: $T, y: $T, z| x.wrapping_add(y.wrapping_sub(x).wrapping_mul(z)))
+        )
+    };
+}
+
+fn slice_loops(c: &mut Criterion) {
+    use fixed::types::{I16F16, I4F4, I8F8};
+    bench_loops!(c, "fulcrum/FixedFloat8", FixedFloat8, i8, ff8, add: loops::add_8, sub: loops::sub_8, mul: loops::mul_8, mul_int: loops::mul_int_8, mul_add: loops::mul_add_8, lerp: loops::lerp_8);
+    bench_loops!(c, "fulcrum/FixedFloat16", FixedFloat16, i16, ff16, add: loops::add_16, sub: loops::sub_16, mul: loops::mul_16, mul_int: loops::mul_int_16, mul_add: loops::mul_add_16, lerp: loops::lerp_16);
+    bench_loops!(c, "fulcrum/FixedFloat32", FixedFloat32, i32, ff32, add: loops::add_32, sub: loops::sub_32, mul: loops::mul_32, mul_int: loops::mul_int_32, mul_add: loops::mul_add_32, lerp: loops::lerp_32);
+    bench_fixed_loops!(c, "fixed-sat/I4F4", I4F4, i8, |q: i64| I4F4::from_bits(
+        (q >> 12) as i8
+    ));
+    bench_fixed_loops!(c, "fixed-sat/I8F8", I8F8, i16, |q: i64| I8F8::from_bits(
+        (q >> 8) as i16
+    ));
+    bench_fixed_loops!(c, "fixed-sat/I16F16", I16F16, i32, |q: i64| {
+        I16F16::from_bits(q as i32)
+    });
+    bench_int_loops!(c, "int/i16", i16, |q: i64| (q >> 8) as i16);
+    bench_int_loops!(c, "int/i32", i32, |q: i64| q as i32);
+}
+
 /// One root function over 4096 operands for each implementation.
 macro_rules! bench_roots {
     ($c:expr, $name:literal, $T:ty, $make:expr, sqrt: $sqrt:expr, rsqrt: $rsqrt:expr, hypot: $hypot:expr) => {{
@@ -794,5 +897,15 @@ fn tick(c: &mut Criterion) {
     g.finish();
 }
 
-criterion_group!(benches, ops, combined, roots, trig, exp_log, vectors, tick);
+criterion_group!(
+    benches,
+    ops,
+    combined,
+    slice_loops,
+    roots,
+    trig,
+    exp_log,
+    vectors,
+    tick
+);
 criterion_main!(benches);
