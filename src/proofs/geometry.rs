@@ -10,8 +10,9 @@
 //! `_64`, never pick them up.
 //!
 //! The rest of the geometry does not converge on a CI runner: `normalize`
-//! and `clamp_length` (the 256-by-128-bit division of `kernel::scale_to`)
-//! exhaust its memory within a minute, `length` and `distance` of 16 bits
+//! and `clamp_length` exhausted its memory within a minute with the
+//! 256-by-128-bit division of `kernel::scale_to`, which `kernel::scale_narrow`
+//! replaced on 8–32 bits in stage 7 (not tried since), `length` and `distance` of 16 bits
 //! and `angle_to` of `Vec3` run past five hours. Exhaustive tests in release
 //! with overflow checks take their place (`tests/vec_geometry.rs`), where
 //! the domain allows it.

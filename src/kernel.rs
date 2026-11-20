@@ -212,10 +212,128 @@ macro_rules! sqrt_start {
     }};
 }
 
+/// `scale_vec` of a kernel, in one of two forms with equal results: the raw
+/// vector `(a, b, c)` scaled to the raw length `k ≥ 0`, every component
+/// correctly rounded and never above `k` in magnitude; the zero vector stays
+/// zero.
+///
+/// `narrow`, for the kernels whose squared lengths fit `u64` (`k8`, `k16`,
+/// `k32`): [`scale_narrow`], one root and one division per vector.
+///
+/// `wide`, for `k64`: [`scale_to`](k64::scale_to) of each component, a
+/// 256-bit product, a division and a root per component.
+macro_rules! scale_kernel {
+    (narrow, $Bits:ty, $UWide:ty) => {
+        /// The raw vector `(a, b, c)` scaled to the raw length `k ≥ 0` by
+        /// [`scale_narrow`](super::scale_narrow); the zero vector stays zero.
+        #[inline]
+        pub(crate) const fn scale_vec(a: $Bits, b: $Bits, c: $Bits, k: $Bits) -> [$Bits; 3] {
+            let s = norm_sq(a, b, c);
+            if s == 0 {
+                return [a, b, c];
+            }
+            let r = super::scale_narrow([a as i64, b as i64, c as i64], k as u64, s as u64);
+            [r[0] as $Bits, r[1] as $Bits, r[2] as $Bits]
+        }
+    };
+    (wide, $Bits:ty, $UWide:ty) => {
+        /// `x · k / √s` for raw `x` and `k` with `x² ≤ s`, `s > 0` and
+        /// `k ≥ 0`, where `s` is the squared length of a vector with `x`
+        /// as a component: that component of the vector scaled to the
+        /// raw length `k`. Correctly rounded and never above `k` in
+        /// magnitude, so it fits.
+        ///
+        /// `q = ⌊x²k² / s⌋` and its remainder `r` come from the exact
+        /// 256-bit product; `t = ⌊√q⌋ = ⌊|x|k/√s⌋`. The magnitude rounds
+        /// up when `q + r/s > (t + ½)²`, that is when `q - t² - t` is
+        /// positive, or zero and `4r > s`. There are no ties: a midpoint
+        /// is rational, so `s` would be a square `h²` of a sum of at most
+        /// three squares; then halving all of them reaches an odd `h`,
+        /// and `2|x|k = (2t + 1) · h` cannot hold with an odd right side
+        /// (INTERNALS §3.15).
+        #[inline]
+        pub(crate) const fn scale_to(x: $Bits, k: $Bits, s: u128) -> $Bits {
+            let ux = x.unsigned_abs() as u128;
+            let k = k.unsigned_abs() as u128;
+            let (hi, lo) = crate::wide::widening_mul_u128(ux * ux, k * k);
+            let (q, r) = crate::wide::div_rem_u256(hi, lo, s);
+            let t = isqrt(q as $UWide) as u128;
+            let d = q as i128 - (t * t + t) as i128;
+            let up = d > 0 || (d == 0 && r > s >> 2);
+            let m = (t + up as u128) as $Bits;
+            if x < 0 {
+                -m
+            } else {
+                m
+            }
+        }
+
+        /// The raw vector `(a, b, c)` scaled to the raw length `k ≥ 0`, each
+        /// component by [`scale_to`]; the zero vector stays zero.
+        #[inline]
+        pub(crate) const fn scale_vec(a: $Bits, b: $Bits, c: $Bits, k: $Bits) -> [$Bits; 3] {
+            let s = norm_sq(a, b, c);
+            if s == 0 {
+                return [a, b, c];
+            }
+            [scale_to(a, k, s), scale_to(b, k, s), scale_to(c, k, s)]
+        }
+    };
+}
+
+/// The raw vector `v` with squared length `s`, `0 < s ≤ 3 · 2^62`, scaled to
+/// the raw length `k < 2^31`: each component `round(|x| · k / √s)` with the
+/// sign of `x`, for components `|x| ≤ 2^31`.
+///
+/// Once per vector: `s` shifted left by an even `z` into
+/// `[2^61, 3 · 2^62]`, its root `R = ⌊√(s · 2^z)⌋` by `k32::isqrt` and
+/// `inv = ⌊2^94 / R⌋ < 2^64`. For each component, `p = |x| · k < 2^62` and the
+/// estimate `m = round(p · inv / 2^(94 − z/2)) ≈ p / √s`, clamped to `k`. The
+/// rounded value is the `m` with `(2m − 1)² · s < 4p² < (2m + 1)² · s` (`m = 0`
+/// needs only the right side): steps up while the right side fails and
+/// `m < k`, otherwise down while the left side fails; each walk sits under an
+/// `if`, as in `isqrt` (ARCHITECTURE §10). The result does not depend
+/// on the estimate, which only keeps the steps few: none for all but a few
+/// in `10^6` components (measured). There are no ties
+/// (INTERNALS §3.15), so the inequalities are strict. `m ≤ k` keeps
+/// `(2m ± 1)² < 2^64`, and every product fits `u128`: `4p² < 2^126`,
+/// `(2m ± 1)² · s < 2^128`, `p · inv + 2^93 < 2^126`.
+#[inline]
+const fn scale_narrow(v: [i64; 3], k: u64, s: u64) -> [i64; 3] {
+    let z = s.leading_zeros().saturating_sub(1) & !1;
+    let inv = ((1u128 << 94) / k32::isqrt(s << z) as u128) as u64;
+    let shift = 94 - z / 2;
+    let mut out = [0i64; 3];
+    let mut i = 0;
+    while i < 3 {
+        let x = v[i];
+        let p = x.unsigned_abs() * k;
+        let four = 4 * (p as u128 * p as u128);
+        let mut m = ((p as u128 * inv as u128 + (1 << (shift - 1))) >> shift) as u64;
+        if m > k {
+            m = k;
+        }
+        if m < k && ((2 * m + 1) * (2 * m + 1)) as u128 * (s as u128) < four {
+            m += 1;
+            while m < k && ((2 * m + 1) * (2 * m + 1)) as u128 * (s as u128) < four {
+                m += 1;
+            }
+        } else if m > 0 && ((2 * m - 1) * (2 * m - 1)) as u128 * (s as u128) > four {
+            m -= 1;
+            while m > 0 && ((2 * m - 1) * (2 * m - 1)) as u128 * (s as u128) > four {
+                m -= 1;
+            }
+        }
+        out[i] = if x < 0 { -(m as i64) } else { m as i64 };
+        i += 1;
+    }
+    out
+}
+
 macro_rules! kernel {
     (
         $k:ident, $Bits:ty, $Wide:ty, $UWide:ty, $Int:ty, $Frac:ty, $F:expr, $div:ident, $branchless_div:expr,
-        $steps:expr, $start:ident
+        $steps:expr, $start:ident, $scale:ident
     ) => {
         pub(crate) mod $k {
             /// The wide intermediate: room for every result before it is
@@ -464,47 +582,7 @@ macro_rules! kernel {
                 um * um
             }
 
-            /// `x · k / √s` for raw `x` and `k` with `x² ≤ s`, `s > 0` and
-            /// `k ≥ 0`, where `s` is the squared length of a vector with `x`
-            /// as a component: that component of the vector scaled to the
-            /// raw length `k`. Correctly rounded and never above `k` in
-            /// magnitude, so it fits.
-            ///
-            /// `q = ⌊x²k² / s⌋` and its remainder `r` come from the exact
-            /// 256-bit product; `t = ⌊√q⌋ = ⌊|x|k/√s⌋`. The magnitude rounds
-            /// up when `q + r/s > (t + ½)²`, that is when `q - t² - t` is
-            /// positive, or zero and `4r > s`. There are no ties: a midpoint
-            /// is rational, so `s` would be a square `h²` of a sum of at most
-            /// three squares; then halving all of them reaches an odd `h`,
-            /// and `2|x|k = (2t + 1) · h` cannot hold with an odd right side
-            /// (INTERNALS §3.15).
-            #[inline]
-            pub(crate) const fn scale_to(x: $Bits, k: $Bits, s: u128) -> $Bits {
-                let ux = x.unsigned_abs() as u128;
-                let k = k.unsigned_abs() as u128;
-                let (hi, lo) = crate::wide::widening_mul_u128(ux * ux, k * k);
-                let (q, r) = crate::wide::div_rem_u256(hi, lo, s);
-                let t = isqrt(q as $UWide) as u128;
-                let d = q as i128 - (t * t + t) as i128;
-                let up = d > 0 || (d == 0 && r > s >> 2);
-                let m = (t + up as u128) as $Bits;
-                if x < 0 {
-                    -m
-                } else {
-                    m
-                }
-            }
-
-            /// The raw vector `(a, b, c)` scaled to the raw length `k ≥ 0`, each
-            /// component by [`scale_to`]; the zero vector stays zero.
-            #[inline]
-            pub(crate) const fn scale_vec(a: $Bits, b: $Bits, c: $Bits, k: $Bits) -> [$Bits; 3] {
-                let s = norm_sq(a, b, c);
-                if s == 0 {
-                    return [a, b, c];
-                }
-                [scale_to(a, k, s), scale_to(b, k, s), scale_to(c, k, s)]
-            }
+            scale_kernel!($scale, $Bits, $UWide);
 
             /// The sign of `|(a, b, c)| - k` for a raw `k ≥ 0`: `-1`, `0` or
             /// `1`, from the exact squares.
@@ -598,10 +676,10 @@ macro_rules! kernel {
     };
 }
 
-kernel!(k8, i8, i16, u16, i8, u8, 4, magnitude, false, 1, table);
-kernel!(k16, i16, i32, u32, i8, u8, 8, signed, true, 1, table);
-kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false, 0, rsqrt);
-kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false, 1, k32);
+kernel!(k8, i8, i16, u16, i8, u8, 4, magnitude, false, 1, table, narrow);
+kernel!(k16, i16, i32, u32, i8, u8, 8, signed, true, 1, table, narrow);
+kernel!(k32, i32, i64, u64, i16, u16, 16, signed, false, 0, rsqrt, narrow);
+kernel!(k64, i64, i128, u128, i32, u32, 32, magnitude, false, 1, k32, wide);
 
 /// `⌊256 · √(t + ½)⌋` for `t < 256`: the start of `isqrt` for an argument
 /// whose leading bits, taken in pairs, are `t`. Within `2^-8` of the root of
