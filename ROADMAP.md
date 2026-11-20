@@ -158,7 +158,7 @@ Checked before the tag `v0.6.0`:
 
 ### Between 6 and 7 (`v0.6.x`)
 
-- [ ] Coverage of `integrations/` merged into the report (`num.rs` and `serialize.rs` show 0 % today), then raise the floor from 80 % (from [Between 3 and 4](#between-3-and-4-v03x)).
+- [x] Coverage of `integrations/` merged into the report (`num.rs` and `serialize.rs` show 0 % today), then raise the floor from 80 % (from [Between 3 and 4](#between-3-and-4-v03x)). `just cov` merges the profiles of both runs with `llvm-cov` of llvm-tools: `num.rs` 91 %, `serialize.rs` 91 %, all of `src` 93.0 % of lines; the floor is 92 % (ARCHITECTURE §10).
 
 ## 7. Optimizations `v0.7.0`
 
@@ -166,14 +166,14 @@ No batch API (`add_assign_slice` and the like): a plain loop over slices is the 
 
 Vectorized loops:
 - [x] `+`, `-`, `*`, `mul_int`, `mul_add`, `lerp` in a loop over slices of `FixedFloat8`, `FixedFloat16` and `FixedFloat32` vectorize on x86-64 (SSE2, AVX2) and aarch64 (NEON), without `unsafe` or intrinsics; where a branch of the kernel blocks it, the kernel is rewritten without the branch. `FixedFloat64` is out of scope: no SIMD set multiplies 64×64 → 128. All of them vectorize on all three, except `*`, `mul_int`, `mul_add`, `lerp` of `FixedFloat32` on SSE2 (no 64-bit compare and no signed 32×32 → 64 multiply) and `mul_int` of `FixedFloat32` on NEON; the rewrites that vectorize them were slower on x86-64 and are rejected (ARCHITECTURE §10).
-- [ ] Measured on the aarch64 runner, where the x86-64 numbers above decided: `mul_int` of `FixedFloat32` as a wide product and `saturate` (vectorizes on NEON), the `u128` division of `isqrt` of `FixedFloat64`, the two of `log2`/`pow` and the one of `mul_div` against `divlu` (no hardware 128/64 division there).
+- [x] Measured on the aarch64 runner, where the x86-64 numbers above decided: `mul_int` of `FixedFloat32` as a wide product and `saturate` (vectorizes on NEON), the `u128` division of `isqrt` of `FixedFloat64`, the two of `log2`/`pow` and the one of `mul_div` against `divlu` (no hardware 128/64 division there). Rejected without the measurement: `src` has no platform code, so each function has one form on every target, and each alternative is slower on x86-64 or no faster; a win on aarch64 alone would not change the choice (ARCHITECTURE §10).
 - [x] A check of the assembly (`--emit asm`, `bench/src/bin/asm.rs`) of these loops and of `mul`, `div`, `saturating_add` in CI on x86-64 (the SSE2 baseline and with AVX2 enabled) and on the aarch64 runner (NEON), so that a loss of vectorization on any of the three fails CI (from [Between 3 and 4](#between-3-and-4-v03x)).
 - [x] Benchmarks of the loops against the same loops of `fixed` and of `i32`/`i16` without rounding; the loops in the instruction-count gate (`bench/benches/instr.rs`, x86-64), so that a loss of speed fails CI.
 - [x] "Arrays" in the API guides (`API.md`, `API.ru.md`): write a plain loop; which widths and operations vectorize, with the numbers of the benchmarks.
 
 Speedups found by the benchmarks of stages 1–6:
 - [x] `pow` without the two `u128` divisions of the wide logarithm (a reciprocal of `u + c` by multiplication, or a table of `1/c`); today 50–53 ns, 1.5–1.9× slower than `libm` (from stage 6). Rejected on x86-64: each division is one hardware 128/64 `div`, and with both replaced by a shift (wrong values, the bound of any replacement) `log2` of `FixedFloat64` takes 18.1 ns instead of 18.05 (ARCHITECTURE §10); the 7-term series is the cost.
-- [ ] Square roots without division: `isqrt` through a Newton iteration for `1/√x` (multiplications only) with the same exact descent; was 5–26 ns, 3.3–16× slower than `libm` (from [Between 3 and 4](#between-3-and-4-v03x)). Done for `FixedFloat32` (`sqrt` 4.65 → 3.68 ns, `rsqrt` 6.96 → 4.94 ns, ARCHITECTURE §10); `FixedFloat64` still takes one `u128` division after the 32-bit start (`sqrt` 17.8 ns): on x86-64 it is one hardware 128/64 `div`, and two 64-bit divisions in its place were slower (ARCHITECTURE §10); to measure on aarch64.
+- [x] Square roots without division: `isqrt` through a Newton iteration for `1/√x` (multiplications only) with the same exact descent; was 5–26 ns, 3.3–16× slower than `libm` (from [Between 3 and 4](#between-3-and-4-v03x)). Done for `FixedFloat32` (`sqrt` 4.65 → 3.68 ns, `rsqrt` 6.96 → 4.94 ns, ARCHITECTURE §10); `FixedFloat64` still takes one `u128` division after the 32-bit start (`sqrt` 17.8 ns): on x86-64 it is one hardware 128/64 `div`, and two 64-bit divisions in its place were slower (ARCHITECTURE §10); rejected for `FixedFloat64`.
 - [x] `length` and `rotate` of the vectors measured against the new `isqrt`; `normalize` and `clamp_length` of `FixedFloat32` (41 and 27 ns) with a division narrower than `u128`, the quotient has at most 33 bits (from [Between 5 and 6](#between-5-and-6-v05x)). `length` of `Vec2f32` 5.91 → 5.20 ns with the new `isqrt`; `rotate` takes no root. On 8–32 bits `normalize` and `clamp_length` take one root and one division per vector instead of a 256-bit product, a division and a root per component: `Vec3` `normalize` 1.3–1.4× faster, `clamp_length` 7–22 %, `Vec2f32` `normalize` on par (ARCHITECTURE §10).
 - [x] Division: `/` 1.08–1.17× slower than `fixed` on 16 bits and in the latency of 32 bits; `mul_div` of `FixedFloat64` on aarch64, the `u128` division against `divlu` (from [Between 3 and 4](#between-3-and-4-v03x)). The latency of 32 bits is now ahead of `fixed` (4.44 against 5.36 ns); on 16 bits the other two forms of the rounded division were slower than the current one (1.87 ns throughput; `fixed` 1.21, it truncates), rejected (ARCHITECTURE §10); `mul_div` on aarch64 moves to the item of the aarch64 runner.
 - [x] Vector operations in the instruction-count gate (from [Between 5 and 6](#between-5-and-6-v05x)).
@@ -182,8 +182,16 @@ Speedups found while working on stage 7:
 - [x] `lerp` and `det` round as `mul` does, adding the half before the shift on 8–32 bits: loops of `lerp` 7–17 % and `perp_dot` 7–16 % faster (ARCHITECTURE §10).
 - [x] `Display` on `u64` with the digits in one buffer: 1.8–3.4× faster (ARCHITECTURE §10).
 
-**Done when:** every item above is done or rejected by a benchmark, with the reason recorded (ARCHITECTURE §10); the loops of the first group vectorize on 8–32 bits; the result bits are unchanged.
+**Done when:** every item above is done or rejected by a benchmark, with the reason recorded (ARCHITECTURE §10); the loops of the first group vectorize on 8–32 bits, except those of `FixedFloat32` that need an instruction the target lacks (on SSE2 a 64-bit compare and a signed 32×32 → 64 multiply for `*`, `mul_int`, `mul_add`, `lerp`; on NEON the saturating 32-bit multiply of `mul_int`), whose rewrites were slower (ARCHITECTURE §10); the result bits are unchanged.
 **Verified by:** the golden hashes on x86-64, ARM64 and 32-bit x86, the exhaustive tests and the oracle on every rewritten function, its Kani harnesses; the instruction-count gate and the README benchmarks for the speed.
+
+Checked before the tag `v0.7.0`:
+- [ ] The job `vectorization` passes on SSE2, AVX2 and NEON (`ubuntu-24.04-arm`), and the instruction-count gate runs the loops and the vector operations.
+- [ ] The weekly exhaustive jobs pass in release with overflow checks: `sqrt` and `rsqrt` of every `FixedFloat32`, `hypot` and `normalize` of every pair of 16 bits, `normalize` and `clamp_length` of 8 bits, `parse ∘ Display` of every `FixedFloat32`.
+- [ ] The Kani harnesses of the kernel pass in the weekly shards, run outside the developer machine; `isqrt_spec_8` and `isqrt_spec_16` cover the starts that did not change, the `rsqrt` start of `k32` and `scale_narrow` are covered by the exhaustive tests above.
+- [ ] The golden hashes are the same on x86-64, ARM64 and 32-bit x86 in debug and release.
+- [ ] The job `coverage` passes with the merged report and the floor of 92 %.
+- [ ] The bench workflow puts the table "Loops over slices" into the README.
 
 ## 8. Lean proofs of the kernel and 1.0 `v1.0.0`
 
