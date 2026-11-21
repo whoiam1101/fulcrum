@@ -159,23 +159,9 @@ fn fixed16_all_values_correctly_rounded() {
 #[test]
 #[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn fixed32_all_values_correctly_rounded() {
-    let threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i64;
-    let span = (1i64 << 32) / threads + 1;
-    let workers: Vec<_> = (0..threads)
-        .map(|k| {
-            std::thread::spawn(move || {
-                let start = i64::from(i32::MIN) + k * span;
-                let end = (start + span).min(i64::from(i32::MAX) + 1);
-                let mut rounded = 0u64;
-                for a in start..end {
-                    rounded += u64::from(check_inverse!(FixedFloat32, 16, a as i32));
-                }
-                rounded
-            })
-        })
-        .collect();
-    let rounded: u64 = workers.into_iter().map(|w| w.join().unwrap()).sum();
+    let rounded = parallel_sum(i64::from(i32::MIN), i64::from(i32::MAX) + 1, |a| {
+        u64::from(check_inverse!(FixedFloat32, 16, a as i32))
+    });
     assert_eq!(rounded, 3 << 32);
 }
 
@@ -184,41 +170,23 @@ fn fixed32_all_values_correctly_rounded() {
 #[test]
 #[ignore = "exhaustive over 2^32 pairs, minutes on every core: the weekly run"]
 fn fixed16_all_pairs_of_atan2_in_range() {
-    let threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i32;
-    let span = 65536 / threads + 1;
-    let workers: Vec<_> = (0..threads)
-        .map(|k| {
-            std::thread::spawn(move || {
-                let start = i32::from(i16::MIN) + k * span;
-                let end = (start + span).min(i32::from(i16::MAX) + 1);
-                let pi = FixedFloat16::PI;
-                for y in start..end {
-                    let y = FixedFloat16::from_bits(y as i16);
-                    for x in i16::MIN..=i16::MAX {
-                        let t = y.atan2(FixedFloat16::from_bits(x));
-                        assert!(-pi <= t && t <= pi, "atan2 {y:?} {x}");
-                    }
-                }
-            })
-        })
-        .collect();
-    for w in workers {
-        w.join().unwrap();
-    }
+    parallel(i64::from(i16::MIN), i64::from(i16::MAX) + 1, |y| {
+        let pi = FixedFloat16::PI;
+        let y = FixedFloat16::from_bits(y as i16);
+        for x in i16::MIN..=i16::MAX {
+            let t = y.atan2(FixedFloat16::from_bits(x));
+            assert!(-pi <= t && t <= pi, "atan2 {y:?} {x}");
+        }
+    });
 }
 
 macro_rules! random_values {
     ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
         #[test]
         fn $module() {
-            let mut rng = Pcg32::new(53, $bits);
-            for _ in 0..100_000 {
-                let a = rng.edge_bits($bits, $f) as $Raw;
-                let b = rng.edge_bits($bits, $f) as $Raw;
-                let _ = check_inverse!($T, $f, a);
-                let _ = check_atan2!($T, $f, a, b);
-            }
+            for_random_edges!(53, 100_000, $bits, $f, |a: $Raw, b: $Raw| {
+                (check_inverse!($T, $f, a), check_atan2!($T, $f, a, b))
+            });
         }
     };
 }

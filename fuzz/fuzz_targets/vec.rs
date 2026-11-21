@@ -11,26 +11,9 @@
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::{atan2_int, Format, TRIG_SCALE};
+use fulcrum_oracle::{atan2_int, is_scaled, Format, TRIG_SCALE};
 use libfuzzer_sys::fuzz_target;
 use num_bigint::BigInt;
-use num_rational::BigRational;
-
-/// Whether `r` is `x · k / √s` rounded to nearest, ties toward `+∞`:
-/// `(2|r| - 1)² · s ≤ 4x²k² < (2|r| + 1)² · s`, the ends swapped for a
-/// negative `x`.
-fn is_scaled(r: i128, x: i128, k: i128, s: &BigInt) -> bool {
-    if r != 0 && (r < 0) != (x < 0) {
-        return false;
-    }
-    let m = BigInt::from(r.unsigned_abs());
-    let n = BigInt::from(4) * BigInt::from(x) * BigInt::from(x) * BigInt::from(k) * BigInt::from(k);
-    let above = (&m * 2 + 1) * (&m * 2 + 1) * s;
-    let below = (&m * 2 - 1) * (&m * 2 - 1) * s;
-    let low_ok = m == BigInt::from(0) || if x >= 0 { below <= n } else { below < n };
-    let high_ok = if x >= 0 { n < above } else { n <= above };
-    low_ok && high_ok
-}
 
 macro_rules! check {
     ($data:ident, $module:ident, $T:ident, $lit:ident, $Acc:ident, $Bits:ty, $bits:tt, $frac:tt) => {{
@@ -59,29 +42,14 @@ macro_rules! check {
             assert_eq!(raw(a3.dot(b3)), fmt.dot(a, b).0);
             assert_eq!(raw(a3.length_sq()), fmt.dot(a, a).0);
             assert_eq!(raw(a2.length_sq()), fmt.dot(&a[..2], &a[..2]).0);
-            let det = |p: i128, q: i128, u: i128, w: i128| {
-                let e = fmt.exact(p) * fmt.exact(w) - fmt.exact(q) * fmt.exact(u);
-                fmt.settle(fmt.round(&e)).0
-            };
+            let det = |p: i128, q: i128, u: i128, w: i128| fmt.det(p, q, u, w).0;
             assert_eq!(raw(a2.perp_dot(b2)), det(a[0], a[1], b[0], b[1]));
             let c = a3.cross(b3);
             assert_eq!(raw(c.x), det(a[1], a[2], b[1], b[2]));
             assert_eq!(raw(c.y), det(a[2], a[0], b[2], b[0]));
             assert_eq!(raw(c.z), det(a[0], a[1], b[0], b[1]));
-            for n in [2, 3] {
-                let sum = a[..n]
-                    .iter()
-                    .fold(BigRational::from_integer(BigInt::from(0)), |s, &v| {
-                        s + fmt.exact(v) * fmt.exact(v)
-                    });
-                let want = fmt.settle(fmt.round_sqrt(&sum)).0;
-                let got = if n == 2 {
-                    raw(a2.length())
-                } else {
-                    raw(a3.length())
-                };
-                assert_eq!(got, want);
-            }
+            assert_eq!(raw(a2.length()), fmt.length(&a[..2]).0);
+            assert_eq!(raw(a3.length()), fmt.length(a).0);
 
             let s2: BigInt = a[..2]
                 .iter()

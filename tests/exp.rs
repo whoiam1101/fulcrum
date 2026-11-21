@@ -102,24 +102,6 @@ fn fixed16_log2_all_values_correctly_rounded() {
     }
 }
 
-/// Runs `check` on every value of `FixedFloat32` on every available thread
-/// and returns the number of values for which it returned `true`.
-fn every_fixed32(check: fn(i32) -> bool) -> u64 {
-    let threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i64;
-    let span = (1i64 << 32) / threads + 1;
-    let workers: Vec<_> = (0..threads)
-        .map(|k| {
-            std::thread::spawn(move || {
-                let start = i64::from(i32::MIN) + k * span;
-                let end = (start + span).min(i64::from(i32::MAX) + 1);
-                (start..end).filter(|&a| check(a as i32)).count() as u64
-            })
-        })
-        .collect();
-    workers.into_iter().map(|w| w.join().unwrap()).sum()
-}
-
 #[test]
 #[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn fixed32_log2_all_values_correctly_rounded() {

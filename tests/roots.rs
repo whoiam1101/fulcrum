@@ -106,15 +106,12 @@ fn fixed16_all_values() {
 macro_rules! random_values {
     (fixed8, $($rest:tt)*) => {};
     ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
-        let mut rng = Pcg32::new(31, $bits);
-        for _ in 0..100_000 {
-            let a = rng.edge_bits($bits, $f) as $Raw;
+        for_random_edges!(31, 100_000, $bits, $f, |a: $Raw, b: $Raw| {
             check_roots!($T, $bits, $f, a);
             if $bits < 64 {
-                let b = rng.edge_bits($bits, $f) as $Raw;
                 check_hypot!($T, $bits, a, b);
             }
-        }
+        })
     }};
 }
 

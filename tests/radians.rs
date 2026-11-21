@@ -27,29 +27,24 @@ use fulcrum::*;
 macro_rules! check_radians {
     ($T:ident, $bits:expr, $f:expr, $a:expr) => {{
         let x = $T::from_bits($a);
-        let s = i128::from(x.sin().to_bits());
-        let c = i128::from(x.cos().to_bits());
-        let t = i128::from(x.tan().to_bits());
+        let (sin, cos, tan, checked_tan) = (x.sin(), x.cos(), x.tan(), x.checked_tan());
+        let s = i128::from(sin.to_bits());
+        let c = i128::from(cos.to_bits());
+        let t = i128::from(tan.to_bits());
         let (rs, rc) = (trig::sin(i128::from($a), $f), trig::cos(i128::from($a), $f));
-        let e = trig::ERROR;
         assert!(trig::within_ulp(s, rs, $f), "sin {:?} = {}", x, s);
         assert!(trig::within_ulp(c, rc, $f), "cos {:?} = {}", x, c);
-        assert_eq!(x.sin_cos(), (x.sin(), x.cos()), "sin_cos {:?}", x);
-        assert_eq!(
-            x.checked_tan().unwrap_or(x.tan()),
-            x.tan(),
-            "checked_tan {:?}",
-            x
-        );
+        assert_eq!(x.sin_cos(), (sin, cos), "sin_cos {:?}", x);
+        assert_eq!(checked_tan.unwrap_or(tan), tan, "checked_tan {:?}", x);
         if x != $T::MIN {
-            assert_eq!((-x).sin(), -x.sin(), "sin odd {:?}", x);
-            assert_eq!((-x).cos(), x.cos(), "cos even {:?}", x);
-            if x.checked_tan().is_some() {
-                assert_eq!((-x).tan(), -x.tan(), "tan odd {:?}", x);
+            assert_eq!((-x).sin(), -sin, "sin odd {:?}", x);
+            assert_eq!((-x).cos(), cos, "cos even {:?}", x);
+            if checked_tan.is_some() {
+                assert_eq!((-x).tan(), -tan, "tan odd {:?}", x);
             }
         }
-        let mut rounded = u32::from(trig::rounded_interval(rs - e, rs + e, $f) == Some(s))
-            + u32::from(trig::rounded_interval(rc - e, rc + e, $f) == Some(c));
+        let mut rounded = u32::from(trig::correctly_rounded(rs, $f) == Some(s))
+            + u32::from(trig::correctly_rounded(rc, $f) == Some(c));
         let narrow = |lo: i128, hi: i128| hi - lo < 1 << (trig::SCALE - $f - 2);
         let (min, max) = (i128::from($T::MIN.to_bits()), i128::from($T::MAX.to_bits()));
         let bound =
@@ -67,7 +62,7 @@ macro_rules! check_radians {
                     _ => None,
                 };
                 if let Some(fits) = fits {
-                    assert_eq!(x.checked_tan().is_some(), fits, "checked_tan {:?}", x);
+                    assert_eq!(checked_tan.is_some(), fits, "checked_tan {:?}", x);
                 }
                 Some((rounded, decided.is_none()))
             }
@@ -120,31 +115,17 @@ fn fixed16_all_values_correctly_rounded() {
 #[test]
 #[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn fixed32_all_values_correctly_rounded() {
-    let threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i64;
-    let span = (1i64 << 32) / threads + 1;
-    let workers: Vec<_> = (0..threads)
-        .map(|k| {
-            std::thread::spawn(move || {
-                let start = i64::from(i32::MIN) + k * span;
-                let end = (start + span).min(i64::from(i32::MAX) + 1);
-                let mut rounded = 0u64;
-                for a in start..end {
-                    let a = a as i32;
-                    let (r, undecided) = check_radians!(FixedFloat32, 32, 16, a).unwrap();
-                    if undecided {
-                        assert!(
-                            trig::TAN_NEAR_MIDPOINT_32.binary_search(&a).is_ok(),
-                            "tan {a:#x} near a midpoint"
-                        );
-                    }
-                    rounded += u64::from(r + u32::from(undecided));
-                }
-                rounded
-            })
-        })
-        .collect();
-    let rounded: u64 = workers.into_iter().map(|w| w.join().unwrap()).sum();
+    let rounded = parallel_sum(i64::from(i32::MIN), i64::from(i32::MAX) + 1, |a| {
+        let a = a as i32;
+        let (r, undecided) = check_radians!(FixedFloat32, 32, 16, a).unwrap();
+        if undecided {
+            assert!(
+                trig::TAN_NEAR_MIDPOINT_32.binary_search(&a).is_ok(),
+                "tan {a:#x} near a midpoint"
+            );
+        }
+        u64::from(r + u32::from(undecided))
+    });
     assert_eq!(rounded, 3 << 32);
 }
 
@@ -152,11 +133,9 @@ macro_rules! random_values {
     ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {
         #[test]
         fn $module() {
-            let mut rng = Pcg32::new(53, $bits);
-            for _ in 0..200_000 {
-                let a = rng.edge_bits($bits, $f) as $Raw;
-                let _ = check_radians!($T, $bits, $f, a);
-            }
+            for_random_edges!(53, 200_000, $bits, $f, |a: $Raw| check_radians!(
+                $T, $bits, $f, a
+            ));
         }
     };
 }

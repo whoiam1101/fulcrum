@@ -10,6 +10,10 @@
 #[path = "../../tests/common/exp.rs"]
 mod exp;
 
+#[allow(dead_code)]
+#[path = "../../tests/common/trig.rs"]
+mod trig;
+
 #[macro_use]
 #[path = "../../tests/common/widths.rs"]
 mod widths;

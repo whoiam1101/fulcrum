@@ -243,7 +243,7 @@ fn exact_powi(a: i128, n: u32, f: u32) -> Option<i128> {
     if m & ((half << 1) - 1) == half {
         return None;
     }
-    let r = ((m >> (s - 1)) + 1) >> 1;
+    let r = exp::round_scaled(m, i128::from(s));
     Some(if p < 0 { -(r as i128) } else { r as i128 })
 }
 
@@ -282,25 +282,11 @@ powi_exact_integers!(fixed64_powi_exact_integers, FixedFloat64, i64, 64, 32);
 #[test]
 #[ignore = "exhaustive over 2^32 pairs, minutes on every core: the weekly run"]
 fn fixed16_pow_every_pair() {
-    let threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as i32;
-    let span = (1i32 << 16) / threads + 1;
-    let workers: Vec<_> = (0..threads)
-        .map(|k| {
-            std::thread::spawn(move || {
-                let start = i32::from(i16::MIN) + k * span;
-                let end = (start + span).min(i32::from(i16::MAX) + 1);
-                let mut decided = 0u64;
-                for a in start..end {
-                    for b in i16::MIN..=i16::MAX {
-                        decided += u64::from(check_pow_pair!(FixedFloat16, 8, a as i16, b));
-                    }
-                }
-                decided
-            })
-        })
-        .collect();
-    let decided: u64 = workers.into_iter().map(|w| w.join().unwrap()).sum();
+    let decided = parallel_sum(i64::from(i16::MIN), i64::from(i16::MAX) + 1, |a| {
+        (i16::MIN..=i16::MAX)
+            .map(|b| u64::from(check_pow_pair!(FixedFloat16, 8, a as i16, b)))
+            .sum()
+    });
     assert!(decided > 4_000_000_000, "decided {decided}");
 }
 

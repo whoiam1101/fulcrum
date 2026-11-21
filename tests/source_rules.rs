@@ -202,19 +202,13 @@ fn extension(path: &Path) -> &str {
 
 #[test]
 fn only_doc_comments() {
-    let lean = root().join("verify").join("lean");
     let found = violations(|path| {
         let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
         match extension(path) {
             "rs" => Some(rust_violation as fn(&str) -> bool),
             "toml" | "yml" | "yaml" => Some(config_violation),
-            "lean" if path.starts_with(&lean) => Some(lean_violation),
-            _ if name == ".gitignore"
-                || name.eq_ignore_ascii_case("justfile")
-                || name == ".justfile" =>
-            {
-                Some(config_violation)
-            }
+            "lean" => Some(lean_violation),
+            _ if name == ".gitignore" || name == "justfile" => Some(config_violation),
             _ => None,
         }
     });

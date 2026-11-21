@@ -166,25 +166,12 @@ fn angle16_all_values() {
 #[test]
 #[ignore = "exhaustive over 2^32 values, minutes on every core: the weekly run"]
 fn angle32_all_values() {
-    let threads =
-        std::thread::available_parallelism().map_or(1, std::num::NonZeroUsize::get) as u64;
-    let span = (1u64 << 32) / threads + 1;
-    let workers: Vec<_> = (0..threads)
-        .map(|k| {
-            std::thread::spawn(move || {
-                let start = k * span;
-                let end = (start + span).min(1 << 32);
-                let mut rounded = 0u64;
-                for t in start..end {
-                    let t = t as u32;
-                    rounded += u64::from(check_angle!(Angle32, FixedFloat32, 32, 16, t, t as i32));
-                    check_same_as_turns!(Angle32, FixedFloat32, t as i32);
-                }
-                rounded
-            })
-        })
-        .collect();
-    let rounded: u64 = workers.into_iter().map(|w| w.join().unwrap()).sum();
+    let rounded = parallel_sum(0, 1 << 32, |t| {
+        let t = t as u32;
+        let r = u64::from(check_angle!(Angle32, FixedFloat32, 32, 16, t, t as i32));
+        check_same_as_turns!(Angle32, FixedFloat32, t as i32);
+        r
+    });
     assert_eq!(rounded, 2 << 32);
 }
 
@@ -192,12 +179,9 @@ macro_rules! random_values {
     ($module:ident, $A:ident, $T:ident, $U:ident, $Raw:ident, $n:tt, $f:tt) => {
         #[test]
         fn $module() {
-            let mut rng = Pcg32::new(59, $n);
-            for _ in 0..200_000 {
-                let t = rng.edge_bits($n, $f) as $U;
-                let x = rng.edge_bits($n, $f) as $Raw;
-                let _ = check_angle!($A, $T, $n, $f, t, x);
-            }
+            for_random_edges!(59, 200_000, $n, $f, |t: $U, x: $Raw| check_angle!(
+                $A, $T, $n, $f, t, x
+            ));
         }
     };
 }

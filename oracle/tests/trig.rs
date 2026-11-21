@@ -15,7 +15,7 @@ mod widths;
 
 use fulcrum::*;
 use fulcrum_oracle::{
-    cos, pi_interval, rounded, sin, sin_turns, tan, within_ulp_of_interval, TRIG_SCALE,
+    cos, pi_interval, rounded, sin, sin_turns, tan, within_ulp_of_interval, Format, TRIG_SCALE,
 };
 use num_bigint::BigInt;
 use num_traits::{One, ToPrimitive};
@@ -40,16 +40,6 @@ fn oracle_known_values() {
     assert!(&lo * &lo <= half && half <= &hi * &hi, "sin(π/4)² = ½");
     let (lo, hi) = sin_turns(3 << 30, 32);
     assert!(lo <= -(BigInt::one() << TRIG_SCALE) && -(BigInt::one() << TRIG_SCALE) <= hi);
-}
-
-/// `(lo, hi)` clamped to the range of a type with `frac` fractional bits and
-/// `bits` bits, in units of `2^-TRIG_SCALE`.
-fn clamp((lo, hi): (BigInt, BigInt), bits: u32, frac: u32) -> (BigInt, BigInt) {
-    let shift = TRIG_SCALE - frac;
-    let max: BigInt = ((BigInt::one() << (bits - 1)) - 1) << shift;
-    let min: BigInt = -(BigInt::one() << (bits - 1)) << shift;
-    let c = |v: BigInt| v.max(min.clone()).min(max.clone());
-    (c(lo), c(hi))
 }
 
 #[test]
@@ -156,7 +146,7 @@ macro_rules! trig_suite {
                         prop_assert!(within_ulp_of_interval(c.to_bits() as i128, &cos(a, $frac), $frac), "cos {:?} = {:?}", x, c);
                         let exact = tan(a, $frac).unwrap();
                         let t = x.tan().to_bits() as i128;
-                        prop_assert!(within_ulp_of_interval(t, &clamp(exact.clone(), $bits, $frac), $frac), "tan {:?} = {}", x, t);
+                        prop_assert!(within_ulp_of_interval(t, &Format { bits: $bits, frac: $frac }.clamp(exact.clone()), $frac), "tan {:?} = {}", x, t);
                         if let Some(r) = rounded(&exact, $frac) {
                             let fits = BigInt::from(<$Bits>::MIN) <= r && r <= BigInt::from(<$Bits>::MAX);
                             prop_assert_eq!(x.checked_tan().is_some(), fits, "checked_tan {:?}", x);

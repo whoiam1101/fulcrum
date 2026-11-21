@@ -15,8 +15,9 @@
 //! [`pow`] is [`exp2`] of `y · log2 x`, with the error of the product
 //! carried into the bound of the mantissa.
 
-/// Fractional bits of [`log2`].
-pub const SCALE: u32 = 64;
+/// Fractional bits of [`log2`]: those of the trigonometric references, so
+/// [`correctly_rounded`] and [`within_ulp`] use the helpers of `trig`.
+pub const SCALE: u32 = super::trig::SCALE;
 
 /// Bound on the error of [`log2`], in units of `2^-64`.
 pub const LOG2_ERROR: i128 = 1 << 8;
@@ -189,19 +190,11 @@ pub fn ln(raw: i128, f: u32) -> i128 {
 /// The value with `f` fractional bits nearest to `r / 2^64`, if every value
 /// within `error` of `r` rounds to it.
 pub fn correctly_rounded(r: i128, error: i128, f: u32) -> Option<i128> {
-    let s = SCALE - f;
-    let round = |v: i128| (v + (1 << (s - 1))) >> s;
-    let lo = round(r - error);
-    if lo == round(r + error) {
-        Some(lo)
-    } else {
-        None
-    }
+    super::trig::rounded_interval(r - error, r + error, f)
 }
 
 /// `|got / 2^f - true value| < 2^-f` for every true value within `error`
 /// of `r / 2^64`.
 pub fn within_ulp(got: i128, r: i128, error: i128, f: u32) -> bool {
-    let ulp = 1i128 << (SCALE - f);
-    ((got << (SCALE - f)) - r).abs() + error < ulp
+    super::trig::within_ulp_of(got, r - error, r + error, f)
 }

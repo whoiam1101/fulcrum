@@ -8,19 +8,18 @@ mod reference;
 
 reference!(spec, i128);
 
+use fulcrum_oracle::Format;
 use num_bigint::BigInt;
 use num_integer::Integer;
 use num_rational::BigRational;
 use num_traits::{One, ToPrimitive};
 use proptest::prelude::*;
 
+/// Integers of `i128`: the format of the arguments of `spec`.
+const INT: Format = Format { bits: 128, frac: 0 };
+
 fn round(x: BigRational) -> i128 {
-    let shifted = x + BigRational::new(BigInt::one(), BigInt::from(2));
-    shifted
-        .numer()
-        .div_floor(shifted.denom())
-        .to_i128()
-        .expect("fits i128")
+    INT.round(&x).to_i128().expect("fits i128")
 }
 
 fn ratio(n: i128, d: i128) -> BigRational {
@@ -28,19 +27,13 @@ fn ratio(n: i128, d: i128) -> BigRational {
 }
 
 fn scaled(n: i128, f: u32) -> BigRational {
-    BigRational::new(BigInt::from(n), BigInt::one() << f)
+    Format { frac: f, ..INT }.exact(n)
 }
 
 fn round_sqrt(num: i128, den: i128) -> i128 {
-    let (num, den) = (BigInt::from(num), BigInt::from(den));
-    let s = (&num / &den).sqrt();
-    let twice = &s * 2 + 1;
-    let s = if &twice * &twice * &den <= num * 4 {
-        s + 1
-    } else {
-        s
-    };
-    s.to_i128().expect("fits i128")
+    INT.round_sqrt(&ratio(num, den))
+        .to_i128()
+        .expect("fits i128")
 }
 
 fn raw() -> impl Strategy<Value = i128> {
@@ -105,12 +98,11 @@ proptest! {
 
     #[test]
     fn range(v in any::<i128>(), bits in 2u32..=127) {
-        let min = -(BigInt::one() << (bits - 1));
-        let max = (BigInt::one() << (bits - 1)) - 1;
+        let fmt = Format { bits, ..INT };
+        let (min, max) = (fmt.min(), fmt.max());
         let big = BigInt::from(v);
-        let clamped = if big < min { min.clone() } else if big > max { max.clone() } else { big.clone() };
-        prop_assert_eq!(spec::saturate(v, bits), clamped.to_i128().unwrap());
-        prop_assert_eq!(spec::fits(v, bits), big >= min && big <= max);
+        prop_assert_eq!(spec::saturate(v, bits), fmt.saturate(big.clone()));
+        prop_assert_eq!(spec::fits(v, bits), fmt.fits(&big));
         let modulus = BigInt::one() << bits;
         let low = (big - &min).mod_floor(&modulus) + &min;
         prop_assert_eq!(spec::wrap(v, bits), low.to_i128().unwrap());

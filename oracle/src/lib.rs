@@ -49,6 +49,15 @@ impl Format {
         (self.saturate(raw), fits)
     }
 
+    /// The interval `[lo, hi] · 2^-TRIG_SCALE` clamped to the range of the
+    /// format.
+    pub fn clamp(self, (lo, hi): (BigInt, BigInt)) -> (BigInt, BigInt) {
+        let shift = TRIG_SCALE - self.frac;
+        let (min, max) = (self.min() << shift, self.max() << shift);
+        let c = |v: BigInt| v.max(min.clone()).min(max.clone());
+        (c(lo), c(hi))
+    }
+
     /// Saturates a raw value to the representable range.
     pub fn saturate(self, raw: BigInt) -> i128 {
         let v = if raw > self.max() {
@@ -61,6 +70,27 @@ impl Format {
         v.to_i128().expect("fits i128")
     }
 
+    /// A division by zero of a dividend of the sign `sign`: `MAX`, `MIN` or
+    /// `0`, with the flag `false`.
+    fn by_zero(self, sign: i128) -> (i128, bool) {
+        let v = match sign {
+            1 => self.max(),
+            -1 => self.min(),
+            _ => BigInt::zero(),
+        };
+        (v.to_i128().unwrap(), false)
+    }
+
+    /// The rounding of `x`, `None` when it is out of range.
+    fn checked(self, x: &BigRational) -> Option<i128> {
+        let r = self.round(x);
+        if self.fits(&r) {
+            r.to_i128()
+        } else {
+            None
+        }
+    }
+
     /// `spec_mul`: saturating rounded product.
     pub fn mul(self, a: i128, b: i128) -> (i128, bool) {
         let r = self.round(&(self.exact(a) * self.exact(b)));
@@ -70,12 +100,7 @@ impl Format {
     /// `spec_div`: saturating rounded quotient; `x / 0` by the sign of `x`.
     pub fn div(self, a: i128, b: i128) -> (i128, bool) {
         if b == 0 {
-            let v = match a.signum() {
-                1 => self.max(),
-                -1 => self.min(),
-                _ => BigInt::zero(),
-            };
-            return (v.to_i128().unwrap(), false);
+            return self.by_zero(a.signum());
         }
         let r = self.round(&(self.exact(a) / self.exact(b)));
         self.settle(r)
@@ -92,12 +117,7 @@ impl Format {
     /// or `0` by the sign of `self · a`, with the flag `false`.
     pub fn mul_div(self, x: i128, a: i128, b: i128) -> (i128, bool) {
         if b == 0 {
-            let v = match x.signum() * a.signum() {
-                1 => self.max(),
-                -1 => self.min(),
-                _ => BigInt::zero(),
-            };
-            return (v.to_i128().unwrap(), false);
+            return self.by_zero(x.signum() * a.signum());
         }
         let r = self.round(&(self.exact(x) * self.exact(a) / self.exact(b)));
         self.settle(r)
@@ -142,8 +162,22 @@ impl Format {
 
     /// `√(x² + y²)` correctly rounded and saturated.
     pub fn hypot(self, x: i128, y: i128) -> (i128, bool) {
-        let sum = self.exact(x) * self.exact(x) + self.exact(y) * self.exact(y);
+        self.length(&[x, y])
+    }
+
+    /// `√Σ x²`, the length of a vector, correctly rounded and saturated.
+    pub fn length(self, x: &[i128]) -> (i128, bool) {
+        let sum = x.iter().fold(BigRational::zero(), |s, &v| {
+            s + self.exact(v) * self.exact(v)
+        });
         self.settle(self.round_sqrt(&sum))
+    }
+
+    /// `a·d - b·c`, the determinant of two vectors, rounded once and
+    /// saturated.
+    pub fn det(self, a: i128, b: i128, c: i128, d: i128) -> (i128, bool) {
+        let e = self.exact(a) * self.exact(d) - self.exact(b) * self.exact(c);
+        self.settle(self.round(&e))
     }
 
     /// `Σ a·b` rounded once and saturated.
@@ -160,12 +194,7 @@ impl Format {
         if den == 0 {
             return None;
         }
-        let r = self.round(&BigRational::new(BigInt::from(num), BigInt::from(den)));
-        if self.fits(&r) {
-            r.to_i128()
-        } else {
-            None
-        }
+        self.checked(&BigRational::new(BigInt::from(num), BigInt::from(den)))
     }
 
     /// Exact value of a decimal string `[-]int[.frac]`.
@@ -195,12 +224,7 @@ impl Format {
 
     /// `spec_parse`: rounded raw value of a decimal string, `None` on overflow.
     pub fn parse(self, text: &str) -> Option<i128> {
-        let r = self.round(&Self::decimal(text));
-        if self.fits(&r) {
-            r.to_i128()
-        } else {
-            None
-        }
+        self.checked(&Self::decimal(text))
     }
 
     /// Whether `text` is exactly `raw / 2^frac` written in decimal.
@@ -228,6 +252,22 @@ impl Format {
 
 /// Bits of the intervals of [`sin_turns`].
 pub const TRIG_SCALE: u32 = 256;
+
+/// Whether `r` is `x · k / √s` rounded to nearest, ties toward `+∞`:
+/// `(2|r| - 1)² · s ≤ 4x²k² < (2|r| + 1)² · s` with the sign of `x`, the
+/// ends swapped for a negative `x`.
+pub fn is_scaled(r: i128, x: i128, k: i128, s: &BigInt) -> bool {
+    if r != 0 && (r < 0) != (x < 0) {
+        return false;
+    }
+    let m = BigInt::from(r.unsigned_abs());
+    let n = BigInt::from(4) * BigInt::from(x) * BigInt::from(x) * BigInt::from(k) * BigInt::from(k);
+    let above = (&m * 2 + 1) * (&m * 2 + 1) * s;
+    let below = (&m * 2 - 1) * (&m * 2 - 1) * s;
+    let low_ok = m.is_zero() || if x >= 0 { below <= n } else { below < n };
+    let high_ok = if x >= 0 { n < above } else { n <= above };
+    low_ok && high_ok
+}
 
 /// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`.
 pub fn within_ulp_of_interval(got: i128, (lo, hi): &(BigInt, BigInt), frac: u32) -> bool {

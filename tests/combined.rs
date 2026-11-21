@@ -88,13 +88,9 @@ fn fixed8_all_triples() {
 macro_rules! random_triples {
     (fixed8, $($rest:tt)*) => {};
     ($module:ident, $T:ident, $lit:ident, $Acc:ident, $Raw:ident, $bits:tt, $f:tt) => {{
-        let mut rng = Pcg32::new(29, $bits);
-        for _ in 0..200_000 {
-            let a = rng.edge_bits($bits, $f) as $Raw;
-            let b = rng.edge_bits($bits, $f) as $Raw;
-            let c = rng.edge_bits($bits, $f) as $Raw;
-            check_triple!($T, $bits, $f, a, b, c);
-        }
+        for_random_edges!(29, 200_000, $bits, $f, |a: $Raw, b: $Raw, c: $Raw| {
+            check_triple!($T, $bits, $f, a, b, c)
+        })
     }};
 }
 

@@ -15,6 +15,20 @@ reference!(spec, i128);
 pub mod exp;
 pub mod trig;
 
+/// Runs `body` `count` times on operands of `bits` bits with `f` fractional
+/// bits from `Pcg32::new(seed, bits)`, each drawn by `edge_bits` and cast to
+/// its type.
+#[allow(unused_macros)]
+macro_rules! for_random_edges {
+    ($seed:expr, $count:expr, $bits:tt, $f:tt, |$($v:ident: $V:ty),+| $body:expr) => {{
+        let mut rng = Pcg32::new($seed, $bits);
+        for _ in 0..$count {
+            $(let $v = rng.edge_bits($bits, $f) as $V;)+
+            let _ = $body;
+        }
+    }};
+}
+
 /// PCG-XSH-RR 64/32 (O'Neill, 2014).
 pub struct Pcg32 {
     state: u64,
@@ -54,16 +68,8 @@ impl Pcg32 {
     /// Raw value of `bits` bits, biased toward edge cases: 0, ±1 ulp, ±1,
     /// MIN, MAX, MIN + 1, powers of two, small values and sign changes.
     pub fn edge_bits(&mut self, bits: u32, frac_bits: u32) -> i64 {
-        let min = if bits == 64 {
-            i64::MIN
-        } else {
-            -(1i64 << (bits - 1))
-        };
-        let max = if bits == 64 {
-            i64::MAX
-        } else {
-            (1i64 << (bits - 1)) - 1
-        };
+        let min = i64::MIN >> (64 - bits);
+        let max = i64::MAX >> (64 - bits);
         let one = 1i64 << frac_bits;
         let sign = |r: &mut Self, v: i64| {
             if r.next_u32() & 1 == 0 {
@@ -674,26 +680,62 @@ where
     totals
 }
 
-/// Calls `f` on every value of `lo..hi`, the range split evenly over the
-/// available threads.
-pub fn parallel<F: Fn(i64) + Send + Sync + 'static>(lo: i64, hi: i64, f: F) {
-    let threads =
-        std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get) as i64;
-    let chunk = (hi - lo) / threads + 1;
+/// Calls `f` on every value of `lo..hi` on every available thread and
+/// returns the sum of its results. The threads take blocks of 2^12 values
+/// from a shared counter, so a thread that drew cheap values (the negative
+/// half of a logarithm or a root) takes more blocks instead of idling.
+pub fn parallel_sum<F: Fn(i64) -> u64 + Send + Sync + 'static>(lo: i64, hi: i64, f: F) -> u64 {
+    const BLOCK: i64 = 1 << 12;
+    let threads = std::thread::available_parallelism().map_or(4, std::num::NonZeroUsize::get);
+    let next = std::sync::Arc::new(std::sync::atomic::AtomicI64::new(lo));
     let f = std::sync::Arc::new(f);
     let handles: Vec<_> = (0..threads)
-        .map(|t| {
-            let f = std::sync::Arc::clone(&f);
+        .map(|_| {
+            let (next, f) = (std::sync::Arc::clone(&next), std::sync::Arc::clone(&f));
             std::thread::spawn(move || {
-                let start = lo + t * chunk;
-                let end = (start + chunk).min(hi);
-                for v in start..end {
-                    f(v);
+                let mut sum = 0;
+                loop {
+                    let start = next.fetch_add(BLOCK, std::sync::atomic::Ordering::Relaxed);
+                    if start >= hi {
+                        return sum;
+                    }
+                    for v in start..(start + BLOCK).min(hi) {
+                        sum += f(v);
+                    }
                 }
             })
         })
         .collect();
-    for h in handles {
-        h.join().unwrap();
+    handles.into_iter().map(|h| h.join().unwrap()).sum()
+}
+
+/// Calls `f` on every value of `lo..hi` on every available thread, as
+/// [`parallel_sum`].
+pub fn parallel<F: Fn(i64) + Send + Sync + 'static>(lo: i64, hi: i64, f: F) {
+    parallel_sum(lo, hi, move |v| {
+        f(v);
+        0
+    });
+}
+
+/// Runs `check` on every value of `FixedFloat32` on every available thread
+/// and returns the number of values for which it returned `true`.
+pub fn every_fixed32(check: fn(i32) -> bool) -> u64 {
+    parallel_sum(i64::from(i32::MIN), i64::from(i32::MAX) + 1, move |a| {
+        u64::from(check(a as i32))
+    })
+}
+
+/// `round(Σ a·b / 2^f)` for raw values of at most 64 bits and at most 2^62
+/// terms, without overflowing `i128`: every product `p` is split into
+/// `p = h·2^64 + l` with `0 ≤ l < 2^64`, and the two halves are summed
+/// separately. `h·2^(64 - f)` is an integer, so only the low sum is rounded.
+pub fn exact_dot<T: Copy>(a: &[T], b: &[T], raw: impl Fn(T) -> i128, f: u32) -> i128 {
+    let (mut hi, mut lo) = (0i128, 0i128);
+    for (&x, &y) in a.iter().zip(b) {
+        let p = raw(x) * raw(y);
+        hi += p >> 64;
+        lo += p & ((1i128 << 64) - 1);
     }
+    (hi << (64 - f)) + spec::round_div(lo, 1i128 << f)
 }

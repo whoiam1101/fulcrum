@@ -6,51 +6,20 @@
 //! definition of rounding on big integers; `rotate` and `angle_to` within
 //! 1 ulp of the 256-bit interval series.
 
+mod common;
+
 #[macro_use]
 #[path = "../../tests/common/widths.rs"]
 mod widths;
 
+use common::edge;
+
 use fulcrum::*;
-use fulcrum_oracle::{atan2_int, sin_turns, within_ulp_of_interval, Format, TRIG_SCALE};
+use fulcrum_oracle::{atan2_int, is_scaled, sin_turns, within_ulp_of_interval, Format, TRIG_SCALE};
 use num_bigint::BigInt;
 use num_rational::BigRational;
 use num_traits::{One, Signed, Zero};
 use proptest::prelude::*;
-
-fn edge(bits: u32, frac: u32) -> impl Strategy<Value = i128> {
-    let min = i128::MIN >> (128 - bits);
-    let max = i128::MAX >> (128 - bits);
-    let one = 1i128 << frac;
-    prop_oneof![
-        1 => Just(0i128),
-        1 => Just(1i128),
-        1 => Just(-1i128),
-        1 => Just(one),
-        1 => Just(-one),
-        1 => Just(min),
-        1 => Just(max),
-        1 => Just(min + 1),
-        2 => (0..bits - 1, any::<bool>()).prop_map(|(k, n)| if n { -(1i128 << k) } else { 1i128 << k }),
-        2 => -4 * one..=4 * one,
-        8 => min..=max,
-    ]
-}
-
-/// Whether `r` is `x · k / √s` rounded to nearest, ties toward `+∞`:
-/// `(2|r| - 1)² · s ≤ 4x²k² < (2|r| + 1)² · s` with the sign of `x`, the
-/// ends swapped for a negative `x`.
-fn is_scaled(r: i128, x: i128, k: i128, s: &BigInt) -> bool {
-    if r != 0 && (r < 0) != (x < 0) {
-        return false;
-    }
-    let m = BigInt::from(r.unsigned_abs());
-    let n = BigInt::from(4) * BigInt::from(x) * BigInt::from(x) * BigInt::from(k) * BigInt::from(k);
-    let above = (&m * 2 + 1) * (&m * 2 + 1) * s;
-    let below = (&m * 2 - 1) * (&m * 2 - 1) * s;
-    let low_ok = m.is_zero() || if x >= 0 { below <= n } else { below < n };
-    let high_ok = if x >= 0 { n < above } else { n <= above };
-    low_ok && high_ok
-}
 
 fn sum_sq(x: &[i128]) -> BigInt {
     x.iter().map(|&v| BigInt::from(v) * BigInt::from(v)).sum()
@@ -71,16 +40,6 @@ macro_rules! vec_suite {
                 x.to_bits() as i128
             }
 
-            fn det(a: i128, b: i128, c: i128, d: i128) -> i128 {
-                let e = FMT.exact(a) * FMT.exact(d) - FMT.exact(b) * FMT.exact(c);
-                FMT.settle(FMT.round(&e)).0
-            }
-
-            fn root_sum(x: &[i128]) -> i128 {
-                let s = x.iter().fold(BigRational::zero(), |s, &v| s + FMT.exact(v) * FMT.exact(v));
-                FMT.settle(FMT.round_sqrt(&s)).0
-            }
-
             proptest! {
                 #![proptest_config(ProptestConfig { cases: 5_000, ..ProptestConfig::default() })]
 
@@ -91,11 +50,11 @@ macro_rules! vec_suite {
                     prop_assert_eq!(raw(a2.dot(b2)), FMT.dot(&a[..2], &b[..2]).0);
                     prop_assert_eq!(raw(a3.dot(b3)), FMT.dot(&a, &b).0);
                     prop_assert_eq!(raw(a3.length_sq()), FMT.dot(&a, &a).0);
-                    prop_assert_eq!(raw(a2.perp_dot(b2)), det(a[0], a[1], b[0], b[1]));
+                    prop_assert_eq!(raw(a2.perp_dot(b2)), FMT.det(a[0], a[1], b[0], b[1]).0);
                     let c = a3.cross(b3);
-                    prop_assert_eq!([raw(c.x), raw(c.y), raw(c.z)], [det(a[1], a[2], b[1], b[2]), det(a[2], a[0], b[2], b[0]), det(a[0], a[1], b[0], b[1])]);
-                    prop_assert_eq!(raw(a2.length()), root_sum(&a[..2]));
-                    prop_assert_eq!(raw(a3.length()), root_sum(&a));
+                    prop_assert_eq!([raw(c.x), raw(c.y), raw(c.z)], [FMT.det(a[1], a[2], b[1], b[2]).0, FMT.det(a[2], a[0], b[2], b[0]).0, FMT.det(a[0], a[1], b[0], b[1]).0]);
+                    prop_assert_eq!(raw(a2.length()), FMT.length(&a[..2]).0);
+                    prop_assert_eq!(raw(a3.length()), FMT.length(&a).0);
                     let d: Vec<BigRational> = a.iter().zip(&b).map(|(&x, &y)| FMT.exact(x) - FMT.exact(y)).collect();
                     for &(n, sq, len) in &[(2, raw(a2.distance_sq(b2)), raw(a2.distance(b2))), (3, raw(a3.distance_sq(b3)), raw(a3.distance(b3)))] {
                         let s = d[..n].iter().fold(BigRational::zero(), |s, x| s + x * x);

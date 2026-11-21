@@ -24,24 +24,10 @@ fn round2(sum: i128, f: u32, bits: u32) -> i128 {
     spec::saturate(spec::round_shift(sum, f), bits)
 }
 
-/// `Σ a[i] · b[i]` at scale `2^-2f`, rounded once and saturated to `bits`.
-/// Every product fits `i128` but three of them may not: the products are
-/// split into the high and low 64 bits, the sum is `hi · 2^64 + lo` with
-/// `lo ≥ 0`, and for `f = 32` its floor at scale `2^-(f + 1)` is
-/// `hi · 2^(65 - f) + ⌊lo / 2^(f - 1)⌋`, which one more halving rounds.
-/// Below 32 bits the sum fits `i128` and is rounded directly.
+/// `Σ a[i] · b[i]` at scale `2^-2f`, rounded once ([`exact_dot`]) and
+/// saturated to `bits`.
 fn dot_raw(a: &[i128], b: &[i128], f: u32, bits: u32) -> i128 {
-    let (mut hi, mut lo) = (0i128, 0i128);
-    for (&x, &y) in a.iter().zip(b) {
-        let p = x * y;
-        hi += p >> 64;
-        lo += p & ((1 << 64) - 1);
-    }
-    if f < 32 {
-        return round2((hi << 64) + lo, f, bits);
-    }
-    let floor = (hi << 33) + (lo >> 31);
-    spec::saturate(spec::round_shift(floor, 1), bits)
+    spec::saturate(exact_dot(a, b, |v| v, f), bits)
 }
 
 /// `Σ x[i]²`, exact: at most `3 · 2^126`.

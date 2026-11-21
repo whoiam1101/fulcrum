@@ -18,22 +18,14 @@
 mod widths;
 
 use fulcrum::*;
-use fulcrum_oracle::{Format, TRIG_SCALE};
+use fulcrum_oracle::{within_ulp_of_interval, Format};
 use libfuzzer_sys::fuzz_target;
 use num_bigint::BigInt;
 
-/// `got / 2^frac` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`
-/// clamped to `[min, max] / 2^frac`.
-fn within_ulp((lo, hi): (BigInt, BigInt), got: i128, frac: u32, min: i128, max: i128) -> bool {
-    let shift = TRIG_SCALE - frac;
-    let clamp = |v: BigInt| {
-        v.max(BigInt::from(min) << shift)
-            .min(BigInt::from(max) << shift)
-    };
-    let (lo, hi) = (clamp(lo), clamp(hi));
-    let got = BigInt::from(got) << shift;
-    let ulp = BigInt::from(1) << shift;
-    &got - lo < ulp && hi - &got < ulp
+/// `got` is within one ulp of every value of `[lo, hi] / 2^TRIG_SCALE`
+/// clamped to the range of `fmt`.
+fn within_ulp(exact: (BigInt, BigInt), got: i128, fmt: Format) -> bool {
+    within_ulp_of_interval(got, &fmt.clamp(exact), fmt.frac)
 }
 
 macro_rules! check {
@@ -63,23 +55,16 @@ macro_rules! check {
             let (hypot, hypot_fits) = fmt.hypot(a as i128, b as i128);
             assert_eq!(x.hypot(y).to_bits() as i128, hypot);
             assert_eq!(x.checked_hypot(y).is_some(), hypot_fits);
-            let (min, max) = (<$Bits>::MIN as i128, <$Bits>::MAX as i128);
             let (s, c) = x.sin_cos();
             let trig = [
                 (fulcrum_oracle::sin(a as i128, $frac), s),
                 (fulcrum_oracle::cos(a as i128, $frac), c),
             ];
             for (exact, got) in trig {
-                assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+                assert!(within_ulp(exact, got.to_bits() as i128, fmt));
             }
             if let Some(exact) = fulcrum_oracle::tan(a as i128, $frac) {
-                assert!(within_ulp(
-                    exact,
-                    x.tan().to_bits() as i128,
-                    $frac,
-                    min,
-                    max
-                ));
+                assert!(within_ulp(exact, x.tan().to_bits() as i128, fmt));
             }
             assert_eq!(x.checked_tan().unwrap_or(x.tan()), x.tan());
             let unit = (a as i128).rem_euclid((1 << ($frac + 1)) + 1) - (1 << $frac);
@@ -91,7 +76,7 @@ macro_rules! check {
                 (fulcrum_oracle::acos(unit, $frac), u.acos()),
             ];
             for (exact, got) in inverse {
-                assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+                assert!(within_ulp(exact, got.to_bits() as i128, fmt));
             }
             let g = <<$T as FixedFloat>::Angle>::from_bits(a as _);
             let t = g.to_bits() as u64;
@@ -104,7 +89,7 @@ macro_rules! check {
                 ),
             ];
             for (exact, got) in turns {
-                assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+                assert!(within_ulp(exact, got.to_bits() as i128, fmt));
             }
             if let Some(r) = fulcrum_oracle::angle_to_radians(t, $bits, $frac) {
                 assert_eq!(BigInt::from(g.to_radians().to_bits()), r);
@@ -117,33 +102,21 @@ macro_rules! check {
             }
             if a > 0 {
                 let exact = fulcrum_oracle::log2(a as i128, $frac);
-                assert!(within_ulp(
-                    exact,
-                    x.log2().to_bits() as i128,
-                    $frac,
-                    min,
-                    max
-                ));
+                assert!(within_ulp(exact, x.log2().to_bits() as i128, fmt));
                 assert_eq!(x.checked_log2(), Some(x.log2()));
             } else {
                 assert_eq!((x.log2(), x.checked_log2()), ($T::MIN, None));
             }
             if (a as i128) >> $frac < $frac - 1 {
                 let exact = fulcrum_oracle::exp2(a as i128, $frac);
-                assert!(within_ulp(
-                    exact,
-                    x.exp2().to_bits() as i128,
-                    $frac,
-                    min,
-                    max
-                ));
+                assert!(within_ulp(exact, x.exp2().to_bits() as i128, fmt));
                 assert_eq!(x.checked_exp2().unwrap_or($T::MAX), x.exp2());
             } else {
                 assert_eq!((x.exp2(), x.checked_exp2()), ($T::MAX, None));
             }
             if a > 0 {
                 let exact = fulcrum_oracle::ln(a as i128, $frac);
-                assert!(within_ulp(exact, x.ln().to_bits() as i128, $frac, min, max));
+                assert!(within_ulp(exact, x.ln().to_bits() as i128, fmt));
                 assert_eq!(x.checked_ln(), Some(x.ln()));
             } else {
                 assert_eq!((x.ln(), x.checked_ln()), ($T::MIN, None));
@@ -154,13 +127,7 @@ macro_rules! check {
                 assert_eq!((x.exp(), x.checked_exp()), ($T::ZERO, Some($T::ZERO)));
             } else {
                 let exact = fulcrum_oracle::exp(a as i128, $frac);
-                assert!(within_ulp(
-                    exact,
-                    x.exp().to_bits() as i128,
-                    $frac,
-                    min,
-                    max
-                ));
+                assert!(within_ulp(exact, x.exp().to_bits() as i128, fmt));
                 assert_eq!(x.checked_exp().unwrap_or($T::MAX), x.exp());
             }
             if a < 0 && a != <$Bits>::MIN {
@@ -187,7 +154,7 @@ macro_rules! check {
                     }
                     match fulcrum_oracle::pow(a as i128, $frac, e, frac_e) {
                         Some(exact) => {
-                            assert!(within_ulp(exact, got.to_bits() as i128, $frac, min, max));
+                            assert!(within_ulp(exact, got.to_bits() as i128, fmt));
                             assert_eq!(checked.unwrap_or($T::MAX), got);
                         }
                         None => assert_eq!((got, checked), ($T::MAX, None)),

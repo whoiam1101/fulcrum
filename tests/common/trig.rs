@@ -293,31 +293,19 @@ pub fn within_ulp_of(got: i128, lo: i128, hi: i128, f: u32) -> bool {
 pub fn rounded_interval(lo: i128, hi: i128, f: u32) -> Option<i128> {
     let s = SCALE - f;
     let round = |v: i128| (v + (1 << (s - 1))) >> s;
-    if round(lo) == round(hi) {
-        Some(round(lo))
-    } else {
-        None
-    }
+    Some(round(lo)).filter(|&lo| lo == round(hi))
 }
 
 /// The value with `f` fractional bits nearest to `r / 2^64`, if every value
 /// within [`ERROR`] of `r` rounds to it.
 pub fn correctly_rounded(r: i128, f: u32) -> Option<i128> {
-    let s = SCALE - f;
-    let round = |v: i128| (v + (1 << (s - 1))) >> s;
-    let lo = round(r - ERROR);
-    if lo == round(r + ERROR) {
-        Some(lo)
-    } else {
-        None
-    }
+    rounded_interval(r - ERROR, r + ERROR, f)
 }
 
 /// `|got / 2^f - true value| < 2^-f` for every true value within [`ERROR`]
 /// of `r`.
 pub fn within_ulp(got: i128, r: i128, f: u32) -> bool {
-    let ulp = 1i128 << (SCALE - f);
-    ((got << (SCALE - f)) - r).abs() + ERROR < ulp
+    within_ulp_of(got, r - ERROR, r + ERROR, f)
 }
 
 /// The `FixedFloat32` arguments whose `tan` lies so close to a midpoint

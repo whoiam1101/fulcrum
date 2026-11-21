@@ -6,7 +6,7 @@
 #[macro_use]
 mod common;
 
-use common::{spec, Pcg32};
+use common::{exact_dot, spec, Pcg32};
 use fulcrum::*;
 
 fn shuffle<T>(rng: &mut Pcg32, v: &mut [T]) {
@@ -124,20 +124,6 @@ macro_rules! order_suite {
             }
         }
     };
-}
-
-/// `round(Σ a·b / 2^f)` for raw values of at most 64 bits and at most 2^62
-/// terms, without overflowing `i128`: every product `p` is split into
-/// `p = h·2^64 + l` with `0 ≤ l < 2^64`, and the two halves are summed
-/// separately. `h·2^(64 - f)` is an integer, so only the low sum is rounded.
-fn exact_dot<T: Copy>(a: &[T], b: &[T], raw: impl Fn(T) -> i128, f: u32) -> i128 {
-    let (mut hi, mut lo) = (0i128, 0i128);
-    for (&x, &y) in a.iter().zip(b) {
-        let p = raw(x) * raw(y);
-        hi += p >> 64;
-        lo += p & ((1i128 << 64) - 1);
-    }
-    (hi << (64 - f)) + spec::round_div(lo, 1i128 << f)
 }
 
 for_each_width!(order_suite!());
