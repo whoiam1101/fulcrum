@@ -4,7 +4,7 @@
 
 #![cfg(feature = "serde")]
 
-use fulcrum::{ff16, ff64, ff8, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
+use fulcrum::{ff64, ff8, FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
 
 #[test]
 fn json_is_the_exact_decimal_string() {
@@ -65,7 +65,7 @@ fn json_float_numbers_round_like_from_f64() {
     );
     assert_eq!(
         serde_json::from_str::<FixedFloat16>("0.5").unwrap(),
-        ff16!(0.5)
+        fulcrum::ff16!(0.5)
     );
     assert!(serde_json::from_str::<FixedFloat8>("8.0").is_err());
 }

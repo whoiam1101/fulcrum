@@ -10,7 +10,6 @@ description = "Tests of the optional serde, bytemuck and num-traits features of 
 [workspace]
 
 [features]
-default = []
 serde = ["fulcrum/serde"]
 bytemuck = ["fulcrum/bytemuck", "dep:bytemuck"]
 num-traits = ["fulcrum/num-traits", "dep:num-traits"]
