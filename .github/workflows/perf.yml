@@ -112,36 +112,20 @@ jobs:
         env:
           GUNGRAUN_HOME: ${{ runner.temp }}/gungraun
         run: |
-          for b in "$RUNNER_TEMP"/target/release/build/fulcrum-bench/*/out/instr-* "$RUNNER_TEMP"/target/release/deps/instr-*; do
-            [ -x "$b" ] || continue
-            echo "== $b"
-            sym="$(nm "$b" | awk '/2w83add22___gungraun_wrapper_mod3add$/ { print $3; exit }')"
-            echo "symbol $sym"
-            nm "$b" | awk -v s="$sym" '$3 == s { print $1 }' | while read -r a; do
-              echo "symbols at $a:"
-              nm -C "$b" | awk -v a="$a" '$1 == a'
-            done
-            objdump -d --no-show-raw-insn --disassemble="$sym" "$b" | grep -A40 "<$sym>:" || true
-            echo "callers of the wrapper:"
-            objdump -d --no-show-raw-insn "$b" | grep -E "(call|jmp).*<$sym>" | head -5
-          done
-          for f in "$GUNGRAUN_HOME"/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.log.base@base "$GUNGRAUN_HOME"/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.log; do
-            echo "== $f"
-            cat "$f" || true
-          done
           for f in "$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out.base@base" "$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out"; do
             read -r -a cmd <<< "$(sed -n 's/^cmd: *//p' "$f")"
-            for demangle in yes no; do
-              out="$RUNNER_TEMP/all-$demangle.out"
-              rm -f "$out"
-              echo "== full run of ${cmd[0]} --demangle=$demangle"
-              valgrind --tool=callgrind --demangle="$demangle" --compress-strings=no --collect-atstart=yes --callgrind-out-file="$out" "${cmd[@]}" > /dev/null 2> "$RUNNER_TEMP/vg.err" && rc=0 || rc=$?
-              echo "exit $rc"
-              grep -E 'Collected|error|warning' "$RUNNER_TEMP/vg.err" || true
-              echo "fn lines: $(grep -c '^fn=' "$out" || true)"
-              grep -E '^fn=.*(gungraun_wrapper|w83add)' "$out" | sort -u | head -6 || true
-              grep -E '^fn=.*instr' "$out" | sort -u | head -6 || true
-            done
+            bin="${cmd[0]}"
+            echo "== $bin"
+            ls -l "$bin"
+            readelf -hW "$bin" | grep -E 'Type|Entry|program headers|section headers' || true
+            readelf -lW "$bin" | sed -n '/Program Headers/,/Section to Segment/p' || true
+            readelf -SW "$bin" | grep -E '\.(text|symtab|strtab|dynsym|debug|gnu_debuglink|note)' || true
+            echo "symtab entries: $(nm "$bin" | wc -l)"
+            valgrind -v --tool=callgrind --collect-atstart=yes --callgrind-out-file="$RUNNER_TEMP/v.out" "${cmd[@]}" > /dev/null 2> "$RUNNER_TEMP/vg.err" && rc=0 || rc=$?
+            echo "exit $rc"
+            grep -iE "instr-|serious|warning|error|symbol|debuginfo|di_notify|rx|discard" "$RUNNER_TEMP/vg.err" | grep -vE "LL cache|L3 cache" | head -40 || true
+            echo "fn lines: $(grep -c '^fn=' "$RUNNER_TEMP/v.out" || true)"
+            grep -E '^fn=' "$RUNNER_TEMP/v.out" | head -12 || true
           done
       - name: summary
         if: always() && steps.baseline.outputs.ready == 'true'
