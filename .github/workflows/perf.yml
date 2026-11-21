@@ -115,16 +115,25 @@ jobs:
           for b in "$RUNNER_TEMP"/target/release/build/fulcrum-bench/*/out/instr-* "$RUNNER_TEMP"/target/release/deps/instr-*; do
             [ -x "$b" ] || continue
             echo "== $b"
-            nm -C "$b" | grep -c __gungraun_wrapper_mod || true
-            nm -C "$b" | grep __gungraun_wrapper_mod | head -3 || true
-            nm "$b" | grep __gungraun_wrapper_mod | head -3 || true
+            sym="$(nm "$b" | awk '/2w83add22___gungraun_wrapper_mod3add$/ { print $3; exit }')"
+            echo "symbol $sym"
+            nm "$b" | awk -v s="$sym" '$3 == s { print $1 }' | while read -r a; do
+              echo "symbols at $a:"
+              nm -C "$b" | awk -v a="$a" '$1 == a'
+            done
+            objdump -d --no-show-raw-insn --disassemble="$sym" "$b" | grep -A40 "<$sym>:" || true
+            echo "callers of the wrapper:"
+            objdump -d --no-show-raw-insn "$b" | grep -E "(call|jmp).*<$sym>" | head -5
           done
-          find "$GUNGRAUN_HOME" -maxdepth 6 | head -40
-          for f in $(find "$GUNGRAUN_HOME" -type f -name 'callgrind*' | grep -E 'width8.*add' | head -4); do
+          for f in "$GUNGRAUN_HOME"/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.log.base@base "$GUNGRAUN_HOME"/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.log; do
             echo "== $f"
-            grep -E '^(version|creator|pid|cmd|part|desc|positions|events|summary|totals):' "$f" || true
-            grep -c '^fn=' "$f" || true
+            cat "$f" || true
           done
+          f="$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out.base@base"
+          read -r -a cmd <<< "$(sed -n 's/^cmd: *//p' "$f")"
+          valgrind -q --tool=callgrind --collect-atstart=yes --callgrind-out-file="$RUNNER_TEMP/all.out" "${cmd[@]}" > /dev/null || true
+          echo "functions named like the wrapper in a full callgrind run of the base:"
+          grep -E '^(fn|cfn)=.*gungraun_wrapper' "$RUNNER_TEMP/all.out" | sort -u | head -20 || true
       - name: summary
         if: always() && steps.baseline.outputs.ready == 'true'
         env:
