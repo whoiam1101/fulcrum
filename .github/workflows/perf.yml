@@ -55,6 +55,8 @@ jobs:
   instructions:
     name: instruction counts against the base commit
     runs-on: ubuntu-24.04
+    env:
+      RUSTFLAGS: "-C linker-features=-lld"
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
@@ -107,26 +109,6 @@ jobs:
         run: |
           set -o pipefail
           cargo bench --bench instr -- --baseline=base --callgrind-limits="$INSTRUCTION_LIMIT" | tee "$RUNNER_TEMP/instr.txt"
-      - name: diagnostics of the baseline
-        if: always()
-        env:
-          GUNGRAUN_HOME: ${{ runner.temp }}/gungraun
-        run: |
-          for f in "$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out.base@base" "$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out"; do
-            read -r -a cmd <<< "$(sed -n 's/^cmd: *//p' "$f")"
-            bin="${cmd[0]}"
-            echo "== $bin"
-            ls -l "$bin"
-            readelf -hW "$bin" | grep -E 'Type|Entry|program headers|section headers' || true
-            readelf -lW "$bin" | sed -n '/Program Headers/,/Section to Segment/p' || true
-            readelf -SW "$bin" | grep -E '\.(text|symtab|strtab|dynsym|debug|gnu_debuglink|note)' || true
-            echo "symtab entries: $(nm "$bin" | wc -l)"
-            valgrind -v --tool=callgrind --collect-atstart=yes --callgrind-out-file="$RUNNER_TEMP/v.out" "${cmd[@]}" > /dev/null 2> "$RUNNER_TEMP/vg.err" && rc=0 || rc=$?
-            echo "exit $rc"
-            grep -iE "instr-|serious|warning|error|symbol|debuginfo|di_notify|rx|discard" "$RUNNER_TEMP/vg.err" | grep -vE "LL cache|L3 cache" | head -40 || true
-            echo "fn lines: $(grep -c '^fn=' "$RUNNER_TEMP/v.out" || true)"
-            grep -E '^fn=' "$RUNNER_TEMP/v.out" | head -12 || true
-          done
       - name: summary
         if: always() && steps.baseline.outputs.ready == 'true'
         env:
