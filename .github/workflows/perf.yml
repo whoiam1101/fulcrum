@@ -107,6 +107,24 @@ jobs:
         run: |
           set -o pipefail
           cargo bench --bench instr -- --baseline=base --callgrind-limits="$INSTRUCTION_LIMIT" | tee "$RUNNER_TEMP/instr.txt"
+      - name: diagnostics of the baseline
+        if: always()
+        env:
+          GUNGRAUN_HOME: ${{ runner.temp }}/gungraun
+        run: |
+          for b in "$RUNNER_TEMP"/target/release/build/fulcrum-bench/*/out/instr-* "$RUNNER_TEMP"/target/release/deps/instr-*; do
+            [ -x "$b" ] || continue
+            echo "== $b"
+            nm -C "$b" | grep -c __gungraun_wrapper_mod || true
+            nm -C "$b" | grep __gungraun_wrapper_mod | head -3 || true
+            nm "$b" | grep __gungraun_wrapper_mod | head -3 || true
+          done
+          find "$GUNGRAUN_HOME" -maxdepth 6 | head -40
+          for f in $(find "$GUNGRAUN_HOME" -type f -name 'callgrind*' | grep -E 'width8.*add' | head -4); do
+            echo "== $f"
+            grep -E '^(version|creator|pid|cmd|part|desc|positions|events|summary|totals):' "$f" || true
+            grep -c '^fn=' "$f" || true
+          done
       - name: summary
         if: always() && steps.baseline.outputs.ready == 'true'
         env:
