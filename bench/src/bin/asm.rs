@@ -59,7 +59,6 @@ fn build(isa: &str, triple: &str, flags: &str) -> PathBuf {
     let dir = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("target/asm")
         .join(isa);
-    let deps = dir.join(triple).join("release/deps");
     let cargo = env::var("CARGO").unwrap_or_else(|_| "cargo".into());
     let status = Command::new(&cargo)
         .args([
@@ -86,16 +85,33 @@ fn build(isa: &str, triple: &str, flags: &str) -> PathBuf {
         .status()
         .expect("cargo runs");
     assert!(status.success(), "cargo rustc --emit asm failed");
-    fs::read_dir(&deps)
-        .expect("deps directory")
-        .flatten()
-        .map(|e| e.path())
-        .find(|p| {
-            p.extension().is_some_and(|x| x == "s")
-                && p.file_name()
+    newest_asm(&dir).expect("the .s file of fulcrum_bench")
+}
+
+/// The newest `fulcrum_bench*.s` under `dir`, searched recursively: where
+/// cargo puts it inside the target directory depends on its version.
+fn newest_asm(dir: &Path) -> Option<PathBuf> {
+    let mut best: Option<(std::time::SystemTime, PathBuf)> = None;
+    let mut stack = vec![dir.to_path_buf()];
+    while let Some(d) = stack.pop() {
+        for entry in fs::read_dir(&d).into_iter().flatten().flatten() {
+            let path = entry.path();
+            let Ok(meta) = entry.metadata() else { continue };
+            if meta.is_dir() {
+                stack.push(path);
+            } else if path.extension().is_some_and(|x| x == "s")
+                && path
+                    .file_name()
                     .is_some_and(|n| n.to_string_lossy().starts_with("fulcrum_bench"))
-        })
-        .expect("the .s file of fulcrum_bench")
+            {
+                let Ok(time) = meta.modified() else { continue };
+                if best.as_ref().is_none_or(|(t, _)| time > *t) {
+                    best = Some((time, path));
+                }
+            }
+        }
+    }
+    best.map(|(_, p)| p)
 }
 
 /// The name of a function of `loops` in a mangled symbol: the identifier
