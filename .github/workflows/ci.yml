@@ -360,4 +360,6 @@ jobs:
         with:
           persist-credentials: false
       - run: curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
+      - run: ~/.elan/bin/lake exe cache get
       - run: ~/.elan/bin/lake build
+      - run: for f in $(find Fulcrum -name '*.lean'); do m="${f%.lean}"; ~/.elan/bin/lake env leanchecker "${m//\//.}"; done
