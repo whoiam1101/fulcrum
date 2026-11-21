@@ -129,11 +129,20 @@ jobs:
             echo "== $f"
             cat "$f" || true
           done
-          f="$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out.base@base"
-          read -r -a cmd <<< "$(sed -n 's/^cmd: *//p' "$f")"
-          valgrind -q --tool=callgrind --collect-atstart=yes --callgrind-out-file="$RUNNER_TEMP/all.out" "${cmd[@]}" > /dev/null || true
-          echo "functions named like the wrapper in a full callgrind run of the base:"
-          grep -E '^(fn|cfn)=.*gungraun_wrapper' "$RUNNER_TEMP/all.out" | sort -u | head -20 || true
+          for f in "$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out.base@base" "$GUNGRAUN_HOME/fulcrum-bench/instr/width8/add.ops/callgrind.add.ops.out"; do
+            read -r -a cmd <<< "$(sed -n 's/^cmd: *//p' "$f")"
+            for demangle in yes no; do
+              out="$RUNNER_TEMP/all-$demangle.out"
+              rm -f "$out"
+              echo "== full run of ${cmd[0]} --demangle=$demangle"
+              valgrind --tool=callgrind --demangle="$demangle" --compress-strings=no --collect-atstart=yes --callgrind-out-file="$out" "${cmd[@]}" > /dev/null 2> "$RUNNER_TEMP/vg.err" && rc=0 || rc=$?
+              echo "exit $rc"
+              grep -E 'Collected|error|warning' "$RUNNER_TEMP/vg.err" || true
+              echo "fn lines: $(grep -c '^fn=' "$out" || true)"
+              grep -E '^fn=.*(gungraun_wrapper|w83add)' "$out" | sort -u | head -6 || true
+              grep -E '^fn=.*instr' "$out" | sort -u | head -6 || true
+            done
+          done
       - name: summary
         if: always() && steps.baseline.outputs.ready == 'true'
         env:
