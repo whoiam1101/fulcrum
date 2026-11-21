@@ -1,10 +1,10 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-manifests := "Cargo.toml oracle/Cargo.toml integrations/Cargo.toml bench/Cargo.toml fuzz/Cargo.toml tools/gen-tables/Cargo.toml"
+sub_manifests := "oracle/Cargo.toml integrations/Cargo.toml bench/Cargo.toml fuzz/Cargo.toml tools/gen-tables/Cargo.toml"
+manifests := "Cargo.toml " + sub_manifests
 test_features := "std,float-convert,serde,bytemuck,num-traits"
 release_features := "std,float-convert"
-optional_features := "serde bytemuck num-traits"
-msrv := "1.60"
+msrv := `sed -n 's/^rust-version = "\(.*\)"$/\1/p' Cargo.toml`
 min_coverage := "92"
 
 [doc("List the recipes")]
@@ -40,10 +40,10 @@ clippy:
     cargo clippy --all-targets --features {{ test_features }} -- -D warnings
     cargo clippy --all-targets --all-features -- -D warnings
 
-[doc("clippy of the root crate, then clippy -D warnings with all features on every manifest")]
+[doc("clippy of the root crate, then clippy -D warnings with all features on every other manifest")]
 [group("lint")]
 clippy-all: clippy
-    for m in {{ manifests }}; do cargo clippy --manifest-path "$m" --all-targets --all-features -- -D warnings; done
+    for m in {{ sub_manifests }}; do cargo clippy --manifest-path "$m" --all-targets --all-features -- -D warnings; done
 
 [doc("rustdoc with warnings as errors")]
 [group("lint")]
@@ -75,26 +75,30 @@ test:
 test-release:
     cargo test --features {{ release_features }} --release
 
+[doc("Doc tests of the root crate with every feature but strict-overflow")]
+[group("test")]
+doctest:
+    cargo test --doc --features {{ test_features }}
+
 [doc("Operators panic instead of saturating")]
 [group("test")]
 test-strict:
     cargo test --features strict-overflow --test strict
 
-[doc("Tests of the optional features through their public traits")]
+[doc("Tests of the optional features through their public traits, every feature combination")]
 [group("test")]
 test-integrations:
-    cargo test --manifest-path integrations/Cargo.toml --all-features
+    cargo hack test --manifest-path integrations/Cargo.toml --feature-powerset
 
 [doc("Exact rational oracle")]
 [group("test")]
 oracle:
     cargo test --manifest-path oracle/Cargo.toml --release
 
-[doc("Build on the minimum supported Rust with each optional feature")]
+[doc("Build on the minimum supported Rust (rust-version of Cargo.toml) without features and with all; src has only positive cfg(feature) branches, so the two builds reach each of them")]
 [group("test")]
 msrv:
     cargo +{{ msrv }} build
-    for f in {{ optional_features }}; do cargo +{{ msrv }} build --features "$f"; done
     cargo +{{ msrv }} build --all-features
 
 [doc("Check every feature combination, clippy every single feature")]
@@ -140,7 +144,7 @@ perf *args:
 asm isa:
     cd bench && cargo run -q --release --bin asm -- {{ isa }}
 
-[doc("Speed against fixed, libm and std floats on one pinned core")]
+[doc("Speed against fixed, libm and std floats, then the README section of bench/src/bin/report.rs on stdout; extra arguments go to criterion")]
 [group("perf")]
 bench *args:
-    bench/run.sh {{ args }}
+    cd bench && cargo bench --bench ops -- {{ args }} && cargo run -q --release --bin report

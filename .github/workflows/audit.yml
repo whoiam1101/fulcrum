@@ -18,20 +18,17 @@ on:
 permissions:
   contents: read
 
+env:
+  JUST_VERSION: "1.58.0"
+
 jobs:
   cargo-deny:
-    name: cargo-deny ${{ matrix.manifest }}
     runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        manifest: [Cargo.toml, oracle/Cargo.toml, integrations/Cargo.toml, bench/Cargo.toml, tools/gen-tables/Cargo.toml, fuzz/Cargo.toml]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: EmbarkStudios/cargo-deny-action@3c6349835b2b7b196a839186cb8b78e02f7b5f25
+      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
         with:
-          manifest-path: ${{ matrix.manifest }}
-          command: check advisories bans licenses sources
-          arguments: --all-features
+          tool: just@${{ env.JUST_VERSION }},cargo-deny
+      - run: just deny

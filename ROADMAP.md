@@ -10,7 +10,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 4 | Trigonometry and angle types | `v0.4.0` | ✅ done |
 | 5 | `Vec2`, `Vec3` | `v0.5.0` | ✅ done |
 | 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | ✅ done |
-| 7 | Optimizations, vectorized loops | `v0.7.0` | |
+| 7 | Optimizations, vectorized loops | `v0.7.0` | ✅ done |
 | 8 | Lean proofs of the kernel, API freeze | `v1.0.0` | |
 | — | `FixedFloat128`, `FixedFloat256`, only on demand | after `1.0` | deferred |
 
@@ -89,7 +89,7 @@ Quality gates:
 - [x] `pre-commit` hooks (`.pre-commit-config.yaml`): file hygiene, gitleaks, typos, actionlint, zizmor, rustfmt and clippy on every manifest, the source rules; tests, MSRV build and `cargo deny` before push.
 - [x] CI: clippy and rustfmt on every manifest, rustdoc without warnings, typos, Miri on the `unsafe` of `src/pod.rs`, line coverage with a floor, every feature combination (`cargo hack`), semver of each release against the previous tag, weekly mutation testing; actions pinned by commit, gitleaks and zizmor in `security.yml`, Dependabot with a 7-day cooldown.
 - [x] CI split between every push and the weekly run: on a push, tests on every width (8 and 16 bits exhaustively, in debug with overflow checks), the oracle and nine quick Kani harnesses outside the kernel (under a minute); weekly, by hand and on a tag, every Kani harness in parallel, the exhaustive `FixedFloat32` runs one job per file with `overflow-checks`, stress (5 + 3 minutes), fuzz, mutants, beta and nightly. Kani harnesses that repeated an exhaustive test are removed; documentation-only changes run `docs.yml` (typos, source rules, doctests) instead of the whole CI.
-- [x] `justfile`: one recipe per local check; the local hooks of `pre-commit` and the CI jobs `lint`, `toolchains`, `msrv`, `powerset`, `miri`, `coverage`, `mutants` call the recipes. The CI `test` matrix (it runs on Windows) and the `audit.yml` matrix (one cargo-deny job per manifest) keep their own lists.
+- [x] `justfile`: one recipe per local check; the local hooks of `pre-commit` and the CI jobs call the recipes; only the CI steps that depend on the runner, the target or a matrix variable (`targets`, `fuzz`, `kani`, the instruction counts of `perf.yml`) call cargo directly.
 - Moved to [Between 6 and 7](#between-6-and-7-v06x): coverage of `integrations/`.
 - Rejected: Miri on more than `pod.rs`; Miri finds undefined behaviour, which only the `unsafe` of `pod.rs` can cause, and overflow in safe code is caught by the debug tests (ARCHITECTURE §10).
 
@@ -160,7 +160,7 @@ Checked before the tag `v0.6.0`:
 
 - [x] Coverage of `integrations/` merged into the report (`num.rs` and `serialize.rs` show 0 % today), then raise the floor from 80 % (from [Between 3 and 4](#between-3-and-4-v03x)). `just cov` merges the profiles of both runs with `llvm-cov` of llvm-tools: `num.rs` 91 %, `serialize.rs` 91 %, all of `src` 93.0 % of lines; the floor is 92 % (ARCHITECTURE §10).
 
-## 7. Optimizations `v0.7.0`
+## 7. Optimizations ✅ `v0.7.0`
 
 No batch API (`add_assign_slice` and the like): a plain loop over slices is the batch operation, and it vectorizes as well as the scalar code it calls. So the work goes into the scalar code, which every loop of the user, `Vec2` and `Vec3` share. Every item keeps the result bits: the golden hashes and the exhaustive tests do not change.
 
@@ -186,12 +186,12 @@ Speedups found while working on stage 7:
 **Verified by:** the golden hashes on x86-64, ARM64 and 32-bit x86, the exhaustive tests and the oracle on every rewritten function, its Kani harnesses; the instruction-count gate and the README benchmarks for the speed.
 
 Checked before the tag `v0.7.0`:
-- [ ] The job `vectorization` passes on SSE2, AVX2 and NEON (`ubuntu-24.04-arm`), and the instruction-count gate runs the loops and the vector operations.
-- [ ] The weekly exhaustive jobs pass in release with overflow checks: `sqrt` and `rsqrt` of every `FixedFloat32`, `hypot` and `normalize` of every pair of 16 bits, `normalize` and `clamp_length` of 8 bits, `parse ∘ Display` of every `FixedFloat32`.
-- [ ] The Kani harnesses of the kernel pass in the weekly shards, run outside the developer machine; `isqrt_spec_8` and `isqrt_spec_16` cover the starts that did not change, the `rsqrt` start of `k32` and `scale_narrow` are covered by the exhaustive tests above.
-- [ ] The golden hashes are the same on x86-64, ARM64 and 32-bit x86 in debug and release.
-- [ ] The job `coverage` passes with the merged report and the floor of 92 %.
-- [ ] The bench workflow puts the table "Loops over slices" into the README.
+- [x] The job `vectorization` passes on SSE2, AVX2 and NEON (`ubuntu-24.04-arm`), and the instruction-count gate runs the loops and the vector operations.
+- [x] The weekly exhaustive jobs pass in release with overflow checks: `sqrt` and `rsqrt` of every `FixedFloat32`, `hypot` and `normalize` of every pair of 16 bits, `normalize` and `clamp_length` of 8 bits, `parse ∘ Display` of every `FixedFloat32`.
+- [x] The Kani harnesses of the kernel pass in the weekly shards, run outside the developer machine; `isqrt_spec_8` and `isqrt_spec_16` cover the starts that did not change, the `rsqrt` start of `k32` and `scale_narrow` are covered by the exhaustive tests above.
+- [x] The golden hashes are the same on x86-64, ARM64 and 32-bit x86 in debug and release.
+- [x] The job `coverage` passes with the merged report and the floor of 92 %.
+- [x] The bench workflow puts the table "Loops over slices" into the README.
 
 ## 8. Lean proofs of the kernel and 1.0 `v1.0.0`
 

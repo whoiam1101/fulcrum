@@ -76,8 +76,10 @@ jobs:
             echo "DETERMINISM=$RUNNER_TEMP/determinism.md" >> "$GITHUB_ENV"
           fi
       - run: cargo bench --bench ops -- --warm-up-time 2 --measurement-time 5
-      - run: cargo run --release --bin report -- ${DETERMINISM:+--determinism "$DETERMINISM"} --readme ../README.md --out "results/$(date -u +%F)-github-ubuntu.md"
-      - run: cargo run -q --release --bin report -- ${DETERMINISM:+--determinism "$DETERMINISM"} >> "$GITHUB_STEP_SUMMARY"
+      - run: |
+          out="results/$(date -u +%F)-github-ubuntu.md"
+          cargo run --release --bin report -- ${DETERMINISM:+--determinism "$DETERMINISM"} --readme ../README.md --out "$out"
+          cat "$out" >> "$GITHUB_STEP_SUMMARY"
       - name: commit results to main
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
