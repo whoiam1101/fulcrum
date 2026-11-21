@@ -342,7 +342,7 @@ pub(crate) const fn angle_cos(t: u64, n: u32, f: u32) -> i64 {
 #[inline]
 pub(crate) const fn angle_from_radians(raw: i64, f: u32, n: u32) -> u64 {
     let (quadrant, frac) = reduce(raw.unsigned_abs(), f);
-    let position = (((frac >> (129 - n)) + 1) >> 1) as u64;
+    let position = crate::kernel::shr_round((frac >> (129 - n)) as i128, 1) as u64;
     let t = (quadrant << (n - 2)).wrapping_add(position) & angle_mask(n);
     if raw < 0 {
         t.wrapping_neg() & angle_mask(n)
@@ -354,14 +354,15 @@ pub(crate) const fn angle_from_radians(raw: i64, f: u32, n: u32) -> u64 {
 /// The angle `t / 2^n` of a turn in radians, `2π · s / 2^n` for the signed
 /// `s ≡ t (mod 2^n)` in `[-2^(n-1), 2^(n-1))`, so in `[-π, π)`, rounded to `f`
 /// fractional bits: `|s| · π · 2^126` exactly on 192 bits, one rounding on
-/// the magnitude, then the sign. `f ≤ 32`, `4 ≤ n ≤ 64`.
+/// the magnitude, then the sign. `f ≤ 32`, `4 ≤ n ≤ 64`. The upper 128 bits
+/// of the product are below `2^63 · 2^63.66 < 2^127`, so they fit `i128`.
 #[inline]
 pub(crate) const fn angle_to_radians(t: u64, n: u32, f: u32) -> i64 {
     let s = ((t << (64 - n)) as i64) >> (64 - n);
     let m = s.unsigned_abs() as u128;
     let high = m * (PI_126 >> 64) + ((m * (PI_126 as u64 as u128)) >> 64);
     let k = 125 + n - f - 64;
-    let r = (((high >> (k - 1)) + 1) >> 1) as i64;
+    let r = crate::kernel::shr_round(high as i128, k) as i64;
     if s < 0 {
         -r
     } else {

@@ -108,23 +108,10 @@ macro_rules! div_kernel {
         }
     };
     (magnitude, $Bits:ty, $Wide:ty, $UWide:ty, $F:expr) => {
-        /// `round(±un / ud)` with the sign `-` when `negative`; `ud` must be
-        /// non-zero and `2·un + ud` must fit the unsigned wide type.
-        #[inline]
-        const fn round_div(un: $UWide, ud: $UWide, negative: bool) -> $Wide {
-            let m = ((un << 1) + (ud - negative as $UWide)) / (ud << 1);
-            let m = m as $Wide;
-            if negative {
-                -m
-            } else {
-                m
-            }
-        }
-
         /// `round(a · 2^F / b)` for raw operands; `b` must be non-zero.
         #[inline]
         pub(crate) const fn div(a: $Bits, b: $Bits) -> $Wide {
-            round_div(
+            round_magnitude_div(
                 (a.unsigned_abs() as $UWide) << $F,
                 b.unsigned_abs() as $UWide,
                 (a < 0) != (b < 0),
@@ -134,7 +121,7 @@ macro_rules! div_kernel {
         /// `round(a / n)` for a raw `a` and an integer `n`; `n` must be non-zero.
         #[inline]
         pub(crate) const fn div_int(a: $Bits, n: $Bits) -> $Wide {
-            round_div(
+            round_magnitude_div(
                 a.unsigned_abs() as $UWide,
                 n.unsigned_abs() as $UWide,
                 (a < 0) != (n < 0),
@@ -426,23 +413,33 @@ macro_rules! kernel {
                 mul(a, b) + c as $Wide
             }
 
+            /// `round(±un / ud)` with the sign `-` when `negative`, on the
+            /// magnitudes: `⌊(2·un + ud − negative) / 2·ud⌋`; `ud` must be
+            /// non-zero and `2·un + ud` must fit the unsigned wide type. Used
+            /// by `mul_div` and by the `magnitude` form of `div`.
+            #[inline]
+            const fn round_magnitude_div(un: $UWide, ud: $UWide, negative: bool) -> $Wide {
+                let m = ((un << 1) + (ud - negative as $UWide)) / (ud << 1);
+                let m = m as $Wide;
+                if negative {
+                    -m
+                } else {
+                    m
+                }
+            }
+
             /// `round(a · b / c)` for raw operands: the exact product divided
             /// once; `c` must be non-zero. The magnitudes are taken on the
-            /// storage type and multiplied unsigned, then divided as in the
-            /// `magnitude` form of `div`: `⌊(2|a·b| + |c| − negative) / 2|c|⌋`.
-            /// `2·|a · b| + |c| ≤ 2^(4N - 1) + 2^(2N - 1)` fits the unsigned
-            /// wide type.
+            /// storage type and multiplied unsigned, then rounded by
+            /// `round_magnitude_div`. `2·|a · b| + |c| ≤ 2^(4N - 1) + 2^(2N - 1)`
+            /// fits the unsigned wide type.
             #[inline]
             pub(crate) const fn mul_div(a: $Bits, b: $Bits, c: $Bits) -> $Wide {
-                let un = (a.unsigned_abs() as $UWide) * (b.unsigned_abs() as $UWide);
-                let ud = c.unsigned_abs() as $UWide;
-                let negative = ((a < 0) != (b < 0)) != (c < 0);
-                let m = ((un << 1) + (ud - negative as $UWide)) / (ud << 1);
-                if negative {
-                    -(m as $Wide)
-                } else {
-                    m as $Wide
-                }
+                round_magnitude_div(
+                    (a.unsigned_abs() as $UWide) * (b.unsigned_abs() as $UWide),
+                    c.unsigned_abs() as $UWide,
+                    ((a < 0) != (b < 0)) != (c < 0),
+                )
             }
 
             /// `a + round((b - a) · t / 2^F)`: linear interpolation rounded

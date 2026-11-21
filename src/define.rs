@@ -54,7 +54,12 @@ macro_rules! define_fixed {
 
             #[inline]
             const fn checked(w: crate::kernel::$k::Wide) -> Option<Self> {
-                match crate::kernel::$k::narrow(w) {
+                Self::from_raw_option(crate::kernel::$k::narrow(w))
+            }
+
+            #[inline]
+            const fn from_raw_option(raw: Option<$Bits>) -> Option<Self> {
+                match raw {
                     Some(raw) => Some(Self { raw }),
                     None => None,
                 }
@@ -151,10 +156,7 @@ macro_rules! define_fixed {
             /// Checked addition.
             #[inline]
             pub const fn checked_add(self, rhs: Self) -> Option<Self> {
-                match self.raw.checked_add(rhs.raw) {
-                    Some(raw) => Some(Self { raw }),
-                    None => None,
-                }
+                Self::from_raw_option(self.raw.checked_add(rhs.raw))
             }
 
             /// Saturating addition.
@@ -181,10 +183,7 @@ macro_rules! define_fixed {
             /// Checked subtraction.
             #[inline]
             pub const fn checked_sub(self, rhs: Self) -> Option<Self> {
-                match self.raw.checked_sub(rhs.raw) {
-                    Some(raw) => Some(Self { raw }),
-                    None => None,
-                }
+                Self::from_raw_option(self.raw.checked_sub(rhs.raw))
             }
 
             /// Saturating subtraction.
@@ -323,10 +322,7 @@ macro_rules! define_fixed {
             /// Checked negation; `None` for `MIN`.
             #[inline]
             pub const fn checked_neg(self) -> Option<Self> {
-                match self.raw.checked_neg() {
-                    Some(raw) => Some(Self { raw }),
-                    None => None,
-                }
+                Self::from_raw_option(self.raw.checked_neg())
             }
 
             /// Saturating negation; `-MIN` gives `MAX`.
@@ -360,10 +356,7 @@ macro_rules! define_fixed {
             /// Checked absolute value; `None` for `MIN`.
             #[inline]
             pub const fn checked_abs(self) -> Option<Self> {
-                match self.raw.checked_abs() {
-                    Some(raw) => Some(Self { raw }),
-                    None => None,
-                }
+                Self::from_raw_option(self.raw.checked_abs())
             }
 
             /// Saturating absolute value.
@@ -397,10 +390,7 @@ macro_rules! define_fixed {
             /// Multiplication by an integer, or `None` on overflow.
             #[inline]
             pub const fn checked_mul_int(self, n: $Bits) -> Option<Self> {
-                match self.raw.checked_mul(n) {
-                    Some(raw) => Some(Self { raw }),
-                    None => None,
-                }
+                Self::from_raw_option(self.raw.checked_mul(n))
             }
 
             /// Wrapping multiplication by an integer.
@@ -666,15 +656,7 @@ macro_rules! define_fixed {
             /// The raw value of `self` clamped to `[-1, 1]`.
             #[inline]
             const fn clamp_unit(self) -> i64 {
-                let one = 1i64 << $F;
-                let raw = self.raw as i64;
-                if raw > one {
-                    one
-                } else if raw < -one {
-                    -one
-                } else {
-                    raw
-                }
+                self.clamp(Self::NEG_ONE, Self::ONE).raw as i64
             }
 
             /// `2^self`, correctly rounded to nearest on every

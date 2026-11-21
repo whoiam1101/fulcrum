@@ -81,12 +81,15 @@ macro_rules! impl_float {
             pub fn saturating_from_f64(x: f64) -> Self {
                 match crate::float::decompose(x, $F) {
                     crate::float::FromF64::Nan => Self::ZERO,
-                    crate::float::FromF64::Value(negative, _, _) => match Self::checked_from_f64(x)
-                    {
-                        Some(v) => v,
-                        None if negative => Self::MIN,
-                        None => Self::MAX,
-                    },
+                    crate::float::FromF64::Value(negative, magnitude, false) => {
+                        match Self::checked_from_sign_magnitude(negative, magnitude) {
+                            Some(v) => v,
+                            None if negative => Self::MIN,
+                            None => Self::MAX,
+                        }
+                    }
+                    crate::float::FromF64::Value(true, _, true) => Self::MIN,
+                    crate::float::FromF64::Value(false, _, true) => Self::MAX,
                 }
             }
 

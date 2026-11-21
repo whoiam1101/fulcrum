@@ -472,97 +472,64 @@ macro_rules! take {
 }
 
 /// `to_le_bytes`, `from_le_bytes`, `to_be_bytes`, `from_be_bytes` of the
-/// vectors of each component type: the components in order, each in the
-/// format of the component.
+/// vectors of each component type of `N` bytes: the components in order,
+/// each in the format of the component.
 macro_rules! impl_vec_bytes {
-    ($($T:ident: $N:literal, $N2:literal, $N3:literal);+ $(;)?) => {$(
+    ($($T:ident: $N:literal),+ $(,)?) => {$(
+        impl_vec_bytes!(
+            @order $T, $N, to_le_bytes, from_le_bytes,
+            "each as [`to_le_bytes`](crate::FixedFloat64::to_le_bytes) of the component: the canonical format for snapshots"
+        );
+        impl_vec_bytes!(@order $T, $N, to_be_bytes, from_be_bytes, "each big-endian");
+    )+};
+    (@order $T:ident, $N:literal, $to:ident, $from:ident, $doc:literal) => {
         impl Vec2<crate::$T> {
-            /// `x` then `y`, each as [`to_le_bytes`](crate::FixedFloat64::to_le_bytes)
-            /// of the component: the canonical format for snapshots.
+            #[doc = concat!("`x` then `y`, ", $doc, ".")]
             #[inline]
-            pub const fn to_le_bytes(self) -> [u8; $N2] {
-                let mut out = [0u8; $N2];
-                put!(out, 0, self.x.to_le_bytes());
-                put!(out, $N, self.y.to_le_bytes());
+            pub const fn $to(self) -> [u8; 2 * $N] {
+                let mut out = [0u8; 2 * $N];
+                put!(out, 0, self.x.$to());
+                put!(out, $N, self.y.$to());
                 out
             }
 
-            /// Inverse of [`Self::to_le_bytes`].
+            #[doc = concat!("Inverse of [`Self::", stringify!($to), "`].")]
             #[inline]
-            pub const fn from_le_bytes(bytes: [u8; $N2]) -> Self {
+            pub const fn $from(bytes: [u8; 2 * $N]) -> Self {
                 Self {
-                    x: crate::$T::from_le_bytes(take!(bytes, 0, $N)),
-                    y: crate::$T::from_le_bytes(take!(bytes, $N, $N)),
-                }
-            }
-
-            /// `x` then `y`, each big-endian.
-            #[inline]
-            pub const fn to_be_bytes(self) -> [u8; $N2] {
-                let mut out = [0u8; $N2];
-                put!(out, 0, self.x.to_be_bytes());
-                put!(out, $N, self.y.to_be_bytes());
-                out
-            }
-
-            /// Inverse of [`Self::to_be_bytes`].
-            #[inline]
-            pub const fn from_be_bytes(bytes: [u8; $N2]) -> Self {
-                Self {
-                    x: crate::$T::from_be_bytes(take!(bytes, 0, $N)),
-                    y: crate::$T::from_be_bytes(take!(bytes, $N, $N)),
+                    x: crate::$T::$from(take!(bytes, 0, $N)),
+                    y: crate::$T::$from(take!(bytes, $N, $N)),
                 }
             }
         }
 
         impl Vec3<crate::$T> {
-            /// `x`, `y` then `z`, each as [`to_le_bytes`](crate::FixedFloat64::to_le_bytes)
-            /// of the component: the canonical format for snapshots.
+            #[doc = concat!("`x`, `y` then `z`, ", $doc, ".")]
             #[inline]
-            pub const fn to_le_bytes(self) -> [u8; $N3] {
-                let mut out = [0u8; $N3];
-                put!(out, 0, self.x.to_le_bytes());
-                put!(out, $N, self.y.to_le_bytes());
-                put!(out, 2 * $N, self.z.to_le_bytes());
+            pub const fn $to(self) -> [u8; 3 * $N] {
+                let mut out = [0u8; 3 * $N];
+                put!(out, 0, self.x.$to());
+                put!(out, $N, self.y.$to());
+                put!(out, 2 * $N, self.z.$to());
                 out
             }
 
-            /// Inverse of [`Self::to_le_bytes`].
+            #[doc = concat!("Inverse of [`Self::", stringify!($to), "`].")]
             #[inline]
-            pub const fn from_le_bytes(bytes: [u8; $N3]) -> Self {
+            pub const fn $from(bytes: [u8; 3 * $N]) -> Self {
                 Self {
-                    x: crate::$T::from_le_bytes(take!(bytes, 0, $N)),
-                    y: crate::$T::from_le_bytes(take!(bytes, $N, $N)),
-                    z: crate::$T::from_le_bytes(take!(bytes, 2 * $N, $N)),
-                }
-            }
-
-            /// `x`, `y` then `z`, each big-endian.
-            #[inline]
-            pub const fn to_be_bytes(self) -> [u8; $N3] {
-                let mut out = [0u8; $N3];
-                put!(out, 0, self.x.to_be_bytes());
-                put!(out, $N, self.y.to_be_bytes());
-                put!(out, 2 * $N, self.z.to_be_bytes());
-                out
-            }
-
-            /// Inverse of [`Self::to_be_bytes`].
-            #[inline]
-            pub const fn from_be_bytes(bytes: [u8; $N3]) -> Self {
-                Self {
-                    x: crate::$T::from_be_bytes(take!(bytes, 0, $N)),
-                    y: crate::$T::from_be_bytes(take!(bytes, $N, $N)),
-                    z: crate::$T::from_be_bytes(take!(bytes, 2 * $N, $N)),
+                    x: crate::$T::$from(take!(bytes, 0, $N)),
+                    y: crate::$T::$from(take!(bytes, $N, $N)),
+                    z: crate::$T::$from(take!(bytes, 2 * $N, $N)),
                 }
             }
         }
-    )+};
+    };
 }
 
 impl_vec_bytes! {
-    FixedFloat8: 1, 2, 3;
-    FixedFloat16: 2, 4, 6;
-    FixedFloat32: 4, 8, 12;
-    FixedFloat64: 8, 16, 24;
+    FixedFloat8: 1,
+    FixedFloat16: 2,
+    FixedFloat32: 4,
+    FixedFloat64: 8,
 }

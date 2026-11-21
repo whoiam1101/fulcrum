@@ -14,7 +14,6 @@ categories = ["mathematics", "no-std", "game-development"]
 include = ["src/**/*.rs", "Cargo.toml", "README.md", "LICENSE"]
 
 [features]
-default = []
 std = []
 float-convert = []
 strict-overflow = []
