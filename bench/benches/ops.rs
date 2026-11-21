@@ -55,7 +55,7 @@
 use criterion::{criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
 use fulcrum::{FixedFloat16, FixedFloat32, FixedFloat64, FixedFloat8};
 use fulcrum_bench::loops::{self, map2, map3, map_int};
-use fulcrum_bench::{divisor, ff16, ff32, ff64, ff8, inputs, operand, q32_32, radicand};
+use fulcrum_bench::{divisor, ff16, ff32, ff64, ff8, inputs, operand, q32_32, radicand, values};
 use std::hint::black_box;
 
 const N: usize = 4096;
@@ -93,14 +93,8 @@ macro_rules! bench_ops {
         g.finish();
     }};
     (@throughput $c:expr, $name:literal, $T:ty, $make:expr, $add:expr, $mul:expr, $div:expr) => {{
-        let a: Vec<$T> = inputs(N, 1)
-            .into_iter()
-            .map(|x| $make(operand(x)))
-            .collect();
-        let b: Vec<$T> = inputs(N, 2)
-            .into_iter()
-            .map(|x| $make(divisor(x)))
-            .collect();
+        let a: Vec<$T> = values(N, 1, operand, $make);
+        let b: Vec<$T> = values(N, 2, divisor, $make);
         let mut out: Vec<$T> = a.clone();
         let add = $add;
         let mul = $mul;
@@ -325,10 +319,10 @@ fn ops(c: &mut Criterion) {
 
 macro_rules! bench_combined {
     ($c:expr, $name:literal, $T:ty, $make:expr, mul_add: $mul_add:expr, mul_div: $mul_div:expr, lerp: $lerp:expr, dot: $dot:expr) => {{
-        let a: Vec<$T> = inputs(N, 5).into_iter().map(|x| $make(operand(x))).collect();
-        let b: Vec<$T> = inputs(N, 6).into_iter().map(|x| $make(operand(x))).collect();
-        let d: Vec<$T> = inputs(N, 7).into_iter().map(|x| $make(divisor(x))).collect();
-        let t: Vec<$T> = inputs(N, 8).into_iter().map(|x| $make((x >> 48) as i64)).collect();
+        let a: Vec<$T> = values(N, 5, operand, $make);
+        let b: Vec<$T> = values(N, 6, operand, $make);
+        let d: Vec<$T> = values(N, 7, divisor, $make);
+        let t: Vec<$T> = values(N, 8, |x| (x >> 48) as i64, $make);
         let mut out: Vec<$T> = a.clone();
         let dot = $dot;
 
@@ -436,8 +430,8 @@ fn combined(c: &mut Criterion) {
 /// operation is a function over whole slices.
 macro_rules! bench_loops {
     ($c:expr, $name:literal, $T:ty, $Int:ty, $make:expr, add: $add:expr, sub: $sub:expr, mul: $mul:expr, mul_int: $mul_int:expr, mul_add: $mul_add:expr, lerp: $lerp:expr) => {{
-        let values = |seed| -> Vec<$T> { inputs(N, seed).into_iter().map(|x| $make(operand(x))).collect() };
-        let (a, b, c) = (values(13), values(14), values(15));
+        let operands = |seed| -> Vec<$T> { values(N, seed, operand, $make) };
+        let (a, b, c) = (operands(13), operands(14), operands(15));
         let n: Vec<$Int> = inputs(N, 16).into_iter().map(|x| ((x >> 60) as i64 - 8) as $Int).collect();
         let mut out = a.clone();
         let mut g = $c.benchmark_group("loops");
@@ -529,14 +523,8 @@ fn slice_loops(c: &mut Criterion) {
 /// One root function over 4096 operands for each implementation.
 macro_rules! bench_roots {
     ($c:expr, $name:literal, $T:ty, $make:expr, sqrt: $sqrt:expr, rsqrt: $rsqrt:expr, hypot: $hypot:expr) => {{
-        let a: Vec<$T> = inputs(N, 9)
-            .into_iter()
-            .map(|x| $make(radicand(x)))
-            .collect();
-        let b: Vec<$T> = inputs(N, 10)
-            .into_iter()
-            .map(|x| $make(radicand(x)))
-            .collect();
+        let a: Vec<$T> = values(N, 9, radicand, $make);
+        let b: Vec<$T> = values(N, 10, radicand, $make);
         let mut out: Vec<$T> = a.clone();
         let (sqrt, rsqrt, hypot) = ($sqrt, $rsqrt, $hypot);
         let mut g = $c.benchmark_group("throughput");
@@ -616,9 +604,9 @@ macro_rules! bench_trig {
      atan2: $atan2:expr, asin: $asin:expr, acos: $acos:expr) => {{
         let make = $make;
         let unit = $unit;
-        let a: Vec<$T> = inputs(N, 11).into_iter().map(|x| make(operand(x))).collect();
-        let b: Vec<$T> = inputs(N, 12).into_iter().map(|x| make(operand(x))).collect();
-        let u: Vec<$T> = inputs(N, 13).into_iter().map(|x| unit(operand(x))).collect();
+        let a: Vec<$T> = values(N, 11, operand, &make);
+        let b: Vec<$T> = values(N, 12, operand, &make);
+        let u: Vec<$T> = values(N, 13, operand, &unit);
         let mut g = $c.benchmark_group("throughput");
         g.throughput(Throughput::Elements(N as u64));
         $(
@@ -694,11 +682,11 @@ macro_rules! bench_exp_log {
      exp: $exp:expr
      $(, pow: $pow:expr, powi: $powi:expr)?) => {{
         let make = $make;
-        let a: Vec<$T> = inputs(N, 14).into_iter().map(|x| make(operand(x))).collect();
+        let a: Vec<$T> = values(N, 14, operand, &make);
         let mut gr = $c.benchmark_group("throughput");
         gr.throughput(Throughput::Elements(N as u64));
         $(
-            let p: Vec<$T> = inputs(N, 15).into_iter().map(|x| make(radicand(x))).collect();
+            let p: Vec<$T> = values(N, 15, radicand, &make);
             let (log2, exp2, ln) = ($log2, $exp2, $ln);
             bench_trig_one(&mut gr, "log2", $name, &p, &a, |x: $T, _| log2(x));
             bench_trig_one(&mut gr, "exp2", $name, &a, &a, |x: $T, _| exp2(x));
@@ -707,7 +695,7 @@ macro_rules! bench_exp_log {
         let exp = $exp;
         bench_trig_one(&mut gr, "exp", $name, &a, &a, |x: $T, _| exp(x));
         $(
-            let g: Vec<$T> = inputs(N, 16).into_iter().map(|x| make((radicand(x) >> 6) | 1)).collect();
+            let g: Vec<$T> = values(N, 16, |x| (radicand(x) >> 6) | 1, &make);
             let n: Vec<i32> = inputs(N, 17).into_iter().map(|x| (x % 17) as i32 - 8).collect();
             let (pow, powi) = ($pow, $powi);
             bench_trig_one(&mut gr, "pow", $name, &g, &a, |x: $T, y: $T| pow(x, y));
@@ -874,14 +862,14 @@ fn tick(c: &mut Criterion) {
     g.bench_function(BenchmarkId::new("one", "fulcrum/FixedFloat32"), |bn| {
         bn.iter_batched_ref(
             tick::fulcrum32,
-            |u| tick::fulcrum(u, |v| FixedFloat32::from_bits(v as i32)),
+            |u| tick::fulcrum(u, ff32),
             BatchSize::LargeInput,
         )
     });
     g.bench_function(BenchmarkId::new("one", "fulcrum/FixedFloat64"), |bn| {
         bn.iter_batched_ref(
             tick::fulcrum64,
-            |u| tick::fulcrum(u, |v| FixedFloat64::from_bits(v << 16)),
+            |u| tick::fulcrum(u, ff64),
             BatchSize::LargeInput,
         )
     });

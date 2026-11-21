@@ -1,6 +1,6 @@
 //! Turns criterion results into the `## Benchmarks` section of the README.
 //!
-//! Usage: `report [--criterion DIR] [--readme FILE] [--out FILE]`.
+//! Usage: `report [--readme FILE] [--out FILE] [--determinism FILE]`.
 //! Without `--readme` and `--out` the section is printed to stdout.
 //!
 //! A difference counts only when the 95% confidence intervals of the two
@@ -45,8 +45,6 @@ const COMBINED: [(&str, &str); 4] = [
     ("dot", "dot product, 4096 terms"),
 ];
 
-const COMBINED_PAIRS: [(&str, &str); 2] = [("FixedFloat32", "I16F16"), ("FixedFloat64", "I32F32")];
-
 const COMBINED_INTS: [&str; 2] = ["i32", "i64"];
 
 const LOOPS: [(&str, &str); 6] = [
@@ -71,9 +69,6 @@ const ROOTS: [(&str, &str); 3] = [
     ("rsqrt", "`rsqrt`"),
     ("hypot", "`hypot`"),
 ];
-
-/// fulcrum type, its float, and the column labels of the float.
-const ROOT_GROUPS: [(&str, &str); 2] = [("FixedFloat32", "f32"), ("FixedFloat64", "f64")];
 
 /// Trigonometric functions: id, label, and whether `cordic` has it.
 const TRIG: [(&str, &str, bool); 9] = [
@@ -119,9 +114,6 @@ const VECTORS: [(&str, &str); 10] = [
     ("vec3_normalize", "`Vec3::normalize`"),
 ];
 
-/// The fulcrum types of the vector benchmarks.
-const VECTOR_TYPES: [&str; 2] = ["FixedFloat32", "FixedFloat64"];
-
 /// Implementations of the "one tick" benchmark: implementation, type and
 /// label.
 const TICK: [(&str, &str, &str); 5] = [
@@ -132,13 +124,10 @@ const TICK: [(&str, &str, &str); 5] = [
     ("glam", "f32", "`glam` `f32`"),
 ];
 
-/// Operands per function and implementation in the trigonometry accuracy
-/// table; each needs the 256-bit oracle.
-const TRIG_ACCURACY_SAMPLES: usize = 20_000;
-
-/// Operands per function and implementation in the accuracy table of the
-/// exponentials and logarithms; each needs the 256-bit oracle.
-const EXP_ACCURACY_SAMPLES: usize = 20_000;
+/// Operands per function and implementation in the accuracy tables of the
+/// trigonometry and of the exponentials and logarithms; each needs the
+/// 256-bit oracle.
+const ORACLE_SAMPLES: usize = 20_000;
 
 /// Operands per function and implementation in the accuracy table.
 const ACCURACY_SAMPLES: usize = 100_000;
@@ -169,12 +158,7 @@ fn expected() -> Vec<String> {
         }
     }
     for (mode, ops, pairs, ints) in [
-        (
-            "throughput",
-            &COMBINED[..],
-            &COMBINED_PAIRS[..],
-            &COMBINED_INTS[..],
-        ),
+        ("throughput", &COMBINED[..], &PAIRS[1..], &COMBINED_INTS[..]),
         ("loops", &LOOPS[..], &LOOP_PAIRS[..], &LOOP_INTS[..]),
     ] {
         for (op, _) in ops {
@@ -188,7 +172,7 @@ fn expected() -> Vec<String> {
         }
     }
     for (op, _) in ROOTS {
-        for (ours, float) in ROOT_GROUPS {
+        for (ours, float) in NATIVE {
             ids.push(id("throughput", op, "fulcrum", ours));
             ids.push(id("throughput", op, "libm", float));
             ids.push(id("throughput", op, "native", float));
@@ -205,7 +189,7 @@ fn expected() -> Vec<String> {
         }
     }
     for (op, _) in VECTORS {
-        for ours in VECTOR_TYPES {
+        for (ours, _) in NATIVE {
             ids.push(id("throughput", op, "fulcrum", ours));
         }
         ids.push(id("throughput", op, "glam", "f32"));
@@ -250,6 +234,25 @@ fn verdict_text(v: Verdict) -> String {
         Verdict::Slower(r) => format!("{:.2}× slower", r),
         Verdict::Even => "on par".to_string(),
     }
+}
+
+/// `faster in … of … cases, on par in …, slower in …` for the verdicts `v`.
+fn tally<'a>(v: impl IntoIterator<Item = &'a Verdict>) -> String {
+    let (mut faster, mut even, mut slower) = (0, 0, 0);
+    for v in v {
+        match v {
+            Verdict::Faster(_) => faster += 1,
+            Verdict::Even => even += 1,
+            Verdict::Slower(_) => slower += 1,
+        }
+    }
+    format!(
+        "faster in {} of {} cases, on par in {}, slower in {}",
+        faster,
+        faster + even + slower,
+        even,
+        slower
+    )
 }
 
 fn load(dir: &Path, out: &mut BTreeMap<String, Est>) {
@@ -460,25 +463,20 @@ impl Report {
         }
     }
 
-    /// How many pairs of `pair_table` fulcrum wins and loses: faster, all,
-    /// slower.
-    fn tally(
+    /// The verdicts of every pair of `pair_table`.
+    fn fixed_verdicts(
         &self,
         mode: &str,
         ops: &[(&str, &str)],
         pairs: &[(&str, &str)],
-    ) -> (usize, usize, usize) {
-        let v: Vec<Verdict> = ops
-            .iter()
+    ) -> Vec<Verdict> {
+        ops.iter()
             .flat_map(|&(op, _)| {
                 pairs
                     .iter()
                     .map(move |&(ours, theirs)| self.vs_fixed(mode, op, ours, theirs))
             })
-            .collect();
-        let faster = v.iter().filter(|v| matches!(v, Verdict::Faster(_))).count();
-        let slower = v.iter().filter(|v| matches!(v, Verdict::Slower(_))).count();
-        (faster, v.len(), slower)
+            .collect()
     }
 
     fn vs_float(&self, op: &str, ours: &str, imp: &str, float: &str) -> Verdict {
@@ -490,24 +488,24 @@ impl Report {
 
     fn vector_table(&self, s: &mut String) {
         s.push_str("| Function |");
-        for ours in VECTOR_TYPES {
+        for (ours, _) in NATIVE {
             let _ = write!(s, " `{}` |", ours);
         }
         s.push_str(" `glam` `f32` |");
-        for ours in VECTOR_TYPES {
+        for (ours, _) in NATIVE {
             let _ = write!(s, " `{}` vs `glam` |", ours);
         }
         s.push_str("\n|---|");
-        for _ in 0..=VECTOR_TYPES.len() {
+        for _ in 0..=NATIVE.len() {
             s.push_str("---:|");
         }
-        for _ in VECTOR_TYPES {
+        for _ in NATIVE {
             s.push_str("---|");
         }
         s.push('\n');
         for (op, label) in VECTORS {
             let _ = write!(s, "| {}", label);
-            for ours in VECTOR_TYPES {
+            for (ours, _) in NATIVE {
                 let _ = write!(
                     s,
                     " | {}",
@@ -515,7 +513,7 @@ impl Report {
                 );
             }
             let _ = write!(s, " | {}", ns(self.get("throughput", op, "glam", "f32").ns));
-            for ours in VECTOR_TYPES {
+            for (ours, _) in NATIVE {
                 let _ = write!(
                     s,
                     " | {}",
@@ -551,7 +549,7 @@ impl Report {
 
     fn roots_table(&self, s: &mut String) {
         s.push('|');
-        for (ours, float) in ROOT_GROUPS {
+        for (ours, float) in NATIVE {
             let _ = write!(
                 s,
                 " | `{}` | `libm` `{}` | `std` `{}` | `{}` vs `libm`",
@@ -559,13 +557,13 @@ impl Report {
             );
         }
         s.push_str(" |\n|---|");
-        for _ in ROOT_GROUPS {
+        for _ in NATIVE {
             s.push_str("---:|---:|---:|---|");
         }
         s.push('\n');
         for (op, label) in ROOTS {
             let _ = write!(s, "| {}", label);
-            for (ours, float) in ROOT_GROUPS {
+            for (ours, float) in NATIVE {
                 let _ = write!(
                     s,
                     " | {} | {} | {} | {}",
@@ -592,15 +590,13 @@ impl Report {
             format, ours, float, float, fixed, ours, ours
         );
         for &(op, label, cordic) in ops {
-            let theirs = if cordic {
-                ns(self.get("throughput", op, "cordic", fixed).ns)
+            let (theirs, vs_cordic) = if cordic {
+                (
+                    ns(self.get("throughput", op, "cordic", fixed).ns),
+                    verdict_text(self.vs_float(op, ours, "cordic", fixed)),
+                )
             } else {
-                "—".to_string()
-            };
-            let vs_cordic = if cordic {
-                verdict_text(self.vs_float(op, ours, "cordic", fixed))
-            } else {
-                "—".to_string()
+                ("—".to_string(), "—".to_string())
             };
             let _ = writeln!(
                 s,
@@ -662,21 +658,10 @@ impl Report {
                 ));
             }
         }
-        let faster = all
-            .iter()
-            .filter(|c| matches!(c.4, Verdict::Faster(_)))
-            .count();
-        let slower = all
-            .iter()
-            .filter(|c| matches!(c.4, Verdict::Slower(_)))
-            .count();
         let _ = writeln!(
             s,
-            "- **Against `fixed`** (same formats, saturating operators): fulcrum is faster in {} of {} cases, on par in {}, slower in {}.",
-            faster,
-            all.len(),
-            all.len() - faster - slower,
-            slower
+            "- **Against `fixed`** (same formats, saturating operators): fulcrum is {}.",
+            tally(all.iter().map(|c| &c.4))
         );
 
         for (op, name) in [("add", "`+`"), ("mul", "`*`"), ("div", "`/`")] {
@@ -744,26 +729,18 @@ impl Report {
             );
         }
 
-        let (faster, all, slower) = self.tally("throughput", &COMBINED, &COMBINED_PAIRS);
         let _ = writeln!(
             s,
-            "- **Combined operations** (`mul_add`, `mul_div`, `lerp`, dot product) against `fixed`: faster in {} of {} cases, on par in {}, slower in {}.",
-            faster,
-            all,
-            all - faster - slower,
-            slower
+            "- **Combined operations** (`mul_add`, `mul_div`, `lerp`, dot product) against `fixed`: {}.",
+            tally(&self.fixed_verdicts("throughput", &COMBINED, &PAIRS[1..]))
         );
-        let (faster, all, slower) = self.tally("loops", &LOOPS, &LOOP_PAIRS);
         let _ = writeln!(
             s,
-            "- **Loops over slices** (`+`, `-`, `*`, `mul_int`, `mul_add`, `lerp` on 8, 16 and 32 bits) against `fixed`: faster in {} of {} cases, on par in {}, slower in {}.",
-            faster,
-            all,
-            all - faster - slower,
-            slower
+            "- **Loops over slices** (`+`, `-`, `*`, `mul_int`, `mul_add`, `lerp` on 8, 16 and 32 bits) against `fixed`: {}.",
+            tally(&self.fixed_verdicts("loops", &LOOPS, &LOOP_PAIRS))
         );
 
-        for (ours, float) in ROOT_GROUPS {
+        for (ours, float) in NATIVE {
             let parts: Vec<String> = ROOTS
                 .iter()
                 .map(|&(op, label)| {
@@ -790,15 +767,7 @@ impl Report {
                     .filter(|&&(_, _, cordic)| imp != "cordic" || cordic)
                     .map(|&(op, _, _)| self.vs_float(op, ours, imp, ty))
                     .collect();
-                let faster = v.iter().filter(|v| matches!(v, Verdict::Faster(_))).count();
-                let slower = v.iter().filter(|v| matches!(v, Verdict::Slower(_))).count();
-                format!(
-                    "faster in {} of {}, on par in {}, slower in {}",
-                    faster,
-                    v.len(),
-                    v.len() - faster - slower,
-                    slower
-                )
+                tally(&v)
             };
             let _ = writeln!(
                 s,
@@ -867,13 +836,7 @@ impl Report {
              and a sum of saturating products, which truncates every term. \
              Integers run the same loops with wrapping `x * y + z`, `x * y / z`, `x + (y - x) * t` and a sum of products.\n\n",
         );
-        self.pair_table(
-            &mut s,
-            "throughput",
-            &COMBINED,
-            &COMBINED_PAIRS,
-            &COMBINED_INTS,
-        );
+        self.pair_table(&mut s, "throughput", &COMBINED, &PAIRS[1..], &COMBINED_INTS);
         s.push_str("\n### Loops over slices, ns per element\n\n");
         s.push_str(
             "A plain loop over slices is the batch operation; the table of `bench/src/bin/asm.rs` lists which of these loops vectorize, checked in CI. \
@@ -1024,9 +987,9 @@ fn trig_accuracy_table(s: &mut String) {
          for `sin_turns` and `cos_turns` they compute `sin(τ·x)` and `cos(τ·x)`. `cordic` is the CORDIC crate on `I16F16` and `I32F32`; \
          its `tan` divides `sin` by `cos` in `fixed`, which wraps on overflow near the poles, hence the huge errors there. \
          Generated by [`bench/src/trig_accuracy.rs`](bench/src/trig_accuracy.rs).\n",
-        TRIG_ACCURACY_SAMPLES
+        ORACLE_SAMPLES
     );
-    float_accuracy_rows(s, &table(TRIG_ACCURACY_SAMPLES));
+    float_accuracy_rows(s, &table(ORACLE_SAMPLES));
 }
 
 /// The accuracy table of `fulcrum_bench::exp_accuracy`.
@@ -1041,9 +1004,9 @@ fn exp_accuracy_table(s: &mut String) {
          Floats (`f32` for Q16.16, `f64` for Q32.32) get the operand exactly and their result rounded to nearest into the format; \
          `libm` computes `powi` as `pow`. `cordic` is the CORDIC crate on `I16F16` and `I32F32`, which has only `exp`. \
          Generated by [`bench/src/exp_accuracy.rs`](bench/src/exp_accuracy.rs).\n",
-        EXP_ACCURACY_SAMPLES
+        ORACLE_SAMPLES
     );
-    float_accuracy_rows(s, &table(EXP_ACCURACY_SAMPLES));
+    float_accuracy_rows(s, &table(ORACLE_SAMPLES));
 }
 
 /// The determinism table of the current README section, so that a run
@@ -1076,22 +1039,14 @@ fn range(v: &[f64]) -> String {
 fn splice(readme: &str, section: &str) -> String {
     let lines: Vec<&str> = readme.lines().collect();
     let start = lines.iter().position(|l| l.trim_end() == HEADING);
-    let (start, end) = match start {
-        Some(i) => {
-            let end = lines[i + 1..]
-                .iter()
-                .position(|l| l.starts_with("## "))
-                .map_or(lines.len(), |j| i + 1 + j);
-            (i, end)
-        }
-        None => {
-            let at = lines
-                .iter()
-                .position(|l| l.trim_end() == "## Citation")
-                .unwrap_or(lines.len());
-            (at, at)
-        }
-    };
+    let start = start.unwrap_or_else(|| {
+        eprintln!("the README has no `{}` heading", HEADING);
+        std::process::exit(1)
+    });
+    let end = lines[start + 1..]
+        .iter()
+        .position(|l| l.starts_with("## "))
+        .map_or(lines.len(), |j| start + 1 + j);
     let mut out = String::new();
     for l in &lines[..start] {
         out.push_str(l);
@@ -1109,7 +1064,7 @@ fn splice(readme: &str, section: &str) -> String {
 }
 
 fn main() {
-    let mut criterion = PathBuf::from("target/criterion");
+    let criterion = Path::new("target/criterion");
     let mut readme: Option<PathBuf> = None;
     let mut out: Option<PathBuf> = None;
     let mut determinism: Option<String> = None;
@@ -1120,21 +1075,20 @@ fn main() {
             std::process::exit(2)
         });
         match a.as_str() {
-            "--criterion" => criterion = v.into(),
             "--readme" => readme = Some(v.into()),
             "--out" => out = Some(v.into()),
             "--determinism" => {
                 determinism = Some(fs::read_to_string(&v).expect("read the determinism table"))
             }
             _ => {
-                eprintln!("usage: report [--criterion DIR] [--readme FILE] [--out FILE] [--determinism FILE]");
+                eprintln!("usage: report [--readme FILE] [--out FILE] [--determinism FILE]");
                 std::process::exit(2)
             }
         }
     }
 
     let mut data = BTreeMap::new();
-    load(&criterion, &mut data);
+    load(criterion, &mut data);
     if data.is_empty() {
         eprintln!(
             "no criterion results in {}, run `cargo bench --bench ops` first",

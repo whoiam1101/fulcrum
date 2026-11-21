@@ -63,10 +63,7 @@ pub(crate) struct Exact {
 impl Exact {
     pub(crate) fn new((lo, hi): (BigInt, BigInt), frac: u32, bits: u32) -> Self {
         let shift = oracle::TRIG_SCALE - frac;
-        let max: BigInt = ((BigInt::one() << (bits - 1)) - 1) << shift;
-        let min: BigInt = -(BigInt::one() << (bits - 1)) << shift;
-        let clamp = |v: BigInt| v.max(min.clone()).min(max.clone());
-        let (lo, hi) = (clamp(lo), clamp(hi));
+        let (lo, hi) = oracle::Format { bits, frac }.clamp((lo, hi));
         let half = BigInt::one() << (shift - 1);
         let round = |v: &BigInt| ((v + &half) >> shift).to_i128().unwrap();
         let mut nearest = vec![round(&lo)];

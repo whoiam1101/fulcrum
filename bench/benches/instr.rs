@@ -29,7 +29,7 @@ const N: usize = 256;
 /// [`N`] values of a type from the raw generator `raw` and its constructor
 /// `make`.
 fn values<T>(seed: u64, raw: fn(u64) -> i64, make: fn(i64) -> T) -> Vec<T> {
-    inputs(N, seed).into_iter().map(|x| make(raw(x))).collect()
+    fulcrum_bench::values(N, seed, raw, make)
 }
 
 macro_rules! width {

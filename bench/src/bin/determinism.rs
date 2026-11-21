@@ -124,12 +124,11 @@ fn read(path: &Path) -> (String, Vec<Vec<u64>>) {
 
 /// The Markdown table of the files of `dir`.
 fn compare(dir: &Path) -> String {
-    let mut files: Vec<_> = std::fs::read_dir(dir)
+    let files: Vec<_> = std::fs::read_dir(dir)
         .expect("read dir")
         .map(|e| e.expect("entry").path())
         .filter(|p| p.is_file())
         .collect();
-    files.sort();
     let mut platforms: Vec<(String, Vec<Vec<u64>>)> = files.iter().map(|p| read(p)).collect();
     platforms.sort_by_key(|(name, _)| (name != BASE, name.clone()));
     let (base_name, base) = &platforms[0];

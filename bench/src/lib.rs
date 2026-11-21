@@ -42,6 +42,12 @@ pub fn radicand(x: u64) -> i64 {
     ((x >> 40) as i64 & ((1 << 24) - 1)) | 1
 }
 
+/// `n` values of a type: the raw Q16.16 operands `raw` of [`inputs`] of
+/// `seed`, each made by `make`.
+pub fn values<T>(n: usize, seed: u64, raw: impl Fn(u64) -> i64, make: impl Fn(i64) -> T) -> Vec<T> {
+    inputs(n, seed).into_iter().map(|x| make(raw(x))).collect()
+}
+
 /// A Q16.16 raw operand as a `FixedFloat8` (Q4.4).
 pub fn ff8(q: i64) -> fulcrum::FixedFloat8 {
     fulcrum::FixedFloat8::from_bits((q >> 12) as i8)
