@@ -3,7 +3,6 @@ updates:
   - package-ecosystem: cargo
     directories:
       - "/"
-      - "/bench"
       - "/tools/gen-tables"
       - "/integrations"
     schedule:
@@ -22,6 +21,7 @@ updates:
     directories:
       - "/oracle"
       - "/fuzz"
+      - "/bench"
     schedule:
       interval: weekly
     cooldown:
