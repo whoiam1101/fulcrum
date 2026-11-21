@@ -108,7 +108,7 @@ hack:
 miri toolchain="nightly":
     cd integrations && MIRIFLAGS=-Zmiri-strict-provenance cargo +{{ toolchain }} miri test --features bytemuck --test bytemuck
 
-[doc("Line coverage of src by the root tests and the tests of integrations/ together, with the CI floor; cargo llvm-cov reports only the binaries of one workspace, so llvm-cov of llvm-tools merges them")]
+[doc("Line coverage of src by the root tests and the tests of integrations/ together, with the CI floor; cargo llvm-cov reports only the binaries of one workspace, so llvm-cov of llvm-tools merges them; the test binaries are found anywhere under the target directory, cargo versions place them differently")]
 [group("test")]
 cov min=min_coverage:
     cargo llvm-cov clean --workspace
@@ -116,7 +116,7 @@ cov min=min_coverage:
     CARGO_LLVM_COV_TARGET_DIR="$PWD/target/llvm-cov-target" cargo llvm-cov --no-report --manifest-path integrations/Cargo.toml --all-features --dep-coverage fulcrum
     tools="$(rustc --print sysroot)/lib/rustlib/$(rustc -vV | sed -n 's/^host: //p')/bin" && d=target/llvm-cov-target \
       && "$tools/llvm-profdata" merge -sparse "$d"/*.profraw -o "$d/merged.profdata" \
-      && "$tools/llvm-cov" report -instr-profile="$d/merged.profdata" $(find "$d/debug/deps" -maxdepth 1 -type f -perm -u+x | sed 's/^/-object=/') \
+      && "$tools/llvm-cov" report -instr-profile="$d/merged.profdata" $(find "$d" -type f -perm -u+x -regextype posix-extended -regex '.*/[a-z0-9_]+-[0-9a-f]{16}' ! -name 'build_script_*' | sed 's/^/-object=/') \
         -ignore-filename-regex='/\.cargo/|/\.rustup/|/rustc/|/tests/|/integrations/|/target/' | tee "$d/report.txt" \
       && awk -v min={{ min }} '$1 == "TOTAL" { found = 1; if ($10 + 0 < min) { print "line coverage " $10 " is below " min "%"; exit 1 } } END { if (!found) exit 1 }' "$d/report.txt"
 
