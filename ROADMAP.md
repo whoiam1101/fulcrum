@@ -11,7 +11,8 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 5 | `Vec2`, `Vec3` | `v0.5.0` | ✅ done |
 | 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | ✅ done |
 | 7 | Optimizations, vectorized loops | `v0.7.0` | ✅ done |
-| 8 | Lean proofs of the kernel, API freeze | `v1.0.0` | |
+| 8 | Lean proofs of the kernel and of the error bounds | `v1.0.0` | |
+| 9 | API review and freeze | `v1.1.0` | |
 | — | `FixedFloat128`, `FixedFloat256`, only on demand | after `1.0` | deferred |
 
 Widths stop at `FixedFloat64` until 1.0. Q32.32 holds ±2.1·10⁹ with a step of 2.3·10⁻¹⁰, which covers game worlds, and the accumulators are already exact. Every extra width would repeat the work of every later stage (tables, error bounds, proofs) for a type nobody uses yet, so the wide types wait at the end of the plan until a concrete need appears ([Wide types](#wide-types-on-demand)).
@@ -199,13 +200,19 @@ Lean 4 is the last step. It covers `src/kernel.rs`, the one place that owns widt
 
 - ✅ Lean L1: the specification in Lean (with Mathlib), and "shift right by N after adding `2^(N-1)` equals rounding to nearest, ties up" for every N (`shr_round`), together with its form "floor plus the first dropped bit" and its branch for shifts of 128 and more; `kernel::shr_round` extracted by Aeneas never fails and returns the rounded value for every `i128` and `u32` (`shr_round_spec` in `verify/lean/Fulcrum/Round.lean`).
 - ✅ Lean L2: checking the high bits ⇔ the result is outside `[MIN, MAX]`, for every width (`fits`, `narrow`, `saturate`): the cast to the storage type keeps exactly the values in range, `narrow` returns them, `saturate` is the clamp; proven on the `fits`, `narrow`, `saturate` of `k8`..`k64` extracted by Aeneas (`verify/lean/Fulcrum/Narrow.lean`).
-- Lean L3: the kernel functions extracted by Aeneas (`mul`, `div`, `div_int`, `mul_add`, `mul_div`, `lerp`, `rescale`, and the integer square root if it lives in the kernel) equal the specification. Proven for `k8`..`k64`, never failing: `mul`, `mul_add`, `lerp` (`Fulcrum/Mul.lean`, `Fulcrum/Lerp.lean`), `mul_div`, `div`, `div_int` in both forms of `div_kernel!` (`Fulcrum/Div.lean`), `rescale` for scales that differ by less than 128 (`Fulcrum/Rescale.lean`); `isqrt` is left.
+- Lean L3: the kernel functions extracted by Aeneas (`mul`, `div`, `div_int`, `mul_add`, `mul_div`, `lerp`, `rescale`, and the integer square root if it lives in the kernel) equal the specification. Proven for `k8`..`k64`, never failing: `mul`, `mul_add`, `lerp` (`Fulcrum/Mul.lean`, `Fulcrum/Lerp.lean`), `mul_div`, `div`, `div_int` in both forms of `div_kernel!` (`Fulcrum/Div.lean`), `rescale` for scales that differ by less than 128 (`Fulcrum/Rescale.lean`), `isqrt` of `k8` and `k16` with the `SQRT_START` table proven as built (`Fulcrum/Sqrt.lean`); `isqrt` of `k32` (the `rsqrt` start) and `k64` is left.
 - Lean L4: the error bounds of INTERNALS §3.11–3.14 on `src/trig.rs` extracted by Aeneas: the quarter table and the series (`sin_turns`, `cos_turns`, the angle types), the reduction by `2/π` (`sin`, `cos`, `tan`, the cotangent near a pole), `atan` of the exact remainder (`atan2`, `asin`, `acos`), and every table entry of `src/tables/trig.rs` within half a unit of the true value; the same for stage 6. If Aeneas cannot extract a part of `trig.rs` (`u128`, loops), Gappa with Rocq stays the fallback for that part.
 - No axiom of our own, no `sorry`, no `native_decide` or `bv_decide`: `#check_axioms` in `verify/lean/Fulcrum.lean` fails the build unless every declaration uses only `propext`, `Classical.choice` and `Quot.sound`, and `leanchecker` in CI replays every module through the kernel. `src/kernel.rs` is extracted to `verify/lean/Fulcrum/Kernel` by Charon and Aeneas at the commit pinned in `verify/lean/lake-manifest.json` (`just aeneas-src aeneas extract`); CI extracts it again and fails when the file differs. The only hand-written definitions are the `unsigned_abs` of `core`, which Aeneas does not know (`Kernel/FunsExternal.lean`).
 - What L1–L3 prove is not brute-forced again: the Kani harnesses of the kernel (`mul_spec_*`, `div_spec_8`, `ratio_and_div_int_spec_8`, `mul_int_spec_*`, `combined_no_div_spec_16`, `mul_no_panic_64`, `div_no_panic_64`, `rounding_spec_*`, `add_round_spec_*`, `shift_spec_*`, `narrow_spec_*`, `from_int_spec_*`, `isqrt_spec_*`) and its exhaustive tests (every pair of 16 bits in `tests/exhaustive.rs`, `sqrt` and `rsqrt` of every `FixedFloat32`, every pair of `hypot` on `FixedFloat16`) are removed; sampled integration tests through the public API stay. Until then they run weekly only, not on every push (INTERNALS §11).
-- API review and freeze; decide on publishing to crates.io.
+- No publishing to crates.io: `rat` uses the git tag.
 
-**Done when:** L1–L3 are proven and nothing in the API is expected to change.
+**Done when:** L1–L4 are proven, and what L1–L3 prove is no longer brute-forced. The API review and freeze move to `v1.1.0`.
+
+## 9. API review and freeze `v1.1.0`
+
+Every public item of `API.md` is reviewed against the engine (`rat`): names, signatures, what is public. After `v1.1.0` the API changes only in a major version.
+
+**Done when:** the review is done and nothing in the API is expected to change.
 
 ## Wide types (on demand)
 

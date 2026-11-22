@@ -6,6 +6,7 @@ import Fulcrum.Mul
 import Fulcrum.Lerp
 import Fulcrum.Div
 import Fulcrum.Rescale
+import Fulcrum.Sqrt
 
 /-!
 # fulcrum
