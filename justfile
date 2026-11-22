@@ -148,3 +148,37 @@ asm isa:
 [group("perf")]
 bench *args:
     cd bench && cargo bench --bench ops -- {{ args }} && cargo run -q --release --bin report
+
+[doc("Lean proofs of verify/lean with the prebuilt Mathlib, then leanchecker replays every module through the kernel, one at a time: given several at once it crashes")]
+[group("verify")]
+lean:
+    cd verify/lean && lake exe cache get && lake build
+    cd verify/lean && for f in $(find Fulcrum -name '*.lean'); do m="${f%.lean}"; lake env leanchecker "${m//\//.}"; done
+
+[doc("Sources of Aeneas at the commit of verify/lean/lake-manifest.json and of Charon at its charon-pin, in target/aeneas")]
+[group("verify")]
+aeneas-src:
+    rm -rf target/aeneas && mkdir -p target/aeneas
+    git clone -q https://github.com/AeneasVerif/aeneas target/aeneas/aeneas
+    git -C target/aeneas/aeneas checkout -q "$(jq -r '.packages[] | select(.name == "aeneas") | .rev' verify/lean/lake-manifest.json)"
+    git clone -q https://github.com/AeneasVerif/charon target/aeneas/charon
+    git -C target/aeneas/charon checkout -q "$(tail -1 target/aeneas/aeneas/charon-pin)"
+    git -C target/aeneas/charon submodule update -q --init --recursive
+    ln -s ../charon target/aeneas/aeneas/charon
+
+[doc("Build Charon and Aeneas of aeneas-src; needs rustup and the opam packages of target/aeneas/aeneas/src/aeneas.opam and target/aeneas/charon/charon.opam")]
+[group("verify")]
+aeneas:
+    cd target/aeneas/charon/charon && cargo build -q --release
+    mkdir -p target/aeneas/charon/bin target/aeneas/aeneas/bin
+    cp target/aeneas/charon/charon/target/release/charon target/aeneas/charon/charon/target/release/charon-driver target/aeneas/charon/bin/
+    cd target/aeneas/aeneas/src && dune build
+    cp target/aeneas/aeneas/src/_build/default/main.exe target/aeneas/aeneas/bin/aeneas
+
+[doc("Extract src/kernel.rs to verify/lean/Fulcrum/Kernel with the Charon and Aeneas of `just aeneas`; the generated headers lose their regular comments, FunsExternal.lean is written by hand")]
+[group("verify")]
+extract:
+    target/aeneas/charon/bin/charon cargo --preset=aeneas --start-from crate::kernel --dest-file target/extract/kernel.llbc
+    rm -rf target/extract/lean
+    target/aeneas/aeneas/bin/aeneas -backend lean -split-files -no-progress-bar -namespace fulcrum -subdir Fulcrum/Kernel -dest target/extract/lean target/extract/kernel.llbc
+    for f in Types Funs; do grep -v '^-- \|^/- ' "target/extract/lean/Fulcrum/Kernel/$f.lean" > "verify/lean/Fulcrum/Kernel/$f.lean"; done

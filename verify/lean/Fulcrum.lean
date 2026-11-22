@@ -1,4 +1,5 @@
 import Fulcrum.Spec
+import Fulcrum.Kernel.Funs
 import Fulcrum.Round
 import Fulcrum.Narrow
 
@@ -21,16 +22,16 @@ elab "#check_axioms" : command => do
   let env ← getEnv
   let allowed := [``propext, ``Classical.choice, ``Quot.sound]
   let mut checked := 0
-  for (name, info) in env.constants.toList do
-    let module := match env.getModuleIdxFor? name with
+  for (decl, ci) in env.constants.toList do
+    let module := match env.getModuleIdxFor? decl with
       | some idx => env.header.moduleNames[idx.toNat]!
       | none => env.mainModule
     unless (`Fulcrum).isPrefixOf module do continue
-    if info matches .axiomInfo _ then
-      throwError "{name} is an axiom"
-    for a in ← collectAxioms name do
+    if ci matches .axiomInfo _ then
+      throwError "{decl} is an axiom"
+    for a in ← collectAxioms decl do
       unless allowed.contains a do
-        throwError "{name} depends on {a}"
+        throwError "{decl} depends on {a}"
     checked := checked + 1
   if checked == 0 then
     throwError "no declarations checked"
