@@ -1,12 +1,30 @@
 import Fulcrum.Spec
 import Fulcrum.Kernel.Funs
-import Fulcrum.Round
-import Fulcrum.Narrow
-import Fulcrum.Mul
-import Fulcrum.Lerp
-import Fulcrum.Div
-import Fulcrum.Rescale
-import Fulcrum.Sqrt
+import Fulcrum.Lemmas.Nat
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.List
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Lemmas.Loop
+import Fulcrum.Math.Range
+import Fulcrum.Math.Round
+import Fulcrum.Math.Div
+import Fulcrum.Math.Newton
+import Fulcrum.Math.Sqrt
+import Fulcrum.Math.Rsqrt
+import Fulcrum.L1.ShrRound
+import Fulcrum.L2.Narrow
+import Fulcrum.L3.Mul
+import Fulcrum.L3.Lerp
+import Fulcrum.L3.Rescale
+import Fulcrum.L3.Div.Magnitude
+import Fulcrum.L3.Div.Signed
+import Fulcrum.L3.Sqrt.Table
+import Fulcrum.L3.Sqrt.Common
+import Fulcrum.L3.Sqrt.K8
+import Fulcrum.L3.Sqrt.K16
+import Fulcrum.L3.Sqrt.RsqrtTable
+import Fulcrum.L3.Sqrt.K32
+import Fulcrum.L3.Sqrt.K64
 
 /-!
 # fulcrum
