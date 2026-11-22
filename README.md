@@ -4,8 +4,12 @@
 [![codeql](https://github.com/whoiam1101/fulcrum/actions/workflows/codeql.yml/badge.svg)](https://github.com/whoiam1101/fulcrum/actions/workflows/codeql.yml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![msrv](https://img.shields.io/badge/MSRV-1.60-orange.svg)](Cargo.toml)
+[![formally verified in Lean 4](https://img.shields.io/badge/formally%20verified-Lean%204-6f42c1.svg)](verify/)
 
 Deterministic fixed-point math for Rust: bit-identical results on every platform, no floating point inside. Operators saturate and never panic; sums are exact and independent of order and thread count. `no_std`, no required dependencies, MSRV 1.60. Made for lockstep networking, replays and simulations that must agree across machines.
+
+> [!IMPORTANT]
+> **Formally verified in Lean 4.** The arithmetic kernel `src/kernel.rs`, which owns every width and every rounding of the crate, is proven correct on the code itself, not on a model: Charon and Aeneas translate the Rust to Lean, and the proofs show that rounding, narrowing, saturation, `*`, `/`, `div_int`, `mul_add`, `mul_div`, `lerp`, rescaling between scales and the integer square root of `FixedFloat8` … `FixedFloat64` never panic and return exactly the specified result — rounded to nearest, ties toward +∞ — for every input of their contract (a non-zero divisor, the root on its domain). The proofs use no axiom beyond those of Lean and Mathlib, no `sorry` and no `native_decide`; CI re-extracts the kernel, rebuilds the proofs and replays them through the Lean kernel on every push. See [`verify/`](verify/).
 
 Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32); vectors `Vec2<T>`, `Vec3<T>` over any of them.
 
@@ -47,7 +51,7 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 
 Local checks are recipes of the [`justfile`](justfile): `just` lists them, `just check` runs the fast ones, `just all` the gate before a push (lint, tests, oracle, MSRV, feature combinations, `cargo deny`). CI calls the same recipes where it can; the OS and target matrices, fuzzing, Kani and Lean stay in `.github/workflows`. Before contributing, install the hooks: `pre-commit install` (gitleaks, typos, actionlint, zizmor and the fast recipes on commit; tests, the MSRV build and `cargo deny` before push).
 
-Verified by exhaustive tests of `FixedFloat8` and `FixedFloat16`, an exact rational oracle, fuzzing, Kani proofs and a golden hash on x86-64, ARM64 and 32-bit x86. CI runs on Linux, macOS and Windows and builds for `thumbv7em` without `std`.
+Verified by Lean 4 proofs of the kernel, exhaustive tests of `FixedFloat8` and `FixedFloat16`, an exact rational oracle, fuzzing, Kani proofs and a golden hash on x86-64, ARM64 and 32-bit x86. CI runs on Linux, macOS and Windows and builds for `thumbv7em` without `std`.
 
 ## Benchmarks
 
