@@ -2,6 +2,10 @@ import Fulcrum.Spec
 import Fulcrum.Kernel.Funs
 import Fulcrum.Round
 import Fulcrum.Narrow
+import Fulcrum.Mul
+import Fulcrum.Lerp
+import Fulcrum.Div
+import Fulcrum.Rescale
 
 /-!
 # fulcrum
