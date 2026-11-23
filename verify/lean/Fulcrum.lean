@@ -11,6 +11,10 @@ import Fulcrum.Math.Div
 import Fulcrum.Math.Newton
 import Fulcrum.Math.Sqrt
 import Fulcrum.Math.Rsqrt
+import Fulcrum.Math.Series
+import Fulcrum.Math.Const
+import Fulcrum.Tables.Trig
+import Fulcrum.Tables.Exp
 import Fulcrum.L1.ShrRound
 import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
