@@ -23,7 +23,7 @@ theorem two_sqrt_le (n x : ℕ) (hx : 0 < x) : 2 * Nat.sqrt n ≤ x + n / x := b
   by_cases h : 2 * s ≤ x
   · exact h.trans (Nat.le_add_right _ _)
   have amgm : ((2 * s - x : ℕ) : ℤ) * x ≤ (s : ℤ) * s := by
-    rw [Nat.cast_sub (by omega), Nat.cast_mul, Nat.cast_ofNat]
+    rw [Nat.cast_sub (Nat.lt_of_not_le h).le, Nat.cast_mul, Nat.cast_ofNat]
     have e : (s : ℤ) * s - (2 * s - x) * x = (s - x) * (s - x) := by ring
     exact sub_nonneg.mp (e ▸ mul_self_nonneg _)
   have : (2 * s - x) * x ≤ n := (Int.ofNat_le.mp (by exact_mod_cast amgm)).trans (Nat.sqrt_le n)

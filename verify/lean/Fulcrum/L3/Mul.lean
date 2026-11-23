@@ -122,7 +122,8 @@ theorem k8_half_spec : fulcrum.kernel.k8.HALF ⦃ h => h.val = 2 ^ 3 ⦄ := by
 /-- `kernel::k8::round_frac` rounds `p / 2^4` when `p + 2^3` fits. -/
 theorem k8_round_frac_spec (p : Std.I16) (hfit : p.val + 2 ^ 3 ≤ IScalar.max .I16) :
     fulcrum.kernel.k8.round_frac p ⦃ r => r.val = roundHalfUp (exact 4 p.val) ⦄ :=
-  round_frac_shape (by decide) _ _ p 4#i32 3 k8_half_spec rfl (Nat.le_of_ble_eq_true rfl) hfit
+  round_frac_shape (fun h => Nat.ne_of_beq_eq_false rfl (congrArg UScalar.val h)) _ _ p
+    4#i32 3 k8_half_spec rfl (Nat.le_of_ble_eq_true rfl) hfit
 
 /-- L3 on the code: `kernel::k8::mul` is `round(a · b / 2^4)`. -/
 theorem k8_mul_spec (a b : Std.I8) :
@@ -137,7 +138,8 @@ theorem k16_half_spec : fulcrum.kernel.k16.HALF ⦃ h => h.val = 2 ^ 7 ⦄ := by
 /-- `kernel::k16::round_frac` rounds `p / 2^8` when `p + 2^7` fits. -/
 theorem k16_round_frac_spec (p : Std.I32) (hfit : p.val + 2 ^ 7 ≤ IScalar.max .I32) :
     fulcrum.kernel.k16.round_frac p ⦃ r => r.val = roundHalfUp (exact 8 p.val) ⦄ :=
-  round_frac_shape (by decide) _ _ p 8#i32 7 k16_half_spec rfl (Nat.le_of_ble_eq_true rfl) hfit
+  round_frac_shape (fun h => Nat.ne_of_beq_eq_false rfl (congrArg UScalar.val h)) _ _ p
+    8#i32 7 k16_half_spec rfl (Nat.le_of_ble_eq_true rfl) hfit
 
 /-- L3 on the code: `kernel::k16::mul` is `round(a · b / 2^8)`. -/
 theorem k16_mul_spec (a b : Std.I16) :
@@ -152,7 +154,8 @@ theorem k32_half_spec : fulcrum.kernel.k32.HALF ⦃ h => h.val = 2 ^ 15 ⦄ := b
 /-- `kernel::k32::round_frac` rounds `p / 2^16` when `p + 2^15` fits. -/
 theorem k32_round_frac_spec (p : Std.I64) (hfit : p.val + 2 ^ 15 ≤ IScalar.max .I64) :
     fulcrum.kernel.k32.round_frac p ⦃ r => r.val = roundHalfUp (exact 16 p.val) ⦄ :=
-  round_frac_shape (by decide) _ _ p 16#i32 15 k32_half_spec rfl (Nat.le_of_ble_eq_true rfl) hfit
+  round_frac_shape (fun h => Nat.ne_of_beq_eq_false rfl (congrArg UScalar.val h)) _ _ p
+    16#i32 15 k32_half_spec rfl (Nat.le_of_ble_eq_true rfl) hfit
 
 /-- L3 on the code: `kernel::k32::mul` is `round(a · b / 2^16)`. -/
 theorem k32_mul_spec (a b : Std.I32) :

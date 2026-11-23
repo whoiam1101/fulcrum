@@ -71,14 +71,15 @@ theorem usize_max_ge : 2 ^ 32 - 1 ≤ UScalar.max .Usize := by
   rw [UScalar.max_def, UScalarTy.Usize_numBits_eq]
   rcases System.Platform.numBits_eq with h | h
   · rw [h]
-  · rw [h]; decide
+  · rw [h]; exact Nat.le_of_ble_eq_true rfl
 
 /-- A cast to `usize` keeps every value below `2^32`. -/
 theorem usize_cast_val {U} (x : UScalar U) (h : x.val < 2 ^ 32) :
     (UScalar.cast .Usize x).val = x.val :=
   UScalar.cast_val_mod_pow_of_inBounds_eq _ _ (by
     rw [UScalarTy.Usize_numBits_eq]
-    rcases System.Platform.numBits_eq with e | e <;> rw [e] <;> omega)
+    rcases System.Platform.numBits_eq with e | e <;> rw [e]
+    exacts [h, h.trans (Nat.pow_lt_pow_right one_lt_two (Nat.le_of_ble_eq_true rfl))])
 
 /-- `x >>> k` of an unsigned `x` by an `i32` of value `n` below the width is
 `⌊x / 2^n⌋`. -/

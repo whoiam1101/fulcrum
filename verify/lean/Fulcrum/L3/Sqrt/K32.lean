@@ -69,7 +69,19 @@ theorem k32_newton3_spec (n x : Std.U64) :
 
 /-- Clearing the last bit of a small `u32`. -/
 theorem clear_low_bit (k : ℕ) (hk : k < 64) : k &&& (2 ^ 32 - 2) = 2 * (k / 2) := by
-  revert k; decide
+  have m2 : 2 * (k / 2) = (k / 2) <<< 1 := by rw [Nat.shiftLeft_eq, pow_one, Nat.mul_comm]
+  rw [show 2 ^ 32 - 2 = (2 ^ 31 - 1) <<< 1 from rfl, m2]
+  refine Nat.eq_of_testBit_eq fun i => ?_
+  rw [Nat.testBit_and, Nat.testBit_shiftLeft, Nat.testBit_shiftLeft, Nat.testBit_two_pow_sub_one,
+    Nat.testBit_div_two]
+  rcases i with _ | j
+  · rw [decide_eq_false (Nat.not_succ_le_zero 0), Bool.false_and, Bool.false_and, Bool.and_false]
+  rw [Nat.add_sub_cancel, decide_eq_true (Nat.le_add_left 1 j), Bool.true_and, Bool.true_and]
+  by_cases hj : j < 31
+  · rw [decide_eq_true hj, Bool.and_true]
+  · rw [decide_eq_false hj, Bool.and_false, Nat.testBit_lt_two_pow ((hk.trans_le
+      (Nat.le_of_ble_eq_true rfl : 64 ≤ 2 ^ (31 + 1))).trans_le
+      (Nat.pow_le_pow_right two_pos (Nat.succ_le_succ (le_of_not_gt hj))))]
 
 /-- L3 on the code: `kernel::k32::isqrt` is `⌊√n⌋` for `n ≤ 3 · 2^62`. -/
 theorem k32_isqrt_spec (n : Std.U64) (hn : n.val ≤ 3 * 2 ^ 62) :

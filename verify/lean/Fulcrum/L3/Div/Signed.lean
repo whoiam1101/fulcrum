@@ -50,7 +50,7 @@ theorem round_div_shape {W U} (j : ℕ) (hW : W.numBits = j + 2 + 1)
         let i3 ← d <<< (1#i32 : Std.I32)
         i2 / i3)
       ⦃ r => r.val = roundHalfUp ((n.val : ℚ) / d.val) ⦄ := by
-  have e : (2 : ℤ) ^ (j + 2) = 4 * 2 ^ j := by ring
+  have e : (2 : ℤ) ^ (j + 2) = 4 * 2 ^ j := (pow_add 2 j 2).trans (mul_comm _ _)
   have hmin : IScalar.min W = -(4 * 2 ^ j) := by rw [min_eq_neg_pow hW, e]
   have hmax : IScalar.max W = 4 * 2 ^ j - 1 := by rw [max_eq_pow_sub_one hW, e]
   have ⟨n0, n1⟩ := lt_of_natAbs_lt hn
@@ -127,7 +127,7 @@ theorem div_signed_shape {S W} (s j F : ℕ) (hS : S.numBits = s + 1) (hW : W.nu
     rw [hp, show IScalar.toNat f = F by rw [IScalar.toNat, hf, Int.toNat_natCast], Int.shiftLeft_eq,
       ca, hW]
     refine (wrap_eq_self_iff (j + 2) _).2 ?_
-    have e : (2 : ℤ) ^ (j + 2) = 4 * 2 ^ j := by ring
+    have e : (2 : ℤ) ^ (j + 2) = 4 * 2 ^ j := (pow_add 2 j 2).trans (mul_comm _ _)
     unfold InRange minOf maxOf
     rw [e]
     omega
