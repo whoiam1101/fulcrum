@@ -175,10 +175,10 @@ aeneas:
     cd target/aeneas/aeneas/src && dune build
     cp target/aeneas/aeneas/src/_build/default/main.exe target/aeneas/aeneas/bin/aeneas
 
-[doc("Extract src/kernel.rs to verify/lean/Fulcrum/Kernel with the Charon and Aeneas of `just aeneas`; the generated headers lose their regular comments, FunsExternal.lean is written by hand")]
+[doc("Extract src/kernel.rs, src/trig.rs, src/exp.rs and their tables to verify/lean/Fulcrum/Kernel with the Charon and Aeneas of `just aeneas`; the generated headers lose their regular comments, FunsExternal.lean is written by hand")]
 [group("verify")]
 extract:
-    target/aeneas/charon/bin/charon cargo --preset=aeneas --start-from crate::kernel --dest-file target/extract/kernel.llbc
+    target/aeneas/charon/bin/charon cargo --preset=aeneas --start-from crate::kernel --start-from crate::trig --start-from crate::exp --dest-file target/extract/kernel.llbc
     rm -rf target/extract/lean
     target/aeneas/aeneas/bin/aeneas -backend lean -split-files -no-progress-bar -namespace fulcrum -subdir Fulcrum/Kernel -dest target/extract/lean target/extract/kernel.llbc
     for f in Types Funs; do grep -v '^-- \|^/- ' "target/extract/lean/Fulcrum/Kernel/$f.lean" > "verify/lean/Fulcrum/Kernel/$f.lean"; done
