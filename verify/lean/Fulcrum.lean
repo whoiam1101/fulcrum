@@ -12,12 +12,15 @@ import Fulcrum.Math.Newton
 import Fulcrum.Math.Sqrt
 import Fulcrum.Math.Rsqrt
 import Fulcrum.L1.ShrRound
+import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
+import Fulcrum.L2.Parts
 import Fulcrum.L3.Mul
 import Fulcrum.L3.Lerp
 import Fulcrum.L3.Rescale
 import Fulcrum.L3.Div.Magnitude
 import Fulcrum.L3.Div.Signed
+import Fulcrum.L3.Div.Total
 import Fulcrum.L3.Sqrt.Table
 import Fulcrum.L3.Sqrt.Common
 import Fulcrum.L3.Sqrt.K8

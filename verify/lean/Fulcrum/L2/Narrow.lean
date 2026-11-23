@@ -4,11 +4,11 @@ public import Fulcrum.Math.Range
 public import Fulcrum.Kernel.Funs
 
 /-!
-# L2: range checks of `kernel::fits`, `narrow` and `saturate`
+# L2: range checks of `kernel::fits`, `narrow`, `saturate` and `wrap`
 
 On the code extracted by Aeneas, for `k8`..`k64`: `fits` is the comparison with
 `[MIN, MAX]`, `narrow` returns `w` exactly when it fits, `saturate` is the
-clamp. The models over the integers are in `Math/Range.lean`; the bodies of
+clamp, `wrap` is two's complement wrapping. The models over the integers are in `Math/Range.lean`; the bodies of
 every width go through `fits_shape`, `narrow_shape` and `saturate_shape`.
 -/
 
@@ -81,6 +81,10 @@ theorem k8_saturate_spec (w : Std.I16) :
     fulcrum.kernel.k8.saturate w ⦃ r => r.val = clamp 7 w.val ⦄ :=
   saturate_shape w _ _ _ _ 7 rfl rfl rfl rfl (IScalar.cast_val_eq _ _)
 
+/-- L2 on the code: `kernel::k8::wrap` keeps the low 8 bits. -/
+theorem k8_wrap_spec (w : Std.I16) : fulcrum.kernel.k8.wrap w ⦃ r => r.val = wrap 7 w.val ⦄ :=
+  (WP.spec_ok _).mpr (IScalar.cast_val_eq _ _)
+
 /-- L2 on the code: `kernel::k16::fits` is the range check of 16 bits. -/
 theorem k16_fits_spec (w : Std.I32) :
     fulcrum.kernel.k16.fits w ⦃ b => b = decide (InRange 15 w.val) ⦄ :=
@@ -96,6 +100,10 @@ theorem k16_narrow_spec (w : Std.I32) :
 theorem k16_saturate_spec (w : Std.I32) :
     fulcrum.kernel.k16.saturate w ⦃ r => r.val = clamp 15 w.val ⦄ :=
   saturate_shape w _ _ _ _ 15 rfl rfl rfl rfl (IScalar.cast_val_eq _ _)
+
+/-- L2 on the code: `kernel::k16::wrap` keeps the low 16 bits. -/
+theorem k16_wrap_spec (w : Std.I32) : fulcrum.kernel.k16.wrap w ⦃ r => r.val = wrap 15 w.val ⦄ :=
+  (WP.spec_ok _).mpr (IScalar.cast_val_eq _ _)
 
 /-- L2 on the code: `kernel::k32::fits` is the range check of 32 bits. -/
 theorem k32_fits_spec (w : Std.I64) :
@@ -113,6 +121,10 @@ theorem k32_saturate_spec (w : Std.I64) :
     fulcrum.kernel.k32.saturate w ⦃ r => r.val = clamp 31 w.val ⦄ :=
   saturate_shape w _ _ _ _ 31 rfl rfl rfl rfl (IScalar.cast_val_eq _ _)
 
+/-- L2 on the code: `kernel::k32::wrap` keeps the low 32 bits. -/
+theorem k32_wrap_spec (w : Std.I64) : fulcrum.kernel.k32.wrap w ⦃ r => r.val = wrap 31 w.val ⦄ :=
+  (WP.spec_ok _).mpr (IScalar.cast_val_eq _ _)
+
 /-- L2 on the code: `kernel::k64::fits` is the range check of 64 bits. -/
 theorem k64_fits_spec (w : Std.I128) :
     fulcrum.kernel.k64.fits w ⦃ b => b = decide (InRange 63 w.val) ⦄ :=
@@ -128,6 +140,10 @@ theorem k64_narrow_spec (w : Std.I128) :
 theorem k64_saturate_spec (w : Std.I128) :
     fulcrum.kernel.k64.saturate w ⦃ r => r.val = clamp 63 w.val ⦄ :=
   saturate_shape w _ _ _ _ 63 rfl rfl rfl rfl (IScalar.cast_val_eq _ _)
+
+/-- L2 on the code: `kernel::k64::wrap` keeps the low 64 bits. -/
+theorem k64_wrap_spec (w : Std.I128) : fulcrum.kernel.k64.wrap w ⦃ r => r.val = wrap 63 w.val ⦄ :=
+  (WP.spec_ok _).mpr (IScalar.cast_val_eq _ _)
 
 end Fulcrum
 
