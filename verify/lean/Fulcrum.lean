@@ -15,6 +15,8 @@ import Fulcrum.Math.Series
 import Fulcrum.Math.Const
 import Fulcrum.Tables.Trig
 import Fulcrum.Tables.Exp
+import Fulcrum.Math.Fixed
+import Fulcrum.Math.Quarter
 import Fulcrum.L1.ShrRound
 import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
@@ -32,6 +34,7 @@ import Fulcrum.L3.Sqrt.K16
 import Fulcrum.L3.Sqrt.RsqrtTable
 import Fulcrum.L3.Sqrt.K32
 import Fulcrum.L3.Sqrt.K64
+import Fulcrum.L4.SinQuarter
 
 /-!
 # fulcrum

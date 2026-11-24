@@ -79,7 +79,7 @@ theorem frac_2_pi_entry :
   exact h
 
 /-- `|k/512 · π - k · piQ/512| ≤ 2^-270` for `k ≤ 512`. -/
-theorem quarter_near (k : ℕ) (hk : k ≤ 512) :
+theorem table_angle_near (k : ℕ) (hk : k ≤ 512) :
     |(k : ℝ) / 256 * (Real.pi / 2) - ((k * piQ / 512 : ℚ) : ℝ)| ≤ 1 / 2 ^ 270 := by
   have e : (k : ℝ) / 256 * (Real.pi / 2) - ((k * piQ / 512 : ℚ) : ℝ) = k / 512 * (Real.pi - piQ) := by
     push_cast; ring
@@ -98,7 +98,7 @@ theorem sin_quarter_entry (k : ℕ) (hk : k < 257) :
   refine entry_near _ 62 _ _ _ ?_ h
   have s := sin_near (k * piQ / 512) 15 (by exact_mod_cast hq)
   have l := (Real.abs_sin_sub_sin_le ((k : ℝ) / 256 * (Real.pi / 2)) ((k * piQ / 512 : ℚ) : ℝ)).trans
-    (quarter_near k (by omega))
+    (table_angle_near k (by omega))
   push_cast at s l ⊢
   exact (abs_sub_le _ _ _).trans ((add_le_add l s).trans_eq (add_comm _ _))
 

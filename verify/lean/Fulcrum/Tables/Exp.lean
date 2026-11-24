@@ -11,7 +11,7 @@ Every constant and every entry of `EXP2`, `LOG2` and `LOG2_WIDE`, as Aeneas
 extracts them, is within `½` of the true value times `2^62`, `2^104` or `2^126`:
 correctly rounded. `ln 2` comes from `log_two_near`; `2 / ln 2` and
 `log₂ (1 + k/256) = log (1 + k/256) / ln 2` from a quotient of two near values
-(`div_near`), the logarithm by the series of `log (1 + x) - log (1 - x)` at
+(`quotient_near`), the logarithm by the series of `log (1 + x) - log (1 - x)` at
 `x = k / (512 + k)`; `2^(k/256) = exp (k/256 · ln 2)` by the series of `exp` at
 `k · ln2Q / 256` and `|exp a - exp q| ≤ exp q · 2 |a - q|`.
 -/
@@ -29,7 +29,7 @@ theorem log_two_ge : (69 / 100 : ℝ) ≤ Real.log 2 := by
   exact c.trans (sub_le_iff_le_add.mpr (neg_le_sub_iff_le_add.mp (abs_le.mp log_two_near).1))
 
 /-- A quotient of values near `S` and `q`, both at least `0.69`, `|S| ≤ 2`. -/
-theorem div_near (L l S q r e : ℝ) (hL : |L - S| ≤ r) (hl : |l - q| ≤ e) (hl0 : 69 / 100 ≤ l)
+theorem quotient_near (L l S q r e : ℝ) (hL : |L - S| ≤ r) (hl : |l - q| ≤ e) (hl0 : 69 / 100 ≤ l)
     (hq0 : 69 / 100 ≤ q) (hS : |S| ≤ 2) : |L / l - S / q| ≤ 2 * r + 5 * e := by
   have lp : 0 < l := (by norm_num : (0 : ℝ) < 69 / 100).trans_le hl0
   have qp : 0 < q := (by norm_num : (0 : ℝ) < 69 / 100).trans_le hq0
@@ -58,7 +58,7 @@ theorem ln2Q_ge : (69 / 100 : ℝ) ≤ ln2Q := by
 
 /-- `2 / ln 2` is within `5 · 2^-270` of `2 / ln2Q`. -/
 theorem two_div_log_two_near : |2 / Real.log 2 - ((2 / ln2Q : ℚ) : ℝ)| ≤ ((5 / 2 ^ 270 : ℚ) : ℝ) := by
-  have h := div_near 2 (Real.log 2) 2 ln2Q 0 (1 / 2 ^ 270) (by rw [sub_self, abs_zero])
+  have h := quotient_near 2 (Real.log 2) 2 ln2Q 0 (1 / 2 ^ 270) (by rw [sub_self, abs_zero])
     log_two_near log_two_ge ln2Q_ge (by rw [abs_two])
   push_cast
   rw [mul_zero, zero_add, mul_one_div] at h
@@ -140,7 +140,7 @@ theorem log2_near (k n : ℕ) (hx : |(k / (512 + k) : ℚ)| < 1) (hS : |logSum (
   have b := log_near _ n hx
   rw [log_artanh_point] at b
   have hS' : |((logSum (k / (512 + k)) n : ℚ) : ℝ)| ≤ 2 := by exact_mod_cast hS
-  have h := div_near _ _ _ _ _ _ b log_two_near log_two_ge ln2Q_ge hS'
+  have h := quotient_near _ _ _ _ _ _ b log_two_near log_two_ge ln2Q_ge hS'
   rw [← Real.log_div_log]
   push_cast
   rw [mul_one_div] at h
