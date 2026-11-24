@@ -679,17 +679,14 @@ isqrt_spec!(isqrt_spec_16, k16, u32, 4);
 
 macro_rules! angle_no_panic {
     ($name:ident, $A:ident, $T:ident) => {
-        /// The angle type never panics: `sin`, `cos`, the conversions in turns
-        /// and radians (the 256-bit product of the reduction and the 192-bit
-        /// product with `π`) and `scale` stay in range on every input. On 8
-        /// and 16 bits, and for the functions of one argument on 32 bits, the
-        /// exhaustive tests of `tests/angle.rs` run every input instead.
+        /// The conversions in turns of the angle type never panic on every
+        /// input. `sin`, `cos`, `scale` and the conversions in radians are
+        /// proven never to fail by Lean (`verify/lean/Fulcrum/L4/Angle.lean`).
         #[kani::proof]
         fn $name() {
             let a = $A::from_bits(kani::any());
             let x = $T::from_bits(kani::any());
-            let _ = (a.sin_cos(), a.to_turns(), a.to_radians(), a.scale(x));
-            let _ = ($A::from_radians(x), $A::from_turns(x));
+            let _ = (a.to_turns(), $A::from_turns(x));
         }
     };
 }
