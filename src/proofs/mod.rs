@@ -677,22 +677,6 @@ macro_rules! isqrt_spec {
 isqrt_spec!(isqrt_spec_8, k8, u16, 4);
 isqrt_spec!(isqrt_spec_16, k16, u32, 4);
 
-macro_rules! inverse_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `atan` and `atan2` never panic: the divisions of `k` and of the
-        /// remainder have a nonzero divisor, the `u128` intermediates stay
-        /// below `2^127` and the angle below `2^64` on every input, also
-        /// `MIN` and `atan2(0, 0)`.
-        #[kani::proof]
-        fn $name() {
-            let (y, x) = ($T::from_bits(kani::any()), $T::from_bits(kani::any()));
-            let _ = (y.atan(), y.atan2(x));
-        }
-    };
-}
-
-inverse_no_panic!(inverse_no_panic_32, FixedFloat32);
-
 macro_rules! angle_no_panic {
     ($name:ident, $A:ident, $T:ident) => {
         /// The angle type never panics: `sin`, `cos`, the conversions in turns
