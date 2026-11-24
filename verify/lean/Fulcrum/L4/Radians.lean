@@ -263,12 +263,13 @@ rounded to 62, wrapping mod 4. -/
 def posN (m f : ℕ) : ℕ := (m * frac2PiN / 2 ^ (f + 64) % 2 ^ 130 + 2 ^ 65) / 2 ^ 66 % 2 ^ 64
 
 /-- The position `posN m f`, shifted by `s` units of `2^-62` quarter turns and
-wrapped, is the angle `m / 2^f` radians shifted by `s / 2^62` quarters, up to
-`0.79 · 2^-62` in the sine: `C` is within `½` of `2/π · 2^192`, the floor and the
-rounding lose below `2^-66` and `½` units. -/
-theorem position_near (m f s : ℕ) (hm : m < 2 ^ 64) :
-    |Real.sin (((posN m f + s) % 2 ^ 64 : ℕ) / 2 ^ 62 * (Real.pi / 2)) -
-      Real.sin (m / 2 ^ f + s / 2 ^ 62 * (Real.pi / 2))| ≤ 79 / 100 / 2 ^ 62 := by
+wrapped, is the angle `m / 2^f` radians shifted by `s / 2^62` quarters, plus
+`δ · π / 2^63` with `|δ| ≤ ½ + 2^-66 + 2^-67`, minus whole turns: `C` is within
+`½` of `2/π · 2^192`, the floor and the rounding lose below `2^-66` and `½` units. -/
+theorem position_angle (m f s : ℕ) (hm : m < 2 ^ 64) :
+    ∃ K : ℕ, ∃ δ : ℝ, |δ| ≤ 1 / 2 + 1 / 2 ^ 66 + 1 / 2 ^ 67 ∧
+      (((posN m f + s) % 2 ^ 64 : ℕ) : ℝ) / 2 ^ 62 * (Real.pi / 2) =
+        (m / 2 ^ f + s / 2 ^ 62 * (Real.pi / 2) + δ * Real.pi / 2 ^ 63) - K * (2 * Real.pi) := by
   have hC : |(frac2PiN : ℝ) - 2 / Real.pi * 2 ^ 192| ≤ 1 / 2 := frac_2_pi_entry
   set N := m * frac2PiN / 2 ^ (f + 64) with hN
   set R := (N % 2 ^ 130 + 2 ^ 65) / 2 ^ 66 with hR
@@ -312,9 +313,16 @@ theorem position_near (m f s : ℕ) (hm : m < 2 ^ 64) :
           mul_le_mul_of_nonneg_left (pow_le_pow_right₀ one_le_two (by omega)) (by positivity)
   have bδ : |δ| ≤ 1 / 2 + 1 / 2 ^ 66 + 1 / 2 ^ 67 := by
     rw [eδ]; exact (abs_add_le _ _).trans (add_le_add ((abs_add_le _ _).trans (add_le_add b1 b2)) b3)
-  have angle : (u : ℝ) / 2 ^ 62 * (Real.pi / 2) =
-      (m / 2 ^ f + s / 2 ^ 62 * (Real.pi / 2) + δ * Real.pi / 2 ^ 63) - K * (2 * Real.pi) := by
-    rw [hδ]; field_simp; ring
+  refine ⟨K, δ, bδ, ?_⟩
+  rw [hδ]; field_simp; ring
+
+/-- The position `posN m f`, shifted by `s` units of `2^-62` quarter turns and
+wrapped, is the angle `m / 2^f` radians shifted by `s / 2^62` quarters, up to
+`0.79 · 2^-62` in the sine (`position_angle`). -/
+theorem position_near (m f s : ℕ) (hm : m < 2 ^ 64) :
+    |Real.sin (((posN m f + s) % 2 ^ 64 : ℕ) / 2 ^ 62 * (Real.pi / 2)) -
+      Real.sin (m / 2 ^ f + s / 2 ^ 62 * (Real.pi / 2))| ≤ 79 / 100 / 2 ^ 62 := by
+  obtain ⟨K, δ, bδ, angle⟩ := position_angle m f s hm
   rw [angle, Real.sin_sub_nat_mul_two_pi]
   refine (Real.abs_sin_sub_sin_le _ _).trans ?_
   rw [add_sub_cancel_left, abs_div, abs_mul, abs_of_pos Real.pi_pos, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 63)]
