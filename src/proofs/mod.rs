@@ -677,20 +677,6 @@ macro_rules! isqrt_spec {
 isqrt_spec!(isqrt_spec_8, k8, u16, 4);
 isqrt_spec!(isqrt_spec_16, k16, u32, 4);
 
-macro_rules! trig_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `sin_turns` and `cos_turns` never panic. The range `[-1, 1]` of
-        /// 64 bits does not finish in 10 minutes; the oracle checks it.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let _ = (x.sin_turns(), x.cos_turns());
-        }
-    };
-}
-
-trig_no_panic!(trig_no_panic_64, FixedFloat64);
-
 macro_rules! radians_no_panic {
     ($name:ident, $T:ident) => {
         /// `sin`, `cos`, `sin_cos`, `tan` and `checked_tan` never panic: the

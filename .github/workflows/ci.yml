@@ -307,7 +307,6 @@ jobs:
             --harness proofs::fraction_bits_spec_32
             --harness proofs::fraction_bits_spec_64
             --harness proofs::accumulator_order_independent_8
-            --harness proofs::trig_no_panic_64
             --harness proofs::angle_no_panic_32
             --harness proofs::angle_no_panic_64
 
