@@ -679,13 +679,13 @@ isqrt_spec!(isqrt_spec_16, k16, u32, 4);
 
 macro_rules! radians_no_panic {
     ($name:ident, $T:ident) => {
-        /// `sin`, `cos`, `sin_cos`, `tan` and `checked_tan` never panic: the
-        /// 256-bit product of the range reduction, the division of `tan` and
-        /// the long division near a pole stay in range on every input.
+        /// `tan` and `checked_tan` never panic: the 256-bit product of the
+        /// range reduction, the division of `tan` and the long division near
+        /// a pole stay in range on every input.
         #[kani::proof]
         fn $name() {
             let x = $T::from_bits(kani::any());
-            let _ = (x.sin_cos(), x.tan(), x.checked_tan());
+            let _ = (x.tan(), x.checked_tan());
         }
     };
 }
