@@ -1,6 +1,7 @@
 module
 
 public import Fulcrum.Math.Series
+public import Fulcrum.Math.Round
 public import Mathlib.Analysis.Real.Pi.Bounds
 
 /-!
@@ -10,7 +11,8 @@ public import Mathlib.Analysis.Real.Pi.Bounds
 a floor division, a truncated product `⌊a · b / 2^62⌋` and `2^62 - a`. Given
 how far each operand is from its ideal real value, these lemmas bound how far
 the result is from the ideal result; `two_term_le` is Cauchy–Schwarz for the
-sum `x · sin a + y · cos a` of two such errors. No code here: the math of L4.
+sum `x · sin a + y · cos a` of two such errors, and `round_shift_near` the one
+rounding by `shr_round` at the end. No code here: the math of L4.
 -/
 
 @[expose] public section
@@ -79,6 +81,34 @@ theorem two_term_le (S C x y K W : ℝ) (hW : S ^ 2 + C ^ 2 = W ^ 2) (hK : x ^ 2
           rw [hW]; exact mul_le_mul_of_nonneg_right hK (sq_nonneg W)
       _ = (K * W) ^ 2 := (mul_pow K W 2).symm
   exact abs_le_of_sq_le_sq' sq (mul_nonneg hK0 hW0) |>.2
+
+/-- Rounding to nearest moves a rational by at most `½`. -/
+theorem roundHalfUp_near (q : ℚ) : |((roundHalfUp q : ℤ) : ℚ) - q| ≤ 1 / 2 := by
+  unfold roundHalfUp
+  have l := Int.floor_le (q + 1 / 2)
+  have u := Int.lt_floor_add_one (q + 1 / 2)
+  rw [show ((⌊q + 1 / 2⌋ : ℤ) : ℚ) + 1 = ((⌊q + 1 / 2⌋ : ℤ) : ℚ) + 1 / 2 + 1 / 2 by ring] at u
+  exact abs_le.mpr ⟨neg_le_sub_iff_le_add.mpr (lt_of_add_lt_add_right u).le, sub_le_iff_le_add'.mpr l⟩
+
+/-- `m · 2^-s` rounded once, for `m` within `E` of `S · 2^62` and `s + f = 62`, is
+within `½ + E / 2^s` of `S · 2^f`. -/
+theorem round_shift_near (m : ℤ) (s f : ℕ) (hs : s + f = 62) (S E : ℝ)
+    (h : |(m : ℝ) - S * 2 ^ 62| ≤ E) :
+    |((roundHalfUp (exact s m) : ℤ) : ℝ) - S * 2 ^ f| ≤ 1 / 2 + E / 2 ^ s := by
+  have r := roundHalfUp_near (exact s m)
+  have r' : |((roundHalfUp (exact s m) : ℤ) : ℝ) - (m : ℝ) / 2 ^ s| ≤ 1 / 2 := by
+    have := (Rat.cast_le (K := ℝ)).mpr r
+    push_cast [exact] at this
+    exact this
+  have p : (0 : ℝ) < 2 ^ s := by positivity
+  have e : (m : ℝ) / 2 ^ s - S * 2 ^ f = ((m : ℝ) - S * 2 ^ 62) / 2 ^ s := by
+    rw [← hs, pow_add]; field_simp
+  calc _ ≤ |((roundHalfUp (exact s m) : ℤ) : ℝ) - (m : ℝ) / 2 ^ s| + |(m : ℝ) / 2 ^ s - S * 2 ^ f| :=
+        abs_sub_le _ _ _
+    _ ≤ 1 / 2 + E / 2 ^ s := by
+        refine add_le_add r' ?_
+        rw [e, abs_div, abs_of_pos p]
+        exact div_le_div_of_nonneg_right h p.le
 
 end Fulcrum
 

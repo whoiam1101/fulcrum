@@ -9,7 +9,8 @@ public import Fulcrum.Math.Fixed
 `s ≈ sin a` and `c ≈ cos a` of `SIN_QUARTER` and the remainder `θ` it adds
 `cos a · sin θ - sin a · (1 - cos θ)` to `s`, both short series in `z = θ²`, every
 product truncated to 62 bits. `quarter_near`: the result is within `6.1` units
-of `sin (a + θ) · 2^62`. The steps follow the error budget of §3.11: `θ` within
+of `sin (a + θ) · 2^62`. `sin_quadrant` and `sin_turn_mod` move any angle in
+quarter or whole turns to the quarter. The steps follow the error budget of §3.11: `θ` within
 `1.002`, `z` within `1.013`, `sin θ` within `2.016` and `1 - cos θ` within `2.508`
 of their ideal values, the dropped terms of the series `0.31` and `0.001`, and
 `2.509 sin a + 2.326 cos a ≤ 3.43` by Cauchy–Schwarz.
@@ -240,6 +241,39 @@ theorem quarter_near (s c B P : ℕ) (a : ℝ) (ha0 : 0 ≤ a) (ha1 : a ≤ Real
     _ ≤ 5 / 2 + ((1 / 2) * (2 ^ 46 * (5 / 2) / 2) + (1 / 2) * (2 ^ 54 * (63 / 40) + 1)) / 2 ^ 62 +
           343 / 100 := add_le_add le_rfl cs'
     _ ≤ 61 / 10 := by norm_num
+
+/-- The sine of `q` quarters plus `p / 2^B` of a quarter is the sine of the
+quarter at `p`, read backwards in an odd quadrant, negated in the lower half. -/
+theorem sin_quadrant (q p B : ℕ) (hq : q < 4) (hp : p ≤ 2 ^ B) :
+    Real.sin ((q * 2 ^ B + p : ℕ) / 2 ^ B * (Real.pi / 2)) =
+      (if q < 2 then 1 else -1) *
+        Real.sin ((if q % 2 = 0 then p else 2 ^ B - p : ℕ) / 2 ^ B * (Real.pi / 2)) := by
+  have P : (0 : ℝ) < 2 ^ B := by positivity
+  have sp : ((2 ^ B - p : ℕ) : ℝ) / 2 ^ B * (Real.pi / 2) = Real.pi / 2 - p / 2 ^ B * (Real.pi / 2) := by
+    rw [Nat.cast_sub hp]; push_cast; field_simp
+  rcases q with _ | _ | _ | _ | q
+  · simp
+  · rw [ite_eq_left (by norm_num : 1 < 2), ite_eq_right (by norm_num : ¬ 1 % 2 = 0), sp, Real.sin_pi_div_two_sub, one_mul]
+    rw [show ((1 * 2 ^ B + p : ℕ) : ℝ) / 2 ^ B * (Real.pi / 2) = p / 2 ^ B * (Real.pi / 2) + Real.pi / 2 by
+      push_cast; field_simp; ring, Real.sin_add_pi_div_two]
+  · rw [ite_eq_right (by norm_num : ¬ 2 < 2), ite_eq_left (by norm_num : 2 % 2 = 0)]
+    rw [show ((2 * 2 ^ B + p : ℕ) : ℝ) / 2 ^ B * (Real.pi / 2) = p / 2 ^ B * (Real.pi / 2) + Real.pi by
+      push_cast; field_simp; ring, Real.sin_add_pi]
+    ring
+  · rw [ite_eq_right (by norm_num : ¬ 3 < 2), ite_eq_right (by norm_num : ¬ 3 % 2 = 0), sp, Real.sin_pi_div_two_sub]
+    rw [show ((3 * 2 ^ B + p : ℕ) : ℝ) / 2 ^ B * (Real.pi / 2) = p / 2 ^ B * (Real.pi / 2) + Real.pi / 2 + Real.pi by
+      push_cast; field_simp; ring, Real.sin_add_pi, Real.sin_add_pi_div_two]
+    ring
+  · omega
+
+/-- `sin (2π · x / 2^f)` depends only on `x mod 2^f`. -/
+theorem sin_turn_mod (x f : ℕ) :
+    Real.sin (2 * Real.pi * x / 2 ^ f) = Real.sin (2 * Real.pi * (x % 2 ^ f : ℕ) / 2 ^ f) := by
+  have e : 2 * Real.pi * x / 2 ^ f = 2 * Real.pi * (x % 2 ^ f : ℕ) / 2 ^ f + (x / 2 ^ f : ℕ) * (2 * Real.pi) := by
+    have := Nat.mod_add_div x (2 ^ f)
+    rw [show (x : ℝ) = ((x % 2 ^ f + 2 ^ f * (x / 2 ^ f) : ℕ) : ℝ) by rw [this]]
+    push_cast; field_simp
+  rw [e, Real.sin_add_nat_mul_two_pi]
 
 end Fulcrum
 
