@@ -18,6 +18,7 @@ import Fulcrum.Tables.Exp
 import Fulcrum.Math.Fixed
 import Fulcrum.Math.Quarter
 import Fulcrum.Math.Cot
+import Fulcrum.Math.Atan
 import Fulcrum.L1.ShrRound
 import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
@@ -39,6 +40,7 @@ import Fulcrum.L4.SinQuarter
 import Fulcrum.L4.Turns
 import Fulcrum.L4.Radians
 import Fulcrum.L4.Tan
+import Fulcrum.L4.Atan
 
 /-!
 # fulcrum
