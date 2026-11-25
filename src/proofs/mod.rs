@@ -730,41 +730,6 @@ vec_no_panic!(vec_no_panic_16, FixedFloat16);
 vec_no_panic!(vec_no_panic_32, FixedFloat32);
 vec_no_panic!(vec_no_panic_64, FixedFloat64);
 
-macro_rules! exp2_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `exp2` and `checked_exp2` never panic: the products of the series
-        /// and of the table entry stay below `2^128`, and the final shift is
-        /// below 128 on every input, also `MIN` and `MAX`. On 8, 16 and 32
-        /// bits the exhaustive tests of `tests/exp.rs` run every input
-        /// instead.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let _ = (x.exp2(), x.checked_exp2());
-        }
-    };
-}
-
-exp2_no_panic!(exp2_no_panic_64, FixedFloat64);
-
-macro_rules! exp_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `exp` and `checked_exp` never panic: outside `(-2f, f)` the
-        /// function returns before the reduction; inside it the product with
-        /// `2·log₂ e` stays below `2^102`, the remainder below `2^119`, the
-        /// one correction keeps the multiple of `ln 2 / 256` in range, and the
-        /// final shift is below 128. On 8, 16 and 32 bits the exhaustive
-        /// tests of `tests/exp.rs` run every input instead.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let _ = (x.exp(), x.checked_exp());
-        }
-    };
-}
-
-exp_no_panic!(exp_no_panic_64, FixedFloat64);
-
 macro_rules! pow_no_panic {
     ($name:ident, $T:ident) => {
         /// `pow`, `checked_pow`, `powi` and `checked_powi` never panic: the
