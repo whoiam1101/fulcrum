@@ -175,7 +175,7 @@ theorem k64_round_frac_spec (p : Std.I128) :
   refine WP.spec_bind (IScalar.ShiftRight_IScalar_spec p i1 (hi1 ▸ Int.natCast_nonneg 31)
     (hi1 ▸ Int.ofNat_lt.mpr (Nat.le_of_ble_eq_true rfl))) fun i2 ⟨hi2, _⟩ => ?_
   rw [IScalar.toNat, hi1, Int.toNat_natCast] at hi2
-  exact add_bit_spec p.val 32 (Nat.succ_ne_zero 31) p.hmin p.hmax i i2 hi hi2
+  exact add_bit_spec p.val 32 126 rfl (Nat.succ_ne_zero 31) p.hmin p.hmax 1#i128 rfl i i2 hi hi2
 
 /-- L3 on the code: `kernel::k64::mul` is `round(a · b / 2^32)`. -/
 theorem k64_mul_spec (a b : Std.I64) :

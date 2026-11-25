@@ -99,13 +99,16 @@ theorem shl_i32_spec {U} (x : UScalar U) (k : Std.I32) (n : ℕ) (hk : k.val = n
     rw [hz, IScalar.toNat, hk, Int.toNat_natCast, Nat.shiftLeft_eq, UScalar.size_def]
     exact Nat.mod_eq_of_lt hx
 
-/-- `x &&& 1` of an `i128` is its last bit, `x mod 2`. -/
-theorem and_one_val (x : Std.I128) : (x &&& 1#i128).val = x.val % 2 := by
-  have one : (1#i128 : Std.I128).bv.toNat = 1 := rfl
-  have d : (2 : ℤ) ∣ ((2 ^ IScalarTy.I128.numBits : ℕ) : ℤ) := ⟨2 ^ 127, rfl⟩
-  have small : ((x.bv.toNat % 2 : ℕ) : ℤ).bmod (2 ^ IScalarTy.I128.numBits) = ((x.bv.toNat % 2 : ℕ) : ℤ) :=
-    Int.bmod_eq_of_le (by rw [IScalarTy.I128_numBits_eq]; omega) (by rw [IScalarTy.I128_numBits_eq]; omega)
-  rw [IScalar.val, IScalar.val, IScalar.bv_and, BitVec.toInt_and, one, Nat.and_one_is_mod,
+/-- `x &&& 1` of a signed type of at least two bits is its last bit, `x mod 2`. -/
+theorem and_one_val {W} (x one : IScalar W) (hone : one.bv.toNat = 1) (m : ℕ)
+    (hW : W.numBits = m + 2) : (x &&& one).val = x.val % 2 := by
+  have d : (2 : ℤ) ∣ ((2 ^ W.numBits : ℕ) : ℤ) := ⟨2 ^ (m + 1), by rw [hW, pow_succ]; push_cast; ring⟩
+  have four : (4 : ℤ) ≤ ((2 ^ W.numBits : ℕ) : ℤ) := by
+    rw [hW, pow_add]; push_cast; nlinarith [one_le_pow₀ (M₀ := ℤ) one_le_two (n := m)]
+  have small : ((x.bv.toNat % 2 : ℕ) : ℤ).bmod (2 ^ W.numBits) = ((x.bv.toNat % 2 : ℕ) : ℤ) := by
+    have b : ((x.bv.toNat % 2 : ℕ) : ℤ) < 2 := by omega
+    exact Int.bmod_eq_of_le (by omega) (by omega)
+  rw [IScalar.val, IScalar.val, IScalar.bv_and, BitVec.toInt_and, hone, Nat.and_one_is_mod,
     small, BitVec.toInt_eq_toNat_bmod, ← Int.emod_emod_of_dvd _ d, Int.bmod_emod,
     Int.emod_emod_of_dvd _ d]
   exact Int.natCast_emod _ 2
