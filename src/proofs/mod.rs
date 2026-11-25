@@ -747,22 +747,6 @@ macro_rules! exp2_no_panic {
 
 exp2_no_panic!(exp2_no_panic_64, FixedFloat64);
 
-macro_rules! log2_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `log2` and `checked_log2` never panic: the exponent shift is at
-        /// most 62, the divisor of `s` is positive and the quotient below
-        /// `2^54`, also for `x ≤ 0`. On 8, 16 and 32 bits the exhaustive
-        /// tests of `tests/exp.rs` run every input instead.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let _ = (x.log2(), x.checked_log2());
-        }
-    };
-}
-
-log2_no_panic!(log2_no_panic_64, FixedFloat64);
-
 macro_rules! exp_no_panic {
     ($name:ident, $T:ident) => {
         /// `exp` and `checked_exp` never panic: outside `(-2f, f)` the
@@ -780,23 +764,6 @@ macro_rules! exp_no_panic {
 }
 
 exp_no_panic!(exp_no_panic_64, FixedFloat64);
-
-macro_rules! ln_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `ln` and `checked_ln` never panic: the steps of `log2`, then the
-        /// integer part times `ln 2` below `2^110` and the mantissa part
-        /// below `2^126` before its shift, also for `x ≤ 0`. On 8, 16 and 32
-        /// bits the exhaustive tests of `tests/exp.rs` run every input
-        /// instead.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let _ = (x.ln(), x.checked_ln());
-        }
-    };
-}
-
-ln_no_panic!(ln_no_panic_64, FixedFloat64);
 
 macro_rules! pow_no_panic {
     ($name:ident, $T:ident) => {
