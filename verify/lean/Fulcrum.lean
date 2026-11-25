@@ -22,6 +22,8 @@ import Fulcrum.Math.Atan
 import Fulcrum.Math.Log
 import Fulcrum.Math.Exp
 import Fulcrum.Math.Pow
+import Fulcrum.Math.RoundSqrt
+import Fulcrum.Math.Scale
 import Fulcrum.L1.ShrRound
 import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
@@ -49,6 +51,11 @@ import Fulcrum.L4.Vec
 import Fulcrum.L4.Log
 import Fulcrum.L4.Exp
 import Fulcrum.L4.Pow
+import Fulcrum.L5.Det
+import Fulcrum.L5.Shift
+import Fulcrum.L5.Round
+import Fulcrum.L5.Length
+import Fulcrum.L5.Scale
 
 /-!
 # fulcrum
