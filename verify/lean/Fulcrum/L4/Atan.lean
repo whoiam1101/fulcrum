@@ -200,11 +200,11 @@ theorem pi_val : fulcrum.tables.trig.PI.val = 14488038916154245685 := by
 noncomputable def roundTarget (xn ng : Bool) (A : ℝ) : ℝ :=
   (if ng then -1 else 1) * (if xn then Real.pi - A else A)
 
-/-- L4 on the code: `trig::round_angle` of `a` within `E ≤ 4.5` of `A · 2^62`,
+/-- L4 on the code: `trig::round_angle` of `a` within `E ≤ 100` of `A · 2^62`,
 `A ∈ [0, π/2]`, `f ≤ 32`, never fails and is within `½ + (E + ½) / 2^(62 - f)` of
 `roundTarget · 2^f`. -/
 theorem round_angle_spec (a : Std.U64) (xn ng : Bool) (f : Std.U32) (hf : f.val ≤ 32) (A E : ℝ)
-    (hA0 : 0 ≤ A) (hA : A ≤ Real.pi / 2) (hE : E ≤ 9 / 2) (ha : |(a.val : ℝ) - A * 2 ^ 62| ≤ E) :
+    (hA0 : 0 ≤ A) (hA : A ≤ Real.pi / 2) (hE : E ≤ 100) (ha : |(a.val : ℝ) - A * 2 ^ 62| ≤ E) :
     fulcrum.trig.round_angle a xn ng f ⦃ r =>
       |(r.val : ℝ) - roundTarget xn ng A * 2 ^ f.val| ≤ 1 / 2 + (E + 1 / 2) / 2 ^ (62 - f.val) ⦄ := by
   unfold fulcrum.trig.round_angle
@@ -240,18 +240,18 @@ theorem round_angle_spec (a : Std.U64) (xn ng : Bool) (f : Std.U32) (hf : f.val 
   rw [hc, hi4] at hi5
   have near := round_shift_near a1.val (62 - f.val) f.val (by omega) θ (E + 1 / 2) (by exact_mod_cast h1)
   rw [← hi5] at near
-  have err : 1 / 2 + (E + 1 / 2) / 2 ^ (62 - f.val) ≤ (6 : ℝ) := by
+  have err : 1 / 2 + (E + 1 / 2) / 2 ^ (62 - f.val) ≤ (101 : ℝ) := by
     have : (E + 1 / 2) / 2 ^ (62 - f.val) ≤ E + 1 / 2 :=
       div_le_self (by linarith [abs_nonneg ((a.val : ℝ) - A * 2 ^ 62)]) (one_le_pow₀ one_le_two)
     linarith
   have i5b : |(i5.val : ℝ)| ≤ 2 ^ 34 := by
-    have sf : |θ * 2 ^ f.val| ≤ 2 ^ 34 - 6 := by
+    have sf : |θ * 2 ^ f.val| ≤ 2 ^ 34 - 101 := by
       rw [abs_of_nonneg (by positivity)]
       have : (2 : ℝ) ^ f.val ≤ 2 ^ 32 := pow_le_pow_right₀ one_le_two hf
       nlinarith [Real.pi_lt_d2]
     calc |(i5.val : ℝ)| ≤ |(i5.val : ℝ) - θ * 2 ^ f.val| + |θ * 2 ^ f.val| :=
           sub_le_iff_le_add.mp (abs_sub_abs_le_abs_sub _ _)
-      _ ≤ 6 + (2 ^ 34 - 6) := add_le_add (near.trans err) sf
+      _ ≤ 101 + (2 ^ 34 - 101) := add_le_add (near.trans err) sf
       _ = 2 ^ 34 := by ring
   have i5i : -(2 ^ 34) ≤ i5.val ∧ i5.val ≤ 2 ^ 34 := by
     have ⟨l, u⟩ := abs_le.mp i5b

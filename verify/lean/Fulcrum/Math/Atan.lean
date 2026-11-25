@@ -340,6 +340,126 @@ theorem root_angles_near (X : ℕ) (hX : X ≤ 2 ^ 62) :
     · rw [arg_compl _ _ le_rfl ŝp, arg_compl _ _ le_rfl (by rw [sU]; positivity)]
       simpa using pos
 
+/-- Jordan's inequality both ways: `|δ| ≤ π/2 · |sin δ|` for `|δ| ≤ π/2`. -/
+theorem abs_le_sin_mul (δ : ℝ) (h : |δ| ≤ Real.pi / 2) : |δ| ≤ Real.pi / 2 * |Real.sin δ| := by
+  have pi0 := Real.pi_pos
+  have key : ∀ x : ℝ, 0 ≤ x → x ≤ Real.pi / 2 → x ≤ Real.pi / 2 * Real.sin x := fun x h0 h1 => by
+    have := Real.mul_le_sin h0 h1
+    have e : Real.pi / 2 * (2 / Real.pi * x) = x := by field_simp
+    calc x = Real.pi / 2 * (2 / Real.pi * x) := e.symm
+      _ ≤ Real.pi / 2 * Real.sin x := mul_le_mul_of_nonneg_left this (by positivity)
+  rcases le_total 0 δ with h0 | h0
+  · rw [abs_of_nonneg h0] at h ⊢
+    exact (key δ h0 h).trans (mul_le_mul_of_nonneg_left (le_abs_self _) (by positivity))
+  · rw [abs_of_nonpos h0] at h ⊢
+    have := key (-δ) (by linarith) h
+    rw [Real.sin_neg] at this
+    exact this.trans (mul_le_mul_of_nonneg_left (neg_le_abs _) (by positivity))
+
+/-- Truncating both coordinates of a point of the first quadrant by at most `e` moves its
+angle by at most `1.01 · e / M`, `M ≤ max(n, d)` the larger truncated coordinate and
+`e ≤ M / 100`: `sin δ = (n D - d N) / (|z| |w|)` with `|n D - d N| ≤ e · max(n, d) ≤ e |z|`,
+Jordan's inequality makes `δ` small, and `δ - δ³/6 < sin δ` brings it to `sin δ`. -/
+theorem arg_truncate (n d N D M e : ℝ) (hn : 0 ≤ n) (hd : 0 ≤ d) (hN : n ≤ N) (hN1 : N ≤ n + e)
+    (hD : d ≤ D) (hD1 : D ≤ d + e) (hM : 0 < M) (hMn : M ≤ max n d) (he : e ≤ M / 100) :
+    |Complex.arg ⟨d, n⟩ - Complex.arg ⟨D, N⟩| ≤ 101 / 100 * (e / M) := by
+  set z : ℂ := ⟨d, n⟩
+  set w : ℂ := ⟨D, N⟩
+  have hn' : n ≤ ‖z‖ := by have := Complex.abs_im_le_norm z; rwa [show z.im = n from rfl, abs_of_nonneg hn] at this
+  have hd' : d ≤ ‖z‖ := by have := Complex.abs_re_le_norm z; rwa [show z.re = d from rfl, abs_of_nonneg hd] at this
+  have zM : M ≤ ‖z‖ := hMn.trans (max_le hn' hd')
+  have wM : M ≤ ‖w‖ := hMn.trans (max_le
+    (by have := Complex.abs_im_le_norm w; rw [show w.im = N from rfl, abs_of_nonneg (hn.trans hN)] at this; linarith)
+    (by have := Complex.abs_re_le_norm w; rw [show w.re = D from rfl, abs_of_nonneg (hd.trans hD)] at this; linarith))
+  have z0 : z ≠ 0 := fun e => by rw [e, norm_zero] at zM; linarith
+  have w0 : w ≠ 0 := fun e => by rw [e, norm_zero] at wM; linarith
+  have zp : 0 < ‖z‖ := hM.trans_le zM
+  have wp : 0 < ‖w‖ := hM.trans_le wM
+  have a0 : 0 ≤ Complex.arg z := Complex.arg_nonneg_iff.mpr hn
+  have a1 : Complex.arg z ≤ Real.pi / 2 := Complex.arg_le_pi_div_two_iff.mpr (Or.inl hd)
+  have b0 : 0 ≤ Complex.arg w := Complex.arg_nonneg_iff.mpr (hn.trans hN)
+  have b1 : Complex.arg w ≤ Real.pi / 2 := Complex.arg_le_pi_div_two_iff.mpr (Or.inl (hd.trans hD))
+  set δ := Complex.arg z - Complex.arg w
+  have hδ : |δ| ≤ Real.pi / 2 := abs_le.mpr ⟨by linarith, by linarith⟩
+  have j := abs_le_sin_mul δ hδ
+  have sd : Real.sin δ = (n * D - d * N) / (‖z‖ * ‖w‖) := by
+    rw [Real.sin_sub, Complex.sin_arg, Complex.sin_arg, Complex.cos_arg z0, Complex.cos_arg w0]
+    show n / ‖z‖ * (D / ‖w‖) - d / ‖z‖ * (N / ‖w‖) = _
+    field_simp
+  have e0 : 0 ≤ e := (sub_nonneg.mpr hN).trans (by linarith)
+  have num : |n * D - d * N| ≤ e * ‖z‖ := by
+    have q : n * D - d * N = n * (D - d) - d * (N - n) := by ring
+    have h1 : 0 ≤ n * (D - d) := mul_nonneg hn (by linarith)
+    have h2 : n * (D - d) ≤ n * e := mul_le_mul_of_nonneg_left (by linarith) hn
+    have h3 : 0 ≤ d * (N - n) := mul_nonneg hd (by linarith)
+    have h4 : d * (N - n) ≤ d * e := mul_le_mul_of_nonneg_left (by linarith) hd
+    have h5 : n * e ≤ ‖z‖ * e := mul_le_mul_of_nonneg_right hn' e0
+    have h6 : d * e ≤ ‖z‖ * e := mul_le_mul_of_nonneg_right hd' e0
+    rw [q]; exact abs_le.mpr ⟨by nlinarith, by nlinarith⟩
+  have s1 : |Real.sin δ| ≤ e / M := by
+    rw [sd, abs_div, abs_of_pos (mul_pos zp wp), div_le_div_iff₀ (mul_pos zp wp) hM]
+    nlinarith [mul_le_mul_of_nonneg_left wM (mul_nonneg e0 zp.le)]
+  have eM : e / M ≤ 1 / 100 := by rw [div_le_iff₀ hM]; linarith
+  have small : |δ| ≤ 16 / 1000 := by
+    calc |δ| ≤ Real.pi / 2 * |Real.sin δ| := j
+      _ ≤ 16 / 10 * (1 / 100) := mul_le_mul (by linarith [Real.pi_lt_d2]) (s1.trans eM) (abs_nonneg _) (by norm_num)
+      _ = 16 / 1000 := by norm_num
+  have sx : Real.sin |δ| ≤ |Real.sin δ| := by
+    rcases le_total 0 δ with h | h
+    · rw [abs_of_nonneg h]; exact le_abs_self _
+    · rw [abs_of_nonpos h, Real.sin_neg]; exact neg_le_abs _
+  rcases (abs_nonneg δ).lt_or_eq with hp | h0
+  · have c := Real.sin_gt_sub_cube hp
+    have cube : |δ| ^ 3 / 6 ≤ |δ| / 1000 := by
+      have : |δ| ^ 2 ≤ (16 / 1000) ^ 2 := pow_le_pow_left₀ (abs_nonneg _) small 2
+      nlinarith [abs_nonneg δ]
+    nlinarith
+  · rw [← h0]; positivity
+
+/-- The integer root of the sum of squares of three truncated coordinates, `c_i ≤ X_i < c_i + 1`,
+is within `2.74` below the length `√(X₀² + X₁² + X₂²)`: the root of the integers is below
+the length by at most `√3`, since `ℓ² - s² = Σ (X_i - c_i)(X_i + c_i) ≤ √3 (ℓ + s)`, and
+the floor adds `1`. -/
+theorem root_length_near (X0 X1 X2 : ℝ) (c0 c1 c2 : ℕ) (h0 : (c0 : ℝ) ≤ X0) (h0' : X0 < c0 + 1)
+    (h1 : (c1 : ℝ) ≤ X1) (h1' : X1 < c1 + 1) (h2 : (c2 : ℝ) ≤ X2) (h2' : X2 < c2 + 1) :
+    (Nat.sqrt (c0 * c0 + c1 * c1 + c2 * c2) : ℝ) ≤ √(X0 ^ 2 + X1 ^ 2 + X2 ^ 2) ∧
+      √(X0 ^ 2 + X1 ^ 2 + X2 ^ 2) ≤ Nat.sqrt (c0 * c0 + c1 * c1 + c2 * c2) + 274 / 100 := by
+  set S := c0 * c0 + c1 * c1 + c2 * c2
+  have l := Real.nat_sqrt_le_real_sqrt (a := S)
+  have u := Real.real_sqrt_lt_nat_sqrt_succ (a := S)
+  have SR : ((S : ℕ) : ℝ) = (c0 : ℝ) ^ 2 + (c1 : ℝ) ^ 2 + (c2 : ℝ) ^ 2 := by simp only [S]; push_cast; ring
+  rw [SR] at l u
+  set s := √((c0 : ℝ) ^ 2 + (c1 : ℝ) ^ 2 + (c2 : ℝ) ^ 2)
+  set ℓ := √(X0 ^ 2 + X1 ^ 2 + X2 ^ 2)
+  have c0p := Nat.cast_nonneg (α := ℝ) c0
+  have c1p := Nat.cast_nonneg (α := ℝ) c1
+  have c2p := Nat.cast_nonneg (α := ℝ) c2
+  have s0 : 0 ≤ s := Real.sqrt_nonneg _
+  have l0 : 0 ≤ ℓ := Real.sqrt_nonneg _
+  have ss : s ^ 2 = (c0 : ℝ) ^ 2 + (c1 : ℝ) ^ 2 + (c2 : ℝ) ^ 2 := Real.sq_sqrt (by positivity)
+  have ll : ℓ ^ 2 = X0 ^ 2 + X1 ^ 2 + X2 ^ 2 := Real.sq_sqrt (by positivity)
+  have sl : s ≤ ℓ := Real.sqrt_le_sqrt (by nlinarith)
+  have k : (3 : ℝ) ≤ (17321 / 10000) ^ 2 := by norm_num
+  have sX : X0 + X1 + X2 ≤ 17321 / 10000 * ℓ :=
+    (abs_le_of_sq_le_sq' (by nlinarith [sq_nonneg (X0 - X1), sq_nonneg (X1 - X2), sq_nonneg (X0 - X2)])
+      (by positivity)).2
+  have sc : (c0 : ℝ) + c1 + c2 ≤ 17321 / 10000 * s :=
+    (abs_le_of_sq_le_sq' (by nlinarith [sq_nonneg ((c0 : ℝ) - c1), sq_nonneg ((c1 : ℝ) - c2), sq_nonneg ((c0 : ℝ) - c2)])
+      (by positivity)).2
+  have diff : (ℓ - s) * (ℓ + s) ≤ 17321 / 10000 * (ℓ + s) := by
+    have : (ℓ - s) * (ℓ + s) = (X0 - c0) * (X0 + c0) + (X1 - c1) * (X1 + c1) + (X2 - c2) * (X2 + c2) := by
+      rw [show (ℓ - s) * (ℓ + s) = ℓ ^ 2 - s ^ 2 by ring, ll, ss]; ring
+    rw [this]
+    nlinarith [mul_le_mul_of_nonneg_right (show X0 - c0 ≤ 1 by linarith) (show 0 ≤ X0 + c0 by linarith),
+      mul_le_mul_of_nonneg_right (show X1 - c1 ≤ 1 by linarith) (show 0 ≤ X1 + c1 by linarith),
+      mul_le_mul_of_nonneg_right (show X2 - c2 ≤ 1 by linarith) (show 0 ≤ X2 + c2 by linarith)]
+  have ls : ℓ - s ≤ 17321 / 10000 := by
+    rcases (add_nonneg l0 s0).lt_or_eq with hp | hz
+    · exact le_of_mul_le_mul_right diff hp
+    · have : ℓ = 0 := by linarith
+      linarith
+  exact ⟨l.trans sl, by linarith⟩
+
 end Fulcrum
 
 end

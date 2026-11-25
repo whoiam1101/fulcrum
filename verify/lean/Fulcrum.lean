@@ -42,6 +42,7 @@ import Fulcrum.L4.Radians
 import Fulcrum.L4.Tan
 import Fulcrum.L4.Atan
 import Fulcrum.L4.Angle
+import Fulcrum.L4.Vec
 
 /-!
 # fulcrum
