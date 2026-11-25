@@ -287,7 +287,8 @@ macro_rules! scale_kernel {
 /// `(2m ± 1)² · s < 2^128`, `p · inv + 2^93 < 2^126`.
 #[inline]
 const fn scale_narrow(v: [i64; 3], k: u64, s: u64) -> [i64; 3] {
-    let z = s.leading_zeros().saturating_sub(1) & !1;
+    let lz = s.leading_zeros();
+    let z = if lz == 0 { 0 } else { (lz - 1) & !1 };
     let inv = ((1u128 << 94) / k32::isqrt(s << z) as u128) as u64;
     let shift = 94 - z / 2;
     let mut out = [0i64; 3];

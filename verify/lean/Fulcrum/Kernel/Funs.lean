@@ -1216,7 +1216,7 @@ def kernel.rescale
          ok (i, raw < i2)
 
 /-- [fulcrum::kernel::rsqrt_start]: loop body 1:
-    Source: 'src/kernel.rs', lines 701:8-708:9 -/
+    Source: 'src/kernel.rs', lines 702:8-709:9 -/
 @[rust_loop_body]
 def kernel.rsqrt_start_loop0_loop0.body
   (d : Std.U128) (lo : Std.U128) (hi : Std.U128) :
@@ -1236,7 +1236,7 @@ def kernel.rsqrt_start_loop0_loop0.body
   else ok (done lo)
 
 /-- [fulcrum::kernel::rsqrt_start]: loop 1:
-    Source: 'src/kernel.rs', lines 701:8-708:9 -/
+    Source: 'src/kernel.rs', lines 702:8-709:9 -/
 @[rust_loop]
 def kernel.rsqrt_start_loop0_loop0
   (d : Std.U128) (lo : Std.U128) (hi : Std.U128) : Result Std.U128 := do
@@ -1245,7 +1245,7 @@ def kernel.rsqrt_start_loop0_loop0
     (lo, hi)
 
 /-- [fulcrum::kernel::rsqrt_start]: loop body 0:
-    Source: 'src/kernel.rs', lines 697:4-711:5 -/
+    Source: 'src/kernel.rs', lines 698:4-712:5 -/
 @[rust_loop_body]
 def kernel.rsqrt_start_loop0.body
   (table : Array Std.U32 192#usize) (t : Std.Usize) :
@@ -1267,7 +1267,7 @@ def kernel.rsqrt_start_loop0.body
   else ok (done table)
 
 /-- [fulcrum::kernel::rsqrt_start]: loop 0:
-    Source: 'src/kernel.rs', lines 697:4-711:5 -/
+    Source: 'src/kernel.rs', lines 698:4-712:5 -/
 @[rust_loop]
 def kernel.rsqrt_start_loop0
   (table : Array Std.U32 192#usize) (t : Std.Usize) :
@@ -1278,22 +1278,22 @@ def kernel.rsqrt_start_loop0
     (table, t)
 
 /-- [fulcrum::kernel::rsqrt_start]:
-    Source: 'src/kernel.rs', lines 694:0-713:1 -/
+    Source: 'src/kernel.rs', lines 695:0-714:1 -/
 def kernel.rsqrt_start : Result (Array Std.U32 192#usize) := do
   let table := Array.repeat 192#usize 0#u32
   kernel.rsqrt_start_loop0 table 64#usize
 
 /-- [fulcrum::kernel::RSQRT_START]
-    Source: 'src/kernel.rs', lines 692:0-692:46 -/
+    Source: 'src/kernel.rs', lines 693:0-693:46 -/
 @[global_simps, irreducible]
 def kernel.RSQRT_START : Result (Array Std.U32 192#usize) := kernel.rsqrt_start
 
 /-- [fulcrum::kernel::k32::NEWTON_STEPS]
-    Source: 'src/kernel.rs', lines 334:12-334:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 335:12-335:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 @[global_simps, irreducible] def kernel.k32.NEWTON_STEPS : Std.U32 := 0#u32
 
 /-- [fulcrum::kernel::k32::isqrt]: loop body 0:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop_body]
 def kernel.k32.isqrt_loop0.body
   (n : Std.U64) (x : Std.U64) : Result (ControlFlow Std.U64 Std.U64) := do
@@ -1304,7 +1304,7 @@ def kernel.k32.isqrt_loop0.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop 0:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop]
 def kernel.k32.isqrt_loop0 (n : Std.U64) (x : Std.U64) : Result Std.U64 := do
   loop
@@ -1312,7 +1312,7 @@ def kernel.k32.isqrt_loop0 (n : Std.U64) (x : Std.U64) : Result Std.U64 := do
     x
 
 /-- [fulcrum::kernel::k32::isqrt]: loop body 1:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop_body]
 def kernel.k32.isqrt_loop1.body
   (n : Std.U64) (x : Std.U64) (i : Std.U32) :
@@ -1328,7 +1328,7 @@ def kernel.k32.isqrt_loop1.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop 1:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop]
 def kernel.k32.isqrt_loop1
   (n : Std.U64) (x : Std.U64) (i : Std.U32) : Result Std.U64 := do
@@ -1337,7 +1337,7 @@ def kernel.k32.isqrt_loop1
     (x, i)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop body 2:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop_body]
 def kernel.k32.isqrt_loop2.body
   (n : Std.U64) (x : Std.U64) : Result (ControlFlow Std.U64 Std.U64) := do
@@ -1348,7 +1348,7 @@ def kernel.k32.isqrt_loop2.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop 2:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop]
 def kernel.k32.isqrt_loop2 (n : Std.U64) (x : Std.U64) : Result Std.U64 := do
   loop
@@ -1356,7 +1356,7 @@ def kernel.k32.isqrt_loop2 (n : Std.U64) (x : Std.U64) : Result Std.U64 := do
     x
 
 /-- [fulcrum::kernel::k32::isqrt]: loop body 3:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop_body]
 def kernel.k32.isqrt_loop3.body
   (n : Std.U64) (x : Std.U64) (i : Std.U32) :
@@ -1372,7 +1372,7 @@ def kernel.k32.isqrt_loop3.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop 3:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop]
 def kernel.k32.isqrt_loop3
   (n : Std.U64) (x : Std.U64) (i : Std.U32) : Result Std.U64 := do
@@ -1381,7 +1381,7 @@ def kernel.k32.isqrt_loop3
     (x, i)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop body 4:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop_body]
 def kernel.k32.isqrt_loop4.body
   (n : Std.U64) (x : Std.U64) : Result (ControlFlow Std.U64 Std.U64) := do
@@ -1392,7 +1392,7 @@ def kernel.k32.isqrt_loop4.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k32::isqrt]: loop 4:
-    Source: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 679:0-679:74 -/
 @[rust_loop]
 def kernel.k32.isqrt_loop4 (n : Std.U64) (x : Std.U64) : Result Std.U64 := do
   loop
@@ -1400,7 +1400,7 @@ def kernel.k32.isqrt_loop4 (n : Std.U64) (x : Std.U64) : Result Std.U64 := do
     x
 
 /-- [fulcrum::kernel::k32::isqrt]:
-    Source: 'src/kernel.rs', lines 494:12-511:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 495:12-512:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.isqrt (n : Std.U64) : Result Std.U64 := do
   if n < 2#u64
   then ok n
@@ -1459,7 +1459,7 @@ def kernel.k32.isqrt (n : Std.U64) : Result Std.U64 := do
       else ok x1
 
 /-- [fulcrum::kernel::scale_narrow]: loop body 1:
-    Source: 'src/kernel.rs', lines 305:12-307:13 -/
+    Source: 'src/kernel.rs', lines 306:12-308:13 -/
 @[rust_loop_body]
 def kernel.scale_narrow_loop0_loop0.body
   (k : Std.U64) (s : Std.U64) (four : Std.U128) (m : Std.U64) :
@@ -1481,7 +1481,7 @@ def kernel.scale_narrow_loop0_loop0.body
   else ok (done m)
 
 /-- [fulcrum::kernel::scale_narrow]: loop 1:
-    Source: 'src/kernel.rs', lines 305:12-307:13 -/
+    Source: 'src/kernel.rs', lines 306:12-308:13 -/
 @[rust_loop]
 def kernel.scale_narrow_loop0_loop0
   (k : Std.U64) (s : Std.U64) (four : Std.U128) (m : Std.U64) :
@@ -1492,7 +1492,7 @@ def kernel.scale_narrow_loop0_loop0
     m
 
 /-- [fulcrum::kernel::scale_narrow]: loop body 2:
-    Source: 'src/kernel.rs', lines 310:12-312:13 -/
+    Source: 'src/kernel.rs', lines 311:12-313:13 -/
 @[rust_loop_body]
 def kernel.scale_narrow_loop0_loop1.body
   (s : Std.U64) (four : Std.U128) (m : Std.U64) :
@@ -1514,7 +1514,7 @@ def kernel.scale_narrow_loop0_loop1.body
   else ok (done m)
 
 /-- [fulcrum::kernel::scale_narrow]: loop 2:
-    Source: 'src/kernel.rs', lines 310:12-312:13 -/
+    Source: 'src/kernel.rs', lines 311:12-313:13 -/
 @[rust_loop]
 def kernel.scale_narrow_loop0_loop1
   (s : Std.U64) (four : Std.U128) (m : Std.U64) : Result Std.U64 := do
@@ -1523,7 +1523,7 @@ def kernel.scale_narrow_loop0_loop1
     m
 
 /-- [fulcrum::kernel::scale_narrow]: loop body 3:
-    Source: 'src/kernel.rs', lines 310:12-312:13 -/
+    Source: 'src/kernel.rs', lines 311:12-313:13 -/
 @[rust_loop_body]
 def kernel.scale_narrow_loop0_loop2.body
   (s : Std.U64) (four : Std.U128) (m : Std.U64) :
@@ -1545,7 +1545,7 @@ def kernel.scale_narrow_loop0_loop2.body
   else ok (done m)
 
 /-- [fulcrum::kernel::scale_narrow]: loop 3:
-    Source: 'src/kernel.rs', lines 310:12-312:13 -/
+    Source: 'src/kernel.rs', lines 311:12-313:13 -/
 @[rust_loop]
 def kernel.scale_narrow_loop0_loop2
   (s : Std.U64) (four : Std.U128) (m : Std.U64) : Result Std.U64 := do
@@ -1554,7 +1554,7 @@ def kernel.scale_narrow_loop0_loop2
     m
 
 /-- [fulcrum::kernel::scale_narrow]: loop body 0:
-    Source: 'src/kernel.rs', lines 295:4-316:5 -/
+    Source: 'src/kernel.rs', lines 296:4-317:5 -/
 @[rust_loop_body]
 def kernel.scale_narrow_loop0.body
   (v : Array Std.I64 3#usize) (k : Std.U64) (s : Std.U64) (inv : Std.U64)
@@ -1692,7 +1692,7 @@ def kernel.scale_narrow_loop0.body
   else ok (done out)
 
 /-- [fulcrum::kernel::scale_narrow]: loop 0:
-    Source: 'src/kernel.rs', lines 295:4-316:5 -/
+    Source: 'src/kernel.rs', lines 296:4-317:5 -/
 @[rust_loop]
 def kernel.scale_narrow_loop0
   (v : Array Std.I64 3#usize) (k : Std.U64) (s : Std.U64) (inv : Std.U64)
@@ -1704,28 +1704,32 @@ def kernel.scale_narrow_loop0
     (out, i)
 
 /-- [fulcrum::kernel::scale_narrow]:
-    Source: 'src/kernel.rs', lines 289:0-318:1 -/
+    Source: 'src/kernel.rs', lines 289:0-319:1 -/
 def kernel.scale_narrow
   (v : Array Std.I64 3#usize) (k : Std.U64) (s : Std.U64) :
   Result (Array Std.I64 3#usize)
   := do
-  let i ← lift (core.num.U64.leading_zeros s)
-  let i1 ← lift (core.num.U32.saturating_sub i 1#u32)
-  let i2 ← lift (~~~ 1#u32)
-  let z ← lift (i1 &&& i2)
-  let i3 ← 1#u128 <<< 94#i32
-  let i4 ← s <<< z
-  let i5 ← kernel.k32.isqrt i4
-  let i6 ← lift (UScalar.cast .U128 i5)
-  let i7 ← i3 / i6
-  let inv ← lift (UScalar.cast .U64 i7)
-  let i8 ← z / 2#u32
-  let shift ← 94#u32 - i8
+  let lz ← lift (core.num.U64.leading_zeros s)
+  let z ←
+    if lz = 0#u32
+    then ok 0#u32
+    else do
+         let i ← lz - 1#u32
+         let i1 ← lift (~~~ 1#u32)
+         ok (i &&& i1)
+  let i ← 1#u128 <<< 94#i32
+  let i1 ← s <<< z
+  let i2 ← kernel.k32.isqrt i1
+  let i3 ← lift (UScalar.cast .U128 i2)
+  let i4 ← i / i3
+  let inv ← lift (UScalar.cast .U64 i4)
+  let i5 ← z / 2#u32
+  let shift ← 94#u32 - i5
   let out := Array.repeat 3#usize 0#i64
   kernel.scale_narrow_loop0 v k s inv shift out 0#usize
 
 /-- [fulcrum::kernel::k8::fits]:
-    Source: 'src/kernel.rs', lines 340:12-342:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 341:12-343:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.fits (w : Std.I16) : Result Bool := do
   let i ← lift (IScalar.cast .I16 core.num.I8.MIN)
   if w >= i
@@ -1734,7 +1738,7 @@ def kernel.k8.fits (w : Std.I16) : Result Bool := do
   else ok false
 
 /-- [fulcrum::kernel::k8::narrow]:
-    Source: 'src/kernel.rs', lines 346:12-352:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 347:12-353:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.narrow (w : Std.I16) : Result (Option Std.I8) := do
   let b ← kernel.k8.fits w
   if b
@@ -1743,7 +1747,7 @@ def kernel.k8.narrow (w : Std.I16) : Result (Option Std.I8) := do
   else ok none
 
 /-- [fulcrum::kernel::k8::saturate]:
-    Source: 'src/kernel.rs', lines 356:12-364:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 357:12-365:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.saturate (w : Std.I16) : Result Std.I8 := do
   let i ← lift (IScalar.cast .I16 core.num.I8.MAX)
   if w > i
@@ -1755,18 +1759,18 @@ def kernel.k8.saturate (w : Std.I16) : Result Std.I8 := do
     else ok (IScalar.cast .I8 w)
 
 /-- [fulcrum::kernel::k8::wrap]:
-    Source: 'src/kernel.rs', lines 368:12-370:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 369:12-371:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.wrap (w : Std.I16) : Result Std.I8 := do
   ok (IScalar.cast .I8 w)
 
 /-- [fulcrum::kernel::k8::to_int]:
-    Source: 'src/kernel.rs', lines 375:12-377:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 376:12-378:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.to_int (w : Std.I16) : Result Std.I8 := do
   let i ← w >>> 4#i32
   ok (IScalar.cast .I8 i)
 
 /-- [fulcrum::kernel::k8::from_parts]:
-    Source: 'src/kernel.rs', lines 381:12-383:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 382:12-384:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.from_parts (int : Std.I8) (frac : Std.U8) : Result Std.I16 := do
   let i ← lift (IScalar.cast .I16 int)
   let i1 ← i <<< 4#i32
@@ -1774,13 +1778,13 @@ def kernel.k8.from_parts (int : Std.I8) (frac : Std.U8) : Result Std.I16 := do
   i1 + i2
 
 /-- [fulcrum::kernel::k8::HALF]
-    Source: 'src/kernel.rs', lines 336:12-336:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 337:12-337:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 @[global_simps, irreducible]
 def kernel.k8.HALF : Result Std.I16 := do let i ← 4#i32 - 1#i32
                                           1#i16 <<< i
 
 /-- [fulcrum::kernel::k8::round_frac]:
-    Source: 'src/kernel.rs', lines 391:12-397:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 392:12-398:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.round_frac (p : Std.I16) : Result Std.I16 := do
   if core.num.I16.BITS = 128#u32
   then
@@ -1794,7 +1798,7 @@ def kernel.k8.round_frac (p : Std.I16) : Result Std.I16 := do
        i1 >>> 4#i32
 
 /-- [fulcrum::kernel::k8::mul]:
-    Source: 'src/kernel.rs', lines 402:12-404:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 403:12-405:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.mul (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   let i ← lift (IScalar.cast .I16 a)
   let i1 ← lift (IScalar.cast .I16 b)
@@ -1802,7 +1806,7 @@ def kernel.k8.mul (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   kernel.k8.round_frac i2
 
 /-- [fulcrum::kernel::k8::mul_add]:
-    Source: 'src/kernel.rs', lines 412:12-414:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 413:12-415:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.mul_add
   (a : Std.I8) (b : Std.I8) (c : Std.I8) : Result Std.I16 := do
   let i ← kernel.k8.mul a b
@@ -1810,7 +1814,7 @@ def kernel.k8.mul_add
   i + i1
 
 /-- [fulcrum::kernel::k8::round_magnitude_div]:
-    Source: 'src/kernel.rs', lines 421:12-429:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 422:12-430:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.round_magnitude_div
   (un : Std.U16) (ud : Std.U16) (negative : Bool) : Result Std.I16 := do
   let i ← un <<< 1#i32
@@ -1825,7 +1829,7 @@ def kernel.k8.round_magnitude_div
   else ok m1
 
 /-- [fulcrum::kernel::k8::mul_div]:
-    Source: 'src/kernel.rs', lines 437:12-443:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 438:12-444:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.mul_div
   (a : Std.I8) (b : Std.I8) (c : Std.I8) : Result Std.I16 := do
   let i ← core.num.I8.unsigned_abs a
@@ -1839,7 +1843,7 @@ def kernel.k8.mul_div
     0#i8))
 
 /-- [fulcrum::kernel::k8::lerp]:
-    Source: 'src/kernel.rs', lines 450:12-452:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 451:12-453:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.lerp
   (a : Std.I8) (b : Std.I8) (t : Std.I8) : Result Std.I16 := do
   let i ← lift (IScalar.cast .I16 a)
@@ -1852,7 +1856,7 @@ def kernel.k8.lerp
   i + i6
 
 /-- [fulcrum::kernel::k8::div]:
-    Source: 'src/kernel.rs', lines 113:8-119:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 113:8-119:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.div (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   let i ← core.num.I8.unsigned_abs a
   let i1 ← lift (UScalar.cast .U16 i)
@@ -1862,7 +1866,7 @@ def kernel.k8.div (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   kernel.k8.round_magnitude_div i2 i4 ((a < 0#i8) != (b < 0#i8))
 
 /-- [fulcrum::kernel::k8::div_int]:
-    Source: 'src/kernel.rs', lines 123:8-129:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 123:8-129:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.div_int (a : Std.I8) (n : Std.I8) : Result Std.I16 := do
   let i ← core.num.I8.unsigned_abs a
   let i1 ← lift (UScalar.cast .U16 i)
@@ -1871,14 +1875,14 @@ def kernel.k8.div_int (a : Std.I8) (n : Std.I8) : Result Std.I16 := do
   kernel.k8.round_magnitude_div i1 i3 ((a < 0#i8) != (n < 0#i8))
 
 /-- [fulcrum::kernel::k8::div_total]:
-    Source: 'src/kernel.rs', lines 461:12-469:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 462:12-470:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.div_total (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   if b = 0#i8
   then ok 0#i16
   else kernel.k8.div a b
 
 /-- [fulcrum::kernel::sqrt_start]: loop body 1:
-    Source: 'src/kernel.rs', lines 721:8-723:9 -/
+    Source: 'src/kernel.rs', lines 722:8-724:9 -/
 @[rust_loop_body]
 def kernel.sqrt_start_loop0_loop0.body
   (v : Std.U32) (s : Std.U32) : Result (ControlFlow Std.U32 Std.U32) := do
@@ -1889,7 +1893,7 @@ def kernel.sqrt_start_loop0_loop0.body
   else ok (done s)
 
 /-- [fulcrum::kernel::sqrt_start]: loop 1:
-    Source: 'src/kernel.rs', lines 721:8-723:9 -/
+    Source: 'src/kernel.rs', lines 722:8-724:9 -/
 @[rust_loop]
 def kernel.sqrt_start_loop0_loop0
   (s : Std.U32) (v : Std.U32) : Result Std.U32 := do
@@ -1898,7 +1902,7 @@ def kernel.sqrt_start_loop0_loop0
     s
 
 /-- [fulcrum::kernel::sqrt_start]: loop body 0:
-    Source: 'src/kernel.rs', lines 719:4-726:5 -/
+    Source: 'src/kernel.rs', lines 720:4-727:5 -/
 @[rust_loop_body]
 def kernel.sqrt_start_loop0.body
   (table : Array Std.U16 256#usize) (t : Std.Usize) (s : Std.U32) :
@@ -1919,7 +1923,7 @@ def kernel.sqrt_start_loop0.body
   else ok (done table)
 
 /-- [fulcrum::kernel::sqrt_start]: loop 0:
-    Source: 'src/kernel.rs', lines 719:4-726:5 -/
+    Source: 'src/kernel.rs', lines 720:4-727:5 -/
 @[rust_loop]
 def kernel.sqrt_start_loop0
   (table : Array Std.U16 256#usize) (t : Std.Usize) (s : Std.U32) :
@@ -1930,22 +1934,22 @@ def kernel.sqrt_start_loop0
     (table, t, s)
 
 /-- [fulcrum::kernel::sqrt_start]:
-    Source: 'src/kernel.rs', lines 715:0-728:1 -/
+    Source: 'src/kernel.rs', lines 716:0-729:1 -/
 def kernel.sqrt_start : Result (Array Std.U16 256#usize) := do
   let table := Array.repeat 256#usize 0#u16
   kernel.sqrt_start_loop0 table 0#usize 0#u32
 
 /-- [fulcrum::kernel::SQRT_START]
-    Source: 'src/kernel.rs', lines 686:0-686:44 -/
+    Source: 'src/kernel.rs', lines 687:0-687:44 -/
 @[global_simps, irreducible]
 def kernel.SQRT_START : Result (Array Std.U16 256#usize) := kernel.sqrt_start
 
 /-- [fulcrum::kernel::k8::NEWTON_STEPS]
-    Source: 'src/kernel.rs', lines 334:12-334:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 335:12-335:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 @[global_simps, irreducible] def kernel.k8.NEWTON_STEPS : Std.U32 := 1#u32
 
 /-- [fulcrum::kernel::k8::isqrt]: loop body 0:
-    Source: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 677:0-677:72 -/
 @[rust_loop_body]
 def kernel.k8.isqrt_loop0.body
   (n : Std.U16) (x : Std.U16) (i : Std.U32) :
@@ -1961,7 +1965,7 @@ def kernel.k8.isqrt_loop0.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k8::isqrt]: loop 0:
-    Source: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 677:0-677:72 -/
 @[rust_loop]
 def kernel.k8.isqrt_loop0
   (n : Std.U16) (x : Std.U16) (i : Std.U32) : Result Std.U16 := do
@@ -1970,7 +1974,7 @@ def kernel.k8.isqrt_loop0
     (x, i)
 
 /-- [fulcrum::kernel::k8::isqrt]: loop body 1:
-    Source: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 677:0-677:72 -/
 @[rust_loop_body]
 def kernel.k8.isqrt_loop1.body
   (n : Std.U16) (x : Std.U16) : Result (ControlFlow Std.U16 Std.U16) := do
@@ -1981,7 +1985,7 @@ def kernel.k8.isqrt_loop1.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k8::isqrt]: loop 1:
-    Source: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 677:0-677:72 -/
 @[rust_loop]
 def kernel.k8.isqrt_loop1 (n : Std.U16) (x : Std.U16) : Result Std.U16 := do
   loop
@@ -1989,7 +1993,7 @@ def kernel.k8.isqrt_loop1 (n : Std.U16) (x : Std.U16) : Result Std.U16 := do
     x
 
 /-- [fulcrum::kernel::k8::isqrt]:
-    Source: 'src/kernel.rs', lines 494:12-511:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 495:12-512:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.isqrt (n : Std.U16) : Result Std.U16 := do
   if n < 2#u16
   then ok n
@@ -2023,7 +2027,7 @@ def kernel.k8.isqrt (n : Std.U16) : Result Std.U16 := do
     else ok x1
 
 /-- [fulcrum::kernel::k8::sqrt_round]:
-    Source: 'src/kernel.rs', lines 517:12-520:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 518:12-521:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.sqrt_round (n : Std.U16) : Result Std.U16 := do
   let s ← kernel.k8.isqrt n
   let i ← s * s
@@ -2032,7 +2036,7 @@ def kernel.k8.sqrt_round (n : Std.U16) : Result Std.U16 := do
   s + i2
 
 /-- [fulcrum::kernel::k8::sqrt]:
-    Source: 'src/kernel.rs', lines 526:12-528:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 527:12-529:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.sqrt (a : Std.I8) : Result Std.I8 := do
   let i ← lift (IScalar.hcast .U16 a)
   let i1 ← i <<< 4#i32
@@ -2040,7 +2044,7 @@ def kernel.k8.sqrt (a : Std.I8) : Result Std.I8 := do
   ok (UScalar.hcast .I8 i2)
 
 /-- [fulcrum::kernel::k8::rsqrt]:
-    Source: 'src/kernel.rs', lines 538:12-543:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 539:12-544:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.rsqrt (a : Std.I8) : Result Std.I8 := do
   let ua ← lift (IScalar.hcast .U16 a)
   let i ← 3#i32 * 4#i32
@@ -2058,7 +2062,7 @@ def kernel.k8.rsqrt (a : Std.I8) : Result Std.I8 := do
   ok (UScalar.hcast .I8 i9)
 
 /-- [fulcrum::kernel::k8::hypot]:
-    Source: 'src/kernel.rs', lines 549:12-553:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 550:12-554:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.hypot (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   let i ← core.num.I8.unsigned_abs a
   let ua ← lift (UScalar.cast .U16 i)
@@ -2071,7 +2075,7 @@ def kernel.k8.hypot (a : Std.I8) (b : Std.I8) : Result Std.I16 := do
   ok (UScalar.hcast .I16 i5)
 
 /-- [fulcrum::kernel::k8::det]:
-    Source: 'src/kernel.rs', lines 562:12-564:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 563:12-565:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.det
   (a : Std.I8) (b : Std.I8) (c : Std.I8) (d : Std.I8) : Result Std.I16 := do
   let i ← lift (IScalar.cast .I16 a)
@@ -2084,7 +2088,7 @@ def kernel.k8.det
   kernel.k8.round_frac i6
 
 /-- [fulcrum::kernel::k8::norm_sq]:
-    Source: 'src/kernel.rs', lines 568:12-573:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 569:12-574:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.norm_sq
   (a : Std.I8) (b : Std.I8) (c : Std.I8) : Result Std.U128 := do
   let i ← core.num.I8.unsigned_abs a
@@ -2100,14 +2104,14 @@ def kernel.k8.norm_sq
   i5 + i6
 
 /-- [fulcrum::kernel::k8::sq]:
-    Source: 'src/kernel.rs', lines 577:12-580:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 578:12-581:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.sq (m : Std.I8) : Result Std.U128 := do
   let i ← core.num.I8.unsigned_abs m
   let um ← lift (UScalar.cast .U128 i)
   um * um
 
 /-- [fulcrum::kernel::k8::scale_vec]:
-    Source: 'src/kernel.rs', lines 217:8-224:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 217:8-224:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.scale_vec
   (a : Std.I8) (b : Std.I8) (c : Std.I8) (k : Std.I8) :
   Result (Array Std.I8 3#usize)
@@ -2131,7 +2135,7 @@ def kernel.k8.scale_vec
     ok (Array.make 3#usize [ i6, i8, i10 ])
 
 /-- [fulcrum::kernel::k8::cmp_length]:
-    Source: 'src/kernel.rs', lines 587:12-597:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 588:12-598:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.cmp_length
   (a : Std.I8) (b : Std.I8) (c : Std.I8) (k : Std.I8) : Result Std.I8 := do
   let s ← kernel.k8.norm_sq a b c
@@ -2143,7 +2147,7 @@ def kernel.k8.cmp_length
        else ok 0#i8
 
 /-- [fulcrum::kernel::k8::hypot3]:
-    Source: 'src/kernel.rs', lines 604:12-609:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 605:12-610:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.hypot3
   (a : Std.I8) (b : Std.I8) (c : Std.I8) : Result Std.I16 := do
   let i ← core.num.I8.unsigned_abs a
@@ -2161,7 +2165,7 @@ def kernel.k8.hypot3
   ok (UScalar.hcast .I16 i8)
 
 /-- [fulcrum::kernel::k8::midpoint]:
-    Source: 'src/kernel.rs', lines 613:12-615:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 614:12-616:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.midpoint (a : Std.I8) (b : Std.I8) : Result Std.I8 := do
   let i ← lift (a ||| b)
   let i1 ← lift (a ^^^ b)
@@ -2169,7 +2173,7 @@ def kernel.k8.midpoint (a : Std.I8) (b : Std.I8) : Result Std.I8 := do
   i - i2
 
 /-- [fulcrum::kernel::k8::shr]:
-    Source: 'src/kernel.rs', lines 620:12-628:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 621:12-629:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.shr (a : Std.I8) (n : Std.U32) : Result Std.I8 := do
   if n = 0#u32
   then ok a
@@ -2184,7 +2188,7 @@ def kernel.k8.shr (a : Std.I8) (n : Std.U32) : Result Std.I8 := do
       i + i3
 
 /-- [fulcrum::kernel::k8::shl]:
-    Source: 'src/kernel.rs', lines 633:12-640:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 634:12-641:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.shl (a : Std.I8) (n : Std.U32) : Result (Std.I8 × Bool) := do
   if n >= core.num.I8.BITS
   then ok (0#i8, a != 0#i8)
@@ -2193,18 +2197,18 @@ def kernel.k8.shl (a : Std.I8) (n : Std.U32) : Result (Std.I8 × Bool) := do
        ok (r, i != a)
 
 /-- [fulcrum::kernel::k8::ONE]
-    Source: 'src/kernel.rs', lines 333:12-333:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 334:12-334:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 @[global_simps, irreducible]
 def kernel.k8.ONE : Result Std.I16 := 1#i16 <<< 4#i32
 
 /-- [fulcrum::kernel::k8::MASK]
-    Source: 'src/kernel.rs', lines 335:12-335:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 336:12-336:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 @[global_simps, irreducible]
 def kernel.k8.MASK : Result Std.I16 := do let i ← kernel.k8.ONE
                                           i - 1#i16
 
 /-- [fulcrum::kernel::k8::ceil]:
-    Source: 'src/kernel.rs', lines 644:12-646:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 645:12-647:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.ceil (a : Std.I8) : Result Std.I16 := do
   let i ← lift (IScalar.cast .I16 a)
   let i1 ← kernel.k8.MASK
@@ -2213,7 +2217,7 @@ def kernel.k8.ceil (a : Std.I8) : Result Std.I16 := do
   ok (i2 &&& i3)
 
 /-- [fulcrum::kernel::k8::round_half_away]:
-    Source: 'src/kernel.rs', lines 650:12-657:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 651:12-658:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.round_half_away (a : Std.I8) : Result Std.I16 := do
   let w ← lift (IScalar.cast .I16 a)
   if w >= 0#i16
@@ -2232,7 +2236,7 @@ def kernel.k8.round_half_away (a : Std.I8) : Result Std.I16 := do
     -. i4
 
 /-- [fulcrum::kernel::k8::round_ties_even]:
-    Source: 'src/kernel.rs', lines 661:12-671:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 676:0-676:72 -/
+    Source: 'src/kernel.rs', lines 662:12-672:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:72 -/
 def kernel.k8.round_ties_even (a : Std.I8) : Result Std.I16 := do
   let w ← lift (IScalar.cast .I16 a)
   let i ← kernel.k8.MASK
@@ -2254,7 +2258,7 @@ def kernel.k8.round_ties_even (a : Std.I8) : Result Std.I16 := do
     else ok floor
 
 /-- [fulcrum::kernel::k16::fits]:
-    Source: 'src/kernel.rs', lines 340:12-342:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 341:12-343:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.fits (w : Std.I32) : Result Bool := do
   let i ← lift (IScalar.cast .I32 core.num.I16.MIN)
   if w >= i
@@ -2263,7 +2267,7 @@ def kernel.k16.fits (w : Std.I32) : Result Bool := do
   else ok false
 
 /-- [fulcrum::kernel::k16::narrow]:
-    Source: 'src/kernel.rs', lines 346:12-352:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 347:12-353:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.narrow (w : Std.I32) : Result (Option Std.I16) := do
   let b ← kernel.k16.fits w
   if b
@@ -2272,7 +2276,7 @@ def kernel.k16.narrow (w : Std.I32) : Result (Option Std.I16) := do
   else ok none
 
 /-- [fulcrum::kernel::k16::saturate]:
-    Source: 'src/kernel.rs', lines 356:12-364:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 357:12-365:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.saturate (w : Std.I32) : Result Std.I16 := do
   let i ← lift (IScalar.cast .I32 core.num.I16.MAX)
   if w > i
@@ -2284,18 +2288,18 @@ def kernel.k16.saturate (w : Std.I32) : Result Std.I16 := do
     else ok (IScalar.cast .I16 w)
 
 /-- [fulcrum::kernel::k16::wrap]:
-    Source: 'src/kernel.rs', lines 368:12-370:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 369:12-371:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.wrap (w : Std.I32) : Result Std.I16 := do
   ok (IScalar.cast .I16 w)
 
 /-- [fulcrum::kernel::k16::to_int]:
-    Source: 'src/kernel.rs', lines 375:12-377:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 376:12-378:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.to_int (w : Std.I32) : Result Std.I16 := do
   let i ← w >>> 8#i32
   ok (IScalar.cast .I16 i)
 
 /-- [fulcrum::kernel::k16::from_parts]:
-    Source: 'src/kernel.rs', lines 381:12-383:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 382:12-384:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.from_parts (int : Std.I8) (frac : Std.U8) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I32 int)
   let i1 ← i <<< 8#i32
@@ -2303,13 +2307,13 @@ def kernel.k16.from_parts (int : Std.I8) (frac : Std.U8) : Result Std.I32 := do
   i1 + i2
 
 /-- [fulcrum::kernel::k16::HALF]
-    Source: 'src/kernel.rs', lines 336:12-336:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 337:12-337:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 @[global_simps, irreducible]
 def kernel.k16.HALF : Result Std.I32 := do let i ← 8#i32 - 1#i32
                                            1#i32 <<< i
 
 /-- [fulcrum::kernel::k16::round_frac]:
-    Source: 'src/kernel.rs', lines 391:12-397:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 392:12-398:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.round_frac (p : Std.I32) : Result Std.I32 := do
   if core.num.I32.BITS = 128#u32
   then
@@ -2323,7 +2327,7 @@ def kernel.k16.round_frac (p : Std.I32) : Result Std.I32 := do
        i1 >>> 8#i32
 
 /-- [fulcrum::kernel::k16::mul]:
-    Source: 'src/kernel.rs', lines 402:12-404:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 403:12-405:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.mul (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I32 a)
   let i1 ← lift (IScalar.cast .I32 b)
@@ -2331,7 +2335,7 @@ def kernel.k16.mul (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   kernel.k16.round_frac i2
 
 /-- [fulcrum::kernel::k16::mul_add]:
-    Source: 'src/kernel.rs', lines 412:12-414:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 413:12-415:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.mul_add
   (a : Std.I16) (b : Std.I16) (c : Std.I16) : Result Std.I32 := do
   let i ← kernel.k16.mul a b
@@ -2339,7 +2343,7 @@ def kernel.k16.mul_add
   i + i1
 
 /-- [fulcrum::kernel::k16::round_magnitude_div]:
-    Source: 'src/kernel.rs', lines 421:12-429:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 422:12-430:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.round_magnitude_div
   (un : Std.U32) (ud : Std.U32) (negative : Bool) : Result Std.I32 := do
   let i ← un <<< 1#i32
@@ -2354,7 +2358,7 @@ def kernel.k16.round_magnitude_div
   else ok m1
 
 /-- [fulcrum::kernel::k16::mul_div]:
-    Source: 'src/kernel.rs', lines 437:12-443:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 438:12-444:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.mul_div
   (a : Std.I16) (b : Std.I16) (c : Std.I16) : Result Std.I32 := do
   let i ← core.num.I16.unsigned_abs a
@@ -2368,7 +2372,7 @@ def kernel.k16.mul_div
     0#i16))
 
 /-- [fulcrum::kernel::k16::lerp]:
-    Source: 'src/kernel.rs', lines 450:12-452:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 451:12-453:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.lerp
   (a : Std.I16) (b : Std.I16) (t : Std.I16) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I32 a)
@@ -2381,7 +2385,7 @@ def kernel.k16.lerp
   i + i6
 
 /-- [fulcrum::kernel::k16::round_div]:
-    Source: 'src/kernel.rs', lines 91:8-96:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 91:8-96:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.round_div (n : Std.I32) (d : Std.I32) : Result Std.I32 := do
   let i ← core.num.I32.unsigned_abs d
   let ud ← lift (UScalar.hcast .I32 i)
@@ -2397,7 +2401,7 @@ def kernel.k16.round_div (n : Std.I32) (d : Std.I32) : Result Std.I32 := do
   i2 / i3
 
 /-- [fulcrum::kernel::k16::div]:
-    Source: 'src/kernel.rs', lines 100:8-102:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 100:8-102:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.div (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I32 a)
   let i1 ← i <<< 8#i32
@@ -2405,25 +2409,25 @@ def kernel.k16.div (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   kernel.k16.round_div i1 i2
 
 /-- [fulcrum::kernel::k16::div_int]:
-    Source: 'src/kernel.rs', lines 106:8-108:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 106:8-108:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.div_int (a : Std.I16) (n : Std.I16) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I32 a)
   let i1 ← lift (IScalar.cast .I32 n)
   kernel.k16.round_div i i1
 
 /-- [fulcrum::kernel::k16::div_total]:
-    Source: 'src/kernel.rs', lines 461:12-469:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 462:12-470:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.div_total (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   let i ← lift (IScalar.cast_fromBool .I16 (b = 0#i16))
   let i1 ← lift (b ||| i)
   kernel.k16.div a i1
 
 /-- [fulcrum::kernel::k16::NEWTON_STEPS]
-    Source: 'src/kernel.rs', lines 334:12-334:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 335:12-335:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 @[global_simps, irreducible] def kernel.k16.NEWTON_STEPS : Std.U32 := 1#u32
 
 /-- [fulcrum::kernel::k16::isqrt]: loop body 0:
-    Source: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 678:0-678:70 -/
 @[rust_loop_body]
 def kernel.k16.isqrt_loop0.body
   (n : Std.U32) (x : Std.U32) (i : Std.U32) :
@@ -2439,7 +2443,7 @@ def kernel.k16.isqrt_loop0.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k16::isqrt]: loop 0:
-    Source: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 678:0-678:70 -/
 @[rust_loop]
 def kernel.k16.isqrt_loop0
   (n : Std.U32) (x : Std.U32) (i : Std.U32) : Result Std.U32 := do
@@ -2448,7 +2452,7 @@ def kernel.k16.isqrt_loop0
     (x, i)
 
 /-- [fulcrum::kernel::k16::isqrt]: loop body 1:
-    Source: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 678:0-678:70 -/
 @[rust_loop_body]
 def kernel.k16.isqrt_loop1.body
   (n : Std.U32) (x : Std.U32) : Result (ControlFlow Std.U32 Std.U32) := do
@@ -2459,7 +2463,7 @@ def kernel.k16.isqrt_loop1.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k16::isqrt]: loop 1:
-    Source: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 678:0-678:70 -/
 @[rust_loop]
 def kernel.k16.isqrt_loop1 (n : Std.U32) (x : Std.U32) : Result Std.U32 := do
   loop
@@ -2467,7 +2471,7 @@ def kernel.k16.isqrt_loop1 (n : Std.U32) (x : Std.U32) : Result Std.U32 := do
     x
 
 /-- [fulcrum::kernel::k16::isqrt]:
-    Source: 'src/kernel.rs', lines 494:12-511:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 495:12-512:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.isqrt (n : Std.U32) : Result Std.U32 := do
   if n < 2#u32
   then ok n
@@ -2502,7 +2506,7 @@ def kernel.k16.isqrt (n : Std.U32) : Result Std.U32 := do
     else ok x1
 
 /-- [fulcrum::kernel::k16::sqrt_round]:
-    Source: 'src/kernel.rs', lines 517:12-520:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 518:12-521:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.sqrt_round (n : Std.U32) : Result Std.U32 := do
   let s ← kernel.k16.isqrt n
   let i ← s * s
@@ -2511,7 +2515,7 @@ def kernel.k16.sqrt_round (n : Std.U32) : Result Std.U32 := do
   s + i2
 
 /-- [fulcrum::kernel::k16::sqrt]:
-    Source: 'src/kernel.rs', lines 526:12-528:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 527:12-529:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.sqrt (a : Std.I16) : Result Std.I16 := do
   let i ← lift (IScalar.hcast .U32 a)
   let i1 ← i <<< 8#i32
@@ -2519,7 +2523,7 @@ def kernel.k16.sqrt (a : Std.I16) : Result Std.I16 := do
   ok (UScalar.hcast .I16 i2)
 
 /-- [fulcrum::kernel::k16::rsqrt]:
-    Source: 'src/kernel.rs', lines 538:12-543:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 539:12-544:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.rsqrt (a : Std.I16) : Result Std.I16 := do
   let ua ← lift (IScalar.hcast .U32 a)
   let i ← 3#i32 * 8#i32
@@ -2537,7 +2541,7 @@ def kernel.k16.rsqrt (a : Std.I16) : Result Std.I16 := do
   ok (UScalar.hcast .I16 i9)
 
 /-- [fulcrum::kernel::k16::hypot]:
-    Source: 'src/kernel.rs', lines 549:12-553:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 550:12-554:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.hypot (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   let i ← core.num.I16.unsigned_abs a
   let ua ← lift (UScalar.cast .U32 i)
@@ -2550,7 +2554,7 @@ def kernel.k16.hypot (a : Std.I16) (b : Std.I16) : Result Std.I32 := do
   ok (UScalar.hcast .I32 i5)
 
 /-- [fulcrum::kernel::k16::det]:
-    Source: 'src/kernel.rs', lines 562:12-564:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 563:12-565:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.det
   (a : Std.I16) (b : Std.I16) (c : Std.I16) (d : Std.I16) :
   Result Std.I32
@@ -2565,7 +2569,7 @@ def kernel.k16.det
   kernel.k16.round_frac i6
 
 /-- [fulcrum::kernel::k16::norm_sq]:
-    Source: 'src/kernel.rs', lines 568:12-573:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 569:12-574:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.norm_sq
   (a : Std.I16) (b : Std.I16) (c : Std.I16) : Result Std.U128 := do
   let i ← core.num.I16.unsigned_abs a
@@ -2581,14 +2585,14 @@ def kernel.k16.norm_sq
   i5 + i6
 
 /-- [fulcrum::kernel::k16::sq]:
-    Source: 'src/kernel.rs', lines 577:12-580:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 578:12-581:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.sq (m : Std.I16) : Result Std.U128 := do
   let i ← core.num.I16.unsigned_abs m
   let um ← lift (UScalar.cast .U128 i)
   um * um
 
 /-- [fulcrum::kernel::k16::scale_vec]:
-    Source: 'src/kernel.rs', lines 217:8-224:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 217:8-224:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.scale_vec
   (a : Std.I16) (b : Std.I16) (c : Std.I16) (k : Std.I16) :
   Result (Array Std.I16 3#usize)
@@ -2612,7 +2616,7 @@ def kernel.k16.scale_vec
     ok (Array.make 3#usize [ i6, i8, i10 ])
 
 /-- [fulcrum::kernel::k16::cmp_length]:
-    Source: 'src/kernel.rs', lines 587:12-597:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 588:12-598:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.cmp_length
   (a : Std.I16) (b : Std.I16) (c : Std.I16) (k : Std.I16) : Result Std.I8 := do
   let s ← kernel.k16.norm_sq a b c
@@ -2624,7 +2628,7 @@ def kernel.k16.cmp_length
        else ok 0#i8
 
 /-- [fulcrum::kernel::k16::hypot3]:
-    Source: 'src/kernel.rs', lines 604:12-609:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 605:12-610:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.hypot3
   (a : Std.I16) (b : Std.I16) (c : Std.I16) : Result Std.I32 := do
   let i ← core.num.I16.unsigned_abs a
@@ -2642,7 +2646,7 @@ def kernel.k16.hypot3
   ok (UScalar.hcast .I32 i8)
 
 /-- [fulcrum::kernel::k16::midpoint]:
-    Source: 'src/kernel.rs', lines 613:12-615:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 614:12-616:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.midpoint (a : Std.I16) (b : Std.I16) : Result Std.I16 := do
   let i ← lift (a ||| b)
   let i1 ← lift (a ^^^ b)
@@ -2650,7 +2654,7 @@ def kernel.k16.midpoint (a : Std.I16) (b : Std.I16) : Result Std.I16 := do
   i - i2
 
 /-- [fulcrum::kernel::k16::shr]:
-    Source: 'src/kernel.rs', lines 620:12-628:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 621:12-629:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.shr (a : Std.I16) (n : Std.U32) : Result Std.I16 := do
   if n = 0#u32
   then ok a
@@ -2665,7 +2669,7 @@ def kernel.k16.shr (a : Std.I16) (n : Std.U32) : Result Std.I16 := do
       i + i3
 
 /-- [fulcrum::kernel::k16::shl]:
-    Source: 'src/kernel.rs', lines 633:12-640:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 634:12-641:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.shl (a : Std.I16) (n : Std.U32) : Result (Std.I16 × Bool) := do
   if n >= core.num.I16.BITS
   then ok (0#i16, a != 0#i16)
@@ -2674,18 +2678,18 @@ def kernel.k16.shl (a : Std.I16) (n : Std.U32) : Result (Std.I16 × Bool) := do
        ok (r, i != a)
 
 /-- [fulcrum::kernel::k16::ONE]
-    Source: 'src/kernel.rs', lines 333:12-333:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 334:12-334:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 @[global_simps, irreducible]
 def kernel.k16.ONE : Result Std.I32 := 1#i32 <<< 8#i32
 
 /-- [fulcrum::kernel::k16::MASK]
-    Source: 'src/kernel.rs', lines 335:12-335:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 336:12-336:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 @[global_simps, irreducible]
 def kernel.k16.MASK : Result Std.I32 := do let i ← kernel.k16.ONE
                                            i - 1#i32
 
 /-- [fulcrum::kernel::k16::ceil]:
-    Source: 'src/kernel.rs', lines 644:12-646:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 645:12-647:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.ceil (a : Std.I16) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I32 a)
   let i1 ← kernel.k16.MASK
@@ -2694,7 +2698,7 @@ def kernel.k16.ceil (a : Std.I16) : Result Std.I32 := do
   ok (i2 &&& i3)
 
 /-- [fulcrum::kernel::k16::round_half_away]:
-    Source: 'src/kernel.rs', lines 650:12-657:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 651:12-658:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.round_half_away (a : Std.I16) : Result Std.I32 := do
   let w ← lift (IScalar.cast .I32 a)
   if w >= 0#i32
@@ -2713,7 +2717,7 @@ def kernel.k16.round_half_away (a : Std.I16) : Result Std.I32 := do
     -. i4
 
 /-- [fulcrum::kernel::k16::round_ties_even]:
-    Source: 'src/kernel.rs', lines 661:12-671:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 677:0-677:70 -/
+    Source: 'src/kernel.rs', lines 662:12-672:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:70 -/
 def kernel.k16.round_ties_even (a : Std.I16) : Result Std.I32 := do
   let w ← lift (IScalar.cast .I32 a)
   let i ← kernel.k16.MASK
@@ -2735,7 +2739,7 @@ def kernel.k16.round_ties_even (a : Std.I16) : Result Std.I32 := do
     else ok floor
 
 /-- [fulcrum::kernel::k32::fits]:
-    Source: 'src/kernel.rs', lines 340:12-342:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 341:12-343:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.fits (w : Std.I64) : Result Bool := do
   let i ← lift (IScalar.cast .I64 core.num.I32.MIN)
   if w >= i
@@ -2744,7 +2748,7 @@ def kernel.k32.fits (w : Std.I64) : Result Bool := do
   else ok false
 
 /-- [fulcrum::kernel::k32::narrow]:
-    Source: 'src/kernel.rs', lines 346:12-352:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 347:12-353:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.narrow (w : Std.I64) : Result (Option Std.I32) := do
   let b ← kernel.k32.fits w
   if b
@@ -2753,7 +2757,7 @@ def kernel.k32.narrow (w : Std.I64) : Result (Option Std.I32) := do
   else ok none
 
 /-- [fulcrum::kernel::k32::saturate]:
-    Source: 'src/kernel.rs', lines 356:12-364:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 357:12-365:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.saturate (w : Std.I64) : Result Std.I32 := do
   let i ← lift (IScalar.cast .I64 core.num.I32.MAX)
   if w > i
@@ -2765,18 +2769,18 @@ def kernel.k32.saturate (w : Std.I64) : Result Std.I32 := do
     else ok (IScalar.cast .I32 w)
 
 /-- [fulcrum::kernel::k32::wrap]:
-    Source: 'src/kernel.rs', lines 368:12-370:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 369:12-371:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.wrap (w : Std.I64) : Result Std.I32 := do
   ok (IScalar.cast .I32 w)
 
 /-- [fulcrum::kernel::k32::to_int]:
-    Source: 'src/kernel.rs', lines 375:12-377:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 376:12-378:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.to_int (w : Std.I64) : Result Std.I32 := do
   let i ← w >>> 16#i32
   ok (IScalar.cast .I32 i)
 
 /-- [fulcrum::kernel::k32::from_parts]:
-    Source: 'src/kernel.rs', lines 381:12-383:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 382:12-384:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.from_parts
   (int : Std.I16) (frac : Std.U16) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I64 int)
@@ -2785,13 +2789,13 @@ def kernel.k32.from_parts
   i1 + i2
 
 /-- [fulcrum::kernel::k32::HALF]
-    Source: 'src/kernel.rs', lines 336:12-336:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 337:12-337:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 @[global_simps, irreducible]
 def kernel.k32.HALF : Result Std.I64 := do let i ← 16#i32 - 1#i32
                                            1#i64 <<< i
 
 /-- [fulcrum::kernel::k32::round_frac]:
-    Source: 'src/kernel.rs', lines 391:12-397:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 392:12-398:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.round_frac (p : Std.I64) : Result Std.I64 := do
   if core.num.I64.BITS = 128#u32
   then
@@ -2805,7 +2809,7 @@ def kernel.k32.round_frac (p : Std.I64) : Result Std.I64 := do
        i1 >>> 16#i32
 
 /-- [fulcrum::kernel::k32::mul]:
-    Source: 'src/kernel.rs', lines 402:12-404:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 403:12-405:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.mul (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I64 a)
   let i1 ← lift (IScalar.cast .I64 b)
@@ -2813,7 +2817,7 @@ def kernel.k32.mul (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   kernel.k32.round_frac i2
 
 /-- [fulcrum::kernel::k32::mul_add]:
-    Source: 'src/kernel.rs', lines 412:12-414:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 413:12-415:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.mul_add
   (a : Std.I32) (b : Std.I32) (c : Std.I32) : Result Std.I64 := do
   let i ← kernel.k32.mul a b
@@ -2821,7 +2825,7 @@ def kernel.k32.mul_add
   i + i1
 
 /-- [fulcrum::kernel::k32::round_magnitude_div]:
-    Source: 'src/kernel.rs', lines 421:12-429:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 422:12-430:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.round_magnitude_div
   (un : Std.U64) (ud : Std.U64) (negative : Bool) : Result Std.I64 := do
   let i ← un <<< 1#i32
@@ -2836,7 +2840,7 @@ def kernel.k32.round_magnitude_div
   else ok m1
 
 /-- [fulcrum::kernel::k32::mul_div]:
-    Source: 'src/kernel.rs', lines 437:12-443:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 438:12-444:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.mul_div
   (a : Std.I32) (b : Std.I32) (c : Std.I32) : Result Std.I64 := do
   let i ← core.num.I32.unsigned_abs a
@@ -2850,7 +2854,7 @@ def kernel.k32.mul_div
     0#i32))
 
 /-- [fulcrum::kernel::k32::lerp]:
-    Source: 'src/kernel.rs', lines 450:12-452:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 451:12-453:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.lerp
   (a : Std.I32) (b : Std.I32) (t : Std.I32) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I64 a)
@@ -2863,7 +2867,7 @@ def kernel.k32.lerp
   i + i6
 
 /-- [fulcrum::kernel::k32::round_div]:
-    Source: 'src/kernel.rs', lines 91:8-96:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 91:8-96:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.round_div (n : Std.I64) (d : Std.I64) : Result Std.I64 := do
   let i ← core.num.I64.unsigned_abs d
   let ud ← lift (UScalar.hcast .I64 i)
@@ -2879,7 +2883,7 @@ def kernel.k32.round_div (n : Std.I64) (d : Std.I64) : Result Std.I64 := do
   i2 / i3
 
 /-- [fulcrum::kernel::k32::div]:
-    Source: 'src/kernel.rs', lines 100:8-102:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 100:8-102:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.div (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I64 a)
   let i1 ← i <<< 16#i32
@@ -2887,21 +2891,21 @@ def kernel.k32.div (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   kernel.k32.round_div i1 i2
 
 /-- [fulcrum::kernel::k32::div_int]:
-    Source: 'src/kernel.rs', lines 106:8-108:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 106:8-108:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.div_int (a : Std.I32) (n : Std.I32) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I64 a)
   let i1 ← lift (IScalar.cast .I64 n)
   kernel.k32.round_div i i1
 
 /-- [fulcrum::kernel::k32::div_total]:
-    Source: 'src/kernel.rs', lines 461:12-469:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 462:12-470:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.div_total (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   if b = 0#i32
   then ok 0#i64
   else kernel.k32.div a b
 
 /-- [fulcrum::kernel::k32::sqrt_round]:
-    Source: 'src/kernel.rs', lines 517:12-520:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 518:12-521:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.sqrt_round (n : Std.U64) : Result Std.U64 := do
   let s ← kernel.k32.isqrt n
   let i ← s * s
@@ -2910,7 +2914,7 @@ def kernel.k32.sqrt_round (n : Std.U64) : Result Std.U64 := do
   s + i2
 
 /-- [fulcrum::kernel::k32::sqrt]:
-    Source: 'src/kernel.rs', lines 526:12-528:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 527:12-529:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.sqrt (a : Std.I32) : Result Std.I32 := do
   let i ← lift (IScalar.hcast .U64 a)
   let i1 ← i <<< 16#i32
@@ -2918,7 +2922,7 @@ def kernel.k32.sqrt (a : Std.I32) : Result Std.I32 := do
   ok (UScalar.hcast .I32 i2)
 
 /-- [fulcrum::kernel::k32::rsqrt]:
-    Source: 'src/kernel.rs', lines 538:12-543:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 539:12-544:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.rsqrt (a : Std.I32) : Result Std.I32 := do
   let ua ← lift (IScalar.hcast .U64 a)
   let i ← 3#i32 * 16#i32
@@ -2936,7 +2940,7 @@ def kernel.k32.rsqrt (a : Std.I32) : Result Std.I32 := do
   ok (UScalar.hcast .I32 i9)
 
 /-- [fulcrum::kernel::k32::hypot]:
-    Source: 'src/kernel.rs', lines 549:12-553:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 550:12-554:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.hypot (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   let i ← core.num.I32.unsigned_abs a
   let ua ← lift (UScalar.cast .U64 i)
@@ -2949,7 +2953,7 @@ def kernel.k32.hypot (a : Std.I32) (b : Std.I32) : Result Std.I64 := do
   ok (UScalar.hcast .I64 i5)
 
 /-- [fulcrum::kernel::k32::det]:
-    Source: 'src/kernel.rs', lines 562:12-564:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 563:12-565:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.det
   (a : Std.I32) (b : Std.I32) (c : Std.I32) (d : Std.I32) :
   Result Std.I64
@@ -2964,7 +2968,7 @@ def kernel.k32.det
   kernel.k32.round_frac i6
 
 /-- [fulcrum::kernel::k32::norm_sq]:
-    Source: 'src/kernel.rs', lines 568:12-573:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 569:12-574:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.norm_sq
   (a : Std.I32) (b : Std.I32) (c : Std.I32) : Result Std.U128 := do
   let i ← core.num.I32.unsigned_abs a
@@ -2980,14 +2984,14 @@ def kernel.k32.norm_sq
   i5 + i6
 
 /-- [fulcrum::kernel::k32::sq]:
-    Source: 'src/kernel.rs', lines 577:12-580:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 578:12-581:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.sq (m : Std.I32) : Result Std.U128 := do
   let i ← core.num.I32.unsigned_abs m
   let um ← lift (UScalar.cast .U128 i)
   um * um
 
 /-- [fulcrum::kernel::k32::scale_vec]:
-    Source: 'src/kernel.rs', lines 217:8-224:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 217:8-224:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.scale_vec
   (a : Std.I32) (b : Std.I32) (c : Std.I32) (k : Std.I32) :
   Result (Array Std.I32 3#usize)
@@ -3011,7 +3015,7 @@ def kernel.k32.scale_vec
     ok (Array.make 3#usize [ i6, i8, i10 ])
 
 /-- [fulcrum::kernel::k32::cmp_length]:
-    Source: 'src/kernel.rs', lines 587:12-597:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 588:12-598:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.cmp_length
   (a : Std.I32) (b : Std.I32) (c : Std.I32) (k : Std.I32) : Result Std.I8 := do
   let s ← kernel.k32.norm_sq a b c
@@ -3023,7 +3027,7 @@ def kernel.k32.cmp_length
        else ok 0#i8
 
 /-- [fulcrum::kernel::k32::hypot3]:
-    Source: 'src/kernel.rs', lines 604:12-609:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 605:12-610:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.hypot3
   (a : Std.I32) (b : Std.I32) (c : Std.I32) : Result Std.I64 := do
   let i ← core.num.I32.unsigned_abs a
@@ -3041,7 +3045,7 @@ def kernel.k32.hypot3
   ok (UScalar.hcast .I64 i8)
 
 /-- [fulcrum::kernel::k32::midpoint]:
-    Source: 'src/kernel.rs', lines 613:12-615:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 614:12-616:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.midpoint (a : Std.I32) (b : Std.I32) : Result Std.I32 := do
   let i ← lift (a ||| b)
   let i1 ← lift (a ^^^ b)
@@ -3049,7 +3053,7 @@ def kernel.k32.midpoint (a : Std.I32) (b : Std.I32) : Result Std.I32 := do
   i - i2
 
 /-- [fulcrum::kernel::k32::shr]:
-    Source: 'src/kernel.rs', lines 620:12-628:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 621:12-629:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.shr (a : Std.I32) (n : Std.U32) : Result Std.I32 := do
   if n = 0#u32
   then ok a
@@ -3064,7 +3068,7 @@ def kernel.k32.shr (a : Std.I32) (n : Std.U32) : Result Std.I32 := do
       i + i3
 
 /-- [fulcrum::kernel::k32::shl]:
-    Source: 'src/kernel.rs', lines 633:12-640:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 634:12-641:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.shl (a : Std.I32) (n : Std.U32) : Result (Std.I32 × Bool) := do
   if n >= core.num.I32.BITS
   then ok (0#i32, a != 0#i32)
@@ -3073,18 +3077,18 @@ def kernel.k32.shl (a : Std.I32) (n : Std.U32) : Result (Std.I32 × Bool) := do
        ok (r, i != a)
 
 /-- [fulcrum::kernel::k32::ONE]
-    Source: 'src/kernel.rs', lines 333:12-333:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 334:12-334:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 @[global_simps, irreducible]
 def kernel.k32.ONE : Result Std.I64 := 1#i64 <<< 16#i32
 
 /-- [fulcrum::kernel::k32::MASK]
-    Source: 'src/kernel.rs', lines 335:12-335:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 336:12-336:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 @[global_simps, irreducible]
 def kernel.k32.MASK : Result Std.I64 := do let i ← kernel.k32.ONE
                                            i - 1#i64
 
 /-- [fulcrum::kernel::k32::ceil]:
-    Source: 'src/kernel.rs', lines 644:12-646:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 645:12-647:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.ceil (a : Std.I32) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I64 a)
   let i1 ← kernel.k32.MASK
@@ -3093,7 +3097,7 @@ def kernel.k32.ceil (a : Std.I32) : Result Std.I64 := do
   ok (i2 &&& i3)
 
 /-- [fulcrum::kernel::k32::round_half_away]:
-    Source: 'src/kernel.rs', lines 650:12-657:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 651:12-658:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.round_half_away (a : Std.I32) : Result Std.I64 := do
   let w ← lift (IScalar.cast .I64 a)
   if w >= 0#i64
@@ -3112,7 +3116,7 @@ def kernel.k32.round_half_away (a : Std.I32) : Result Std.I64 := do
     -. i4
 
 /-- [fulcrum::kernel::k32::round_ties_even]:
-    Source: 'src/kernel.rs', lines 661:12-671:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 678:0-678:74 -/
+    Source: 'src/kernel.rs', lines 662:12-672:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:74 -/
 def kernel.k32.round_ties_even (a : Std.I32) : Result Std.I64 := do
   let w ← lift (IScalar.cast .I64 a)
   let i ← kernel.k32.MASK
@@ -3134,7 +3138,7 @@ def kernel.k32.round_ties_even (a : Std.I32) : Result Std.I64 := do
     else ok floor
 
 /-- [fulcrum::kernel::k64::fits]:
-    Source: 'src/kernel.rs', lines 340:12-342:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 341:12-343:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.fits (w : Std.I128) : Result Bool := do
   let i ← lift (IScalar.cast .I128 core.num.I64.MIN)
   if w >= i
@@ -3143,7 +3147,7 @@ def kernel.k64.fits (w : Std.I128) : Result Bool := do
   else ok false
 
 /-- [fulcrum::kernel::k64::narrow]:
-    Source: 'src/kernel.rs', lines 346:12-352:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 347:12-353:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.narrow (w : Std.I128) : Result (Option Std.I64) := do
   let b ← kernel.k64.fits w
   if b
@@ -3152,7 +3156,7 @@ def kernel.k64.narrow (w : Std.I128) : Result (Option Std.I64) := do
   else ok none
 
 /-- [fulcrum::kernel::k64::saturate]:
-    Source: 'src/kernel.rs', lines 356:12-364:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 357:12-365:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.saturate (w : Std.I128) : Result Std.I64 := do
   let i ← lift (IScalar.cast .I128 core.num.I64.MAX)
   if w > i
@@ -3164,18 +3168,18 @@ def kernel.k64.saturate (w : Std.I128) : Result Std.I64 := do
     else ok (IScalar.cast .I64 w)
 
 /-- [fulcrum::kernel::k64::wrap]:
-    Source: 'src/kernel.rs', lines 368:12-370:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 369:12-371:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.wrap (w : Std.I128) : Result Std.I64 := do
   ok (IScalar.cast .I64 w)
 
 /-- [fulcrum::kernel::k64::to_int]:
-    Source: 'src/kernel.rs', lines 375:12-377:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 376:12-378:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.to_int (w : Std.I128) : Result Std.I64 := do
   let i ← w >>> 32#i32
   ok (IScalar.cast .I64 i)
 
 /-- [fulcrum::kernel::k64::from_parts]:
-    Source: 'src/kernel.rs', lines 381:12-383:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 382:12-384:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.from_parts
   (int : Std.I32) (frac : Std.U32) : Result Std.I128 := do
   let i ← lift (IScalar.cast .I128 int)
@@ -3184,14 +3188,14 @@ def kernel.k64.from_parts
   i1 + i2
 
 /-- [fulcrum::kernel::k64::HALF]
-    Source: 'src/kernel.rs', lines 336:12-336:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 337:12-337:46; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 @[global_simps, irreducible]
 def kernel.k64.HALF : Result Std.I128 := do
   let i ← 32#i32 - 1#i32
   1#i128 <<< i
 
 /-- [fulcrum::kernel::k64::round_frac]:
-    Source: 'src/kernel.rs', lines 391:12-397:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 392:12-398:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.round_frac (p : Std.I128) : Result Std.I128 := do
   if core.num.I128.BITS = 128#u32
   then
@@ -3205,7 +3209,7 @@ def kernel.k64.round_frac (p : Std.I128) : Result Std.I128 := do
        i1 >>> 32#i32
 
 /-- [fulcrum::kernel::k64::mul]:
-    Source: 'src/kernel.rs', lines 402:12-404:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 403:12-405:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.mul (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   let i ← lift (IScalar.cast .I128 a)
   let i1 ← lift (IScalar.cast .I128 b)
@@ -3213,7 +3217,7 @@ def kernel.k64.mul (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   kernel.k64.round_frac i2
 
 /-- [fulcrum::kernel::k64::mul_add]:
-    Source: 'src/kernel.rs', lines 412:12-414:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 413:12-415:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.mul_add
   (a : Std.I64) (b : Std.I64) (c : Std.I64) : Result Std.I128 := do
   let i ← kernel.k64.mul a b
@@ -3221,7 +3225,7 @@ def kernel.k64.mul_add
   i + i1
 
 /-- [fulcrum::kernel::k64::round_magnitude_div]:
-    Source: 'src/kernel.rs', lines 421:12-429:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 422:12-430:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.round_magnitude_div
   (un : Std.U128) (ud : Std.U128) (negative : Bool) : Result Std.I128 := do
   let i ← un <<< 1#i32
@@ -3236,7 +3240,7 @@ def kernel.k64.round_magnitude_div
   else ok m1
 
 /-- [fulcrum::kernel::k64::mul_div]:
-    Source: 'src/kernel.rs', lines 437:12-443:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 438:12-444:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.mul_div
   (a : Std.I64) (b : Std.I64) (c : Std.I64) : Result Std.I128 := do
   let i ← core.num.I64.unsigned_abs a
@@ -3250,7 +3254,7 @@ def kernel.k64.mul_div
     0#i64))
 
 /-- [fulcrum::kernel::k64::lerp]:
-    Source: 'src/kernel.rs', lines 450:12-452:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 451:12-453:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.lerp
   (a : Std.I64) (b : Std.I64) (t : Std.I64) : Result Std.I128 := do
   let i ← lift (IScalar.cast .I128 a)
@@ -3263,7 +3267,7 @@ def kernel.k64.lerp
   i + i6
 
 /-- [fulcrum::kernel::k64::div]:
-    Source: 'src/kernel.rs', lines 113:8-119:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 113:8-119:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.div (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   let i ← core.num.I64.unsigned_abs a
   let i1 ← lift (UScalar.cast .U128 i)
@@ -3273,7 +3277,7 @@ def kernel.k64.div (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   kernel.k64.round_magnitude_div i2 i4 ((a < 0#i64) != (b < 0#i64))
 
 /-- [fulcrum::kernel::k64::div_int]:
-    Source: 'src/kernel.rs', lines 123:8-129:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 123:8-129:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.div_int (a : Std.I64) (n : Std.I64) : Result Std.I128 := do
   let i ← core.num.I64.unsigned_abs a
   let i1 ← lift (UScalar.cast .U128 i)
@@ -3282,18 +3286,18 @@ def kernel.k64.div_int (a : Std.I64) (n : Std.I64) : Result Std.I128 := do
   kernel.k64.round_magnitude_div i1 i3 ((a < 0#i64) != (n < 0#i64))
 
 /-- [fulcrum::kernel::k64::div_total]:
-    Source: 'src/kernel.rs', lines 461:12-469:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 462:12-470:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.div_total (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   if b = 0#i64
   then ok 0#i128
   else kernel.k64.div a b
 
 /-- [fulcrum::kernel::k64::NEWTON_STEPS]
-    Source: 'src/kernel.rs', lines 334:12-334:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 335:12-335:45; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 @[global_simps, irreducible] def kernel.k64.NEWTON_STEPS : Std.U32 := 1#u32
 
 /-- [fulcrum::kernel::k64::isqrt]: loop body 0:
-    Source: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 680:0-680:75 -/
 @[rust_loop_body]
 def kernel.k64.isqrt_loop0.body
   (n : Std.U128) (x : Std.U128) (i : Std.U32) :
@@ -3309,7 +3313,7 @@ def kernel.k64.isqrt_loop0.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k64::isqrt]: loop 0:
-    Source: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 680:0-680:75 -/
 @[rust_loop]
 def kernel.k64.isqrt_loop0
   (n : Std.U128) (x : Std.U128) (i : Std.U32) : Result Std.U128 := do
@@ -3318,7 +3322,7 @@ def kernel.k64.isqrt_loop0
     (x, i)
 
 /-- [fulcrum::kernel::k64::isqrt]: loop body 1:
-    Source: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 680:0-680:75 -/
 @[rust_loop_body]
 def kernel.k64.isqrt_loop1.body
   (n : Std.U128) (x : Std.U128) : Result (ControlFlow Std.U128 Std.U128) := do
@@ -3329,7 +3333,7 @@ def kernel.k64.isqrt_loop1.body
   else ok (done x)
 
 /-- [fulcrum::kernel::k64::isqrt]: loop 1:
-    Source: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 680:0-680:75 -/
 @[rust_loop]
 def kernel.k64.isqrt_loop1
   (n : Std.U128) (x : Std.U128) : Result Std.U128 := do
@@ -3338,7 +3342,7 @@ def kernel.k64.isqrt_loop1
     x
 
 /-- [fulcrum::kernel::k64::isqrt]:
-    Source: 'src/kernel.rs', lines 494:12-511:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 495:12-512:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.isqrt (n : Std.U128) : Result Std.U128 := do
   if n < 2#u128
   then ok n
@@ -3370,7 +3374,7 @@ def kernel.k64.isqrt (n : Std.U128) : Result Std.U128 := do
       else ok x1
 
 /-- [fulcrum::kernel::k64::sqrt_round]:
-    Source: 'src/kernel.rs', lines 517:12-520:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 518:12-521:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.sqrt_round (n : Std.U128) : Result Std.U128 := do
   let s ← kernel.k64.isqrt n
   let i ← s * s
@@ -3379,7 +3383,7 @@ def kernel.k64.sqrt_round (n : Std.U128) : Result Std.U128 := do
   s + i2
 
 /-- [fulcrum::kernel::k64::sqrt]:
-    Source: 'src/kernel.rs', lines 526:12-528:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 527:12-529:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.sqrt (a : Std.I64) : Result Std.I64 := do
   let i ← lift (IScalar.hcast .U128 a)
   let i1 ← i <<< 32#i32
@@ -3387,7 +3391,7 @@ def kernel.k64.sqrt (a : Std.I64) : Result Std.I64 := do
   ok (UScalar.hcast .I64 i2)
 
 /-- [fulcrum::kernel::k64::rsqrt]:
-    Source: 'src/kernel.rs', lines 538:12-543:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 539:12-544:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.rsqrt (a : Std.I64) : Result Std.I64 := do
   let ua ← lift (IScalar.hcast .U128 a)
   let i ← 3#i32 * 32#i32
@@ -3405,7 +3409,7 @@ def kernel.k64.rsqrt (a : Std.I64) : Result Std.I64 := do
   ok (UScalar.hcast .I64 i9)
 
 /-- [fulcrum::kernel::k64::hypot]:
-    Source: 'src/kernel.rs', lines 549:12-553:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 550:12-554:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.hypot (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   let i ← core.num.I64.unsigned_abs a
   let ua ← lift (UScalar.cast .U128 i)
@@ -3418,7 +3422,7 @@ def kernel.k64.hypot (a : Std.I64) (b : Std.I64) : Result Std.I128 := do
   ok (UScalar.hcast .I128 i5)
 
 /-- [fulcrum::kernel::k64::det]:
-    Source: 'src/kernel.rs', lines 562:12-564:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 563:12-565:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.det
   (a : Std.I64) (b : Std.I64) (c : Std.I64) (d : Std.I64) :
   Result Std.I128
@@ -3433,7 +3437,7 @@ def kernel.k64.det
   kernel.k64.round_frac i6
 
 /-- [fulcrum::kernel::k64::norm_sq]:
-    Source: 'src/kernel.rs', lines 568:12-573:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 569:12-574:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.norm_sq
   (a : Std.I64) (b : Std.I64) (c : Std.I64) : Result Std.U128 := do
   let i ← core.num.I64.unsigned_abs a
@@ -3449,7 +3453,7 @@ def kernel.k64.norm_sq
   i5 + i6
 
 /-- [fulcrum::kernel::k64::sq]:
-    Source: 'src/kernel.rs', lines 577:12-580:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 578:12-581:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.sq (m : Std.I64) : Result Std.U128 := do
   let i ← core.num.I64.unsigned_abs m
   let um ← lift (UScalar.cast .U128 i)
@@ -3546,7 +3550,7 @@ def wide.div_rem_u256
     ok (i4, i5)
 
 /-- [fulcrum::kernel::k64::scale_to]:
-    Source: 'src/kernel.rs', lines 242:8-256:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 242:8-256:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.scale_to
   (x : Std.I64) (k : Std.I64) (s : Std.U128) : Result Std.I64 := do
   let i ← core.num.I64.unsigned_abs x
@@ -3579,7 +3583,7 @@ def kernel.k64.scale_to
   else ok m
 
 /-- [fulcrum::kernel::k64::scale_vec]:
-    Source: 'src/kernel.rs', lines 261:8-267:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 261:8-267:9; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.scale_vec
   (a : Std.I64) (b : Std.I64) (c : Std.I64) (k : Std.I64) :
   Result (Array Std.I64 3#usize)
@@ -3594,7 +3598,7 @@ def kernel.k64.scale_vec
     ok (Array.make 3#usize [ i, i1, i2 ])
 
 /-- [fulcrum::kernel::k64::cmp_length]:
-    Source: 'src/kernel.rs', lines 587:12-597:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 588:12-598:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.cmp_length
   (a : Std.I64) (b : Std.I64) (c : Std.I64) (k : Std.I64) : Result Std.I8 := do
   let s ← kernel.k64.norm_sq a b c
@@ -3606,7 +3610,7 @@ def kernel.k64.cmp_length
        else ok 0#i8
 
 /-- [fulcrum::kernel::k64::hypot3]:
-    Source: 'src/kernel.rs', lines 604:12-609:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 605:12-610:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.hypot3
   (a : Std.I64) (b : Std.I64) (c : Std.I64) : Result Std.I128 := do
   let i ← core.num.I64.unsigned_abs a
@@ -3624,7 +3628,7 @@ def kernel.k64.hypot3
   ok (UScalar.hcast .I128 i8)
 
 /-- [fulcrum::kernel::k64::midpoint]:
-    Source: 'src/kernel.rs', lines 613:12-615:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 614:12-616:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.midpoint (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   let i ← lift (a ||| b)
   let i1 ← lift (a ^^^ b)
@@ -3632,7 +3636,7 @@ def kernel.k64.midpoint (a : Std.I64) (b : Std.I64) : Result Std.I64 := do
   i - i2
 
 /-- [fulcrum::kernel::k64::shr]:
-    Source: 'src/kernel.rs', lines 620:12-628:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 621:12-629:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.shr (a : Std.I64) (n : Std.U32) : Result Std.I64 := do
   if n = 0#u32
   then ok a
@@ -3647,7 +3651,7 @@ def kernel.k64.shr (a : Std.I64) (n : Std.U32) : Result Std.I64 := do
       i + i3
 
 /-- [fulcrum::kernel::k64::shl]:
-    Source: 'src/kernel.rs', lines 633:12-640:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 634:12-641:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.shl (a : Std.I64) (n : Std.U32) : Result (Std.I64 × Bool) := do
   if n >= core.num.I64.BITS
   then ok (0#i64, a != 0#i64)
@@ -3656,18 +3660,18 @@ def kernel.k64.shl (a : Std.I64) (n : Std.U32) : Result (Std.I64 × Bool) := do
        ok (r, i != a)
 
 /-- [fulcrum::kernel::k64::ONE]
-    Source: 'src/kernel.rs', lines 333:12-333:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 334:12-334:39; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 @[global_simps, irreducible]
 def kernel.k64.ONE : Result Std.I128 := 1#i128 <<< 32#i32
 
 /-- [fulcrum::kernel::k64::MASK]
-    Source: 'src/kernel.rs', lines 335:12-335:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 336:12-336:40; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 @[global_simps, irreducible]
 def kernel.k64.MASK : Result Std.I128 := do let i ← kernel.k64.ONE
                                             i - 1#i128
 
 /-- [fulcrum::kernel::k64::ceil]:
-    Source: 'src/kernel.rs', lines 644:12-646:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 645:12-647:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.ceil (a : Std.I64) : Result Std.I128 := do
   let i ← lift (IScalar.cast .I128 a)
   let i1 ← kernel.k64.MASK
@@ -3676,7 +3680,7 @@ def kernel.k64.ceil (a : Std.I64) : Result Std.I128 := do
   ok (i2 &&& i3)
 
 /-- [fulcrum::kernel::k64::round_half_away]:
-    Source: 'src/kernel.rs', lines 650:12-657:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 651:12-658:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.round_half_away (a : Std.I64) : Result Std.I128 := do
   let w ← lift (IScalar.cast .I128 a)
   if w >= 0#i128
@@ -3695,7 +3699,7 @@ def kernel.k64.round_half_away (a : Std.I64) : Result Std.I128 := do
     -. i4
 
 /-- [fulcrum::kernel::k64::round_ties_even]:
-    Source: 'src/kernel.rs', lines 661:12-671:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 679:0-679:75 -/
+    Source: 'src/kernel.rs', lines 662:12-672:13; this code is generated from a macro invocation at: 'src/kernel.rs', lines 680:0-680:75 -/
 def kernel.k64.round_ties_even (a : Std.I64) : Result Std.I128 := do
   let w ← lift (IScalar.cast .I128 a)
   let i ← kernel.k64.MASK
