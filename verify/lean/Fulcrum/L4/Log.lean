@@ -387,27 +387,33 @@ theorem ln_2_frac_val : fulcrum.tables.exp.LN_2_FRAC.val = 104 := by
 theorem ln_2_val : fulcrum.tables.exp.LN_2.val = 14058695031733113177892216608772 := by
   unfold fulcrum.tables.exp.LN_2; rfl
 
+/-- `⌊LN_2 / 2^40⌋` is within `1.001` of `ln 2 · 2^64`, and below `0.6932 · 2^64`. -/
+theorem ln_2_hi_near :
+    |((fulcrum.tables.exp.LN_2.val / 2 ^ 40 : ℕ) : ℝ) - Real.log 2 * 2 ^ 64| ≤ 1001 / 1000 ∧
+      ((fulcrum.tables.exp.LN_2.val / 2 ^ 40 : ℕ) : ℝ) ≤ 6932 / 10000 * 2 ^ 64 := by
+  have hL := ln_2_entry
+  have l1 := log_two_le'
+  have ⟨fl, fu⟩ := floor_div_near fulcrum.tables.exp.LN_2.val (2 ^ 40) (by positivity)
+  push_cast at fl fu
+  have : |(fulcrum.tables.exp.LN_2.val : ℝ) / 2 ^ 40 - Real.log 2 * 2 ^ 64| ≤ 1 / 2 / 2 ^ 40 := by
+    rw [show (fulcrum.tables.exp.LN_2.val : ℝ) / 2 ^ 40 - Real.log 2 * 2 ^ 64 =
+      ((fulcrum.tables.exp.LN_2.val : ℝ) - Real.log 2 * 2 ^ 104) / 2 ^ 40 by ring, abs_div,
+      abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 40)]
+    exact div_le_div_of_nonneg_right hL (by positivity)
+  have ⟨a, b⟩ := abs_le.mp this
+  have e : |((fulcrum.tables.exp.LN_2.val / 2 ^ 40 : ℕ) : ℝ) - Real.log 2 * 2 ^ 64| ≤ 1001 / 1000 :=
+    abs_le.mpr ⟨by nlinarith, by nlinarith⟩
+  exact ⟨e, by nlinarith [(abs_le.mp e).2]⟩
+
 /-- The mantissa part of `exp::ln`: `⌊l · ⌊LN_2 / 2^40⌋ / 2^22⌋` for `l` within `7.6` of
 `S · 2^62`, `0 ≤ S ≤ 1`, is within `5.52 · 2^42` of `S · ln 2 · 2^104`. -/
 theorem ln_part_near (l : ℕ) (S : ℝ) (hS0 : 0 ≤ S) (hS1 : S ≤ 1) (hl : |(l : ℝ) - S * 2 ^ 62| ≤ 76 / 10) :
     |((l * (fulcrum.tables.exp.LN_2.val / 2 ^ 40) / 2 ^ 22 : ℕ) : ℝ) - S * Real.log 2 * 2 ^ 104| ≤
       552 / 100 * 2 ^ 42 := by
-  have hL := ln_2_entry
   have l1 := log_two_le'
   have l0 := log_two_ge'
+  have ⟨elam, lamM⟩ := ln_2_hi_near
   set lam := fulcrum.tables.exp.LN_2.val / 2 ^ 40 with hlam
-  have ⟨fl, fu⟩ := floor_div_near fulcrum.tables.exp.LN_2.val (2 ^ 40) (by positivity)
-  rw [← hlam] at fl fu
-  push_cast at fl fu
-  have elam : |(lam : ℝ) - Real.log 2 * 2 ^ 64| ≤ 1001 / 1000 := by
-    have : |(fulcrum.tables.exp.LN_2.val : ℝ) / 2 ^ 40 - Real.log 2 * 2 ^ 64| ≤ 1 / 2 / 2 ^ 40 := by
-      rw [show (fulcrum.tables.exp.LN_2.val : ℝ) / 2 ^ 40 - Real.log 2 * 2 ^ 64 =
-        ((fulcrum.tables.exp.LN_2.val : ℝ) - Real.log 2 * 2 ^ 104) / 2 ^ 40 by ring, abs_div,
-        abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 40)]
-      exact div_le_div_of_nonneg_right hL (by positivity)
-    have ⟨a, b⟩ := abs_le.mp this
-    exact abs_le.mpr ⟨by nlinarith, by nlinarith⟩
-  have lamM : (lam : ℝ) ≤ 6932 / 10000 * 2 ^ 64 := by nlinarith [(abs_le.mp elam).2]
   have ⟨pl, pu⟩ := floor_div_near (l * lam) (2 ^ 22) (by positivity)
   push_cast at pl pu
   have core : |(l : ℝ) * lam / 2 ^ 22 - S * Real.log 2 * 2 ^ 104| ≤ 5519 / 1000 * 2 ^ 42 := by

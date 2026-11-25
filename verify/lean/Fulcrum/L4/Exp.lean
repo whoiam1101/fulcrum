@@ -16,7 +16,8 @@ On the code extracted by Aeneas, with `1 ≤ f ≤ 32`.
 - `exp2_unit(k, b, f)` takes `y = ⌊b · LN_2 / 2^(f + 32)⌋`, within `2^-72 + 2^-113` of
   `b / 2^f · ln 2`: within `1.4 · 2^56` of `2^(k/256 + b/2^f) · 2^126`.
 - `round_mantissa` is one `shr_round` by `min (126 - f - n) 128`; `mantissa_round_near` turns
-  a mantissa within `1.4 · 2^56` into a result within `½ + 1.4 · 2^(2f) / 2^72`.
+  a mantissa within `E` into a result within `½ + E · 2^(2f) / 2^(127 + j)` for `n + j ≤ f - 1`,
+  here `E = 1.4 · 2^56` and `j = 1`: `½ + 1.4 · 2^(2f) / 2^72`.
 - `exp2` splits `raw = n · 2^f + t` by a shift and a mask and returns the mark `2^(2f)` for
   `n ≥ f - 1`; otherwise it is within `½ + 1.4 · 2^(2f) / 2^72` of `2^(raw / 2^f) · 2^f`.
 - `exp` returns the mark from `raw ≥ f · 2^f` and `0` from `raw ≤ -2f · 2^f`; `j` is within
@@ -250,22 +251,22 @@ theorem exp_unit_spec (k y : Std.U64) (hk : k.val < 256) (hy : y.val ≤ fulcrum
     (2 : ℝ) ^ ((k.val : ℝ) / 256) * 2 ^ 126 * (1 + E) by rw [hE]; ring]
   exact mn
 
-/-- `e^A` against `e^B` for `|A - B| ≤ d ≤ 2^-60`: within `(1 + 2^-60) · d · e^B`. -/
-theorem exp_shift_near (A B d : ℝ) (h : |A - B| ≤ d) (hd : d ≤ 1 / 2 ^ 60) :
-    |Real.exp A - Real.exp B| ≤ Real.exp B * ((1 + 1 / 2 ^ 60) * d) := by
+/-- `e^A` against `e^B` for `|A - B| ≤ d ≤ c ≤ 1`: within `(1 + c) · d · e^B`. -/
+theorem exp_shift_near (A B d c : ℝ) (h : |A - B| ≤ d) (hd : d ≤ c) (hc : c ≤ 1) :
+    |Real.exp A - Real.exp B| ≤ Real.exp B * ((1 + c) * d) := by
   have d0 : 0 ≤ d := (abs_nonneg _).trans h
-  have h1 : |A - B| ≤ 1 := h.trans (hd.trans (by norm_num))
+  have h1 : |A - B| ≤ 1 := h.trans (hd.trans hc)
   have q := Real.abs_exp_sub_one_sub_id_le h1
   rw [show Real.exp A - Real.exp B = Real.exp B * (Real.exp (A - B) - 1) by
     rw [mul_sub, ← Real.exp_add, add_sub_cancel, mul_one], abs_mul, abs_of_pos (Real.exp_pos _)]
   refine mul_le_mul_of_nonneg_left ?_ (Real.exp_pos _).le
-  have sq : (A - B) ^ 2 ≤ d * (1 / 2 ^ 60) := by
+  have sq : (A - B) ^ 2 ≤ d * c := by
     rw [← sq_abs, sq]; exact mul_le_mul h (h.trans hd) (abs_nonneg _) d0
   calc |Real.exp (A - B) - 1| ≤ |Real.exp (A - B) - 1 - (A - B)| + |A - B| := by
         have := abs_add_le (Real.exp (A - B) - 1 - (A - B)) (A - B)
         rwa [sub_add_cancel] at this
     _ ≤ (A - B) ^ 2 + d := add_le_add q h
-    _ ≤ (1 + 1 / 2 ^ 60) * d := by nlinarith
+    _ ≤ (1 + c) * d := by nlinarith
 
 /-- L4 on the code: `exp::exp2_unit(k, b, f)` of `k < 256`, `b · 2^8 < 2^f`, `f ≤ 32` never
 fails and is within `1.4 · 2^56` of `2^(k/256 + b/2^f) · 2^126`, at most `2^127 - 2^55`. -/
@@ -342,7 +343,7 @@ theorem exp2_unit_spec (k b : Std.U64) (f : Std.U32) (hk : k.val < 256) (hb : b.
     calc |A - B| ≤ |A - (b.val : ℝ) * fulcrum.tables.exp.LN_2.val / 2 ^ (f.val + 32) / 2 ^ 72| +
           |(b.val : ℝ) * fulcrum.tables.exp.LN_2.val / 2 ^ (f.val + 32) / 2 ^ 72 - B| := abs_sub_le _ _ _
       _ ≤ _ := add_le_add fl mid
-  have es := exp_shift_near A B _ dAB (by norm_num)
+  have es := exp_shift_near A B _ (1 / 2 ^ 60) dAB (by norm_num) (by norm_num)
   have tgt : (2 : ℝ) ^ ((k.val : ℝ) / 256 + b.val / 2 ^ f.val) = (2 : ℝ) ^ ((k.val : ℝ) / 256) * Real.exp B := by
     rw [Real.rpow_add two_pos, Real.rpow_def_of_pos two_pos (b.val / 2 ^ f.val)]
   have top : (2 : ℝ) ^ ((k.val : ℝ) / 256) * Real.exp B ≤ 2 := by
@@ -448,23 +449,23 @@ theorem exp2_scale (raw n : ℤ) (f s : ℕ) (t : ℝ) (h : (raw : ℝ) = 2 ^ f 
   rw [e, Real.rpow_add two_pos, Real.rpow_intCast, ← p]
   ring
 
-/-- The rounding of `exp2`, `exp` and `exp2_wide`: a mantissa `m < 2^127` within `1.4 · 2^56`
-of `X · 2^s`, `s = 126 - f - n`, `n ≤ f - 2`, `0 ≤ X`, `X · 2^s ≤ 2^128`, rounded once by
-`2^(min s 128)`, `f ≤ 32`, is within `½ + 1.4 · 2^(2f) / 2^72` of `X`. -/
-theorem mantissa_round_near (m : ℕ) (n : ℤ) (f : ℕ) (X : ℝ) (mlt : m < 2 ^ 127) (hf : f ≤ 32) (hn : n ≤ f - 2) (X0 : 0 ≤ X)
-    (hX : X * 2 ^ (126 - f - n).toNat ≤ 2 ^ 128)
-    (hm : |(m : ℝ) - X * 2 ^ (126 - f - n).toNat| ≤ 14 / 10 * 2 ^ 56) :
+/-- The rounding of `exp2`, `exp` and `exp2_wide`: a mantissa `m < 2^127` within `E` of
+`X · 2^s`, `s = 126 - f - n`, `n + j ≤ f - 1`, `0 ≤ X`, `X · 2^s ≤ 2^128`, rounded once by
+`2^(min s 128)`, `f ≤ 32`, is within `½ + E · 2^(2f) / 2^(127 + j)` of `X`. -/
+theorem mantissa_round_near (m : ℕ) (n : ℤ) (f j : ℕ) (X E : ℝ) (mlt : m < 2 ^ 127) (hf : f ≤ 32)
+    (hn : n + j ≤ f - 1) (X0 : 0 ≤ X) (E0 : 0 ≤ E) (hX : X * 2 ^ (126 - f - n).toNat ≤ 2 ^ 128)
+    (hm : |(m : ℝ) - X * 2 ^ (126 - f - n).toNat| ≤ E) :
     |((roundHalfUp (exact (min (126 - f - n).toNat 128) m) : ℤ) : ℝ) - X| ≤
-      1 / 2 + 14 / 10 * 2 ^ (2 * f) / 2 ^ 72 := by
+      1 / 2 + E * 2 ^ (2 * f) / 2 ^ (127 + j) := by
   set s : ℕ := (126 - f - n).toNat with hsd
   have sv : (s : ℤ) = 126 - f - n := Int.toNat_of_nonneg (by omega)
   by_cases cl : s ≤ 128
   · rw [min_eq_left cl]
-    have near := round_div_near m s X (14 / 10 * 2 ^ 56) (by exact_mod_cast hm)
+    have near := round_div_near m s X E (by exact_mod_cast hm)
     refine near.trans (add_le_add le_rfl ?_)
-    rw [div_le_div_iff₀ (by positivity) (by positivity), mul_assoc, mul_assoc]
-    refine mul_le_mul_of_nonneg_left ?_ (by norm_num)
-    rw [← pow_add, ← pow_add]
+    rw [div_le_div_iff₀ (by positivity) (by positivity), mul_assoc]
+    refine mul_le_mul_of_nonneg_left ?_ E0
+    rw [← pow_add]
     exact pow_le_pow_right₀ one_le_two (by omega)
   · rw [min_eq_right (by omega)]
     have q0 : (0 : ℚ) ≤ exact 128 m := by unfold exact; positivity
@@ -479,7 +480,7 @@ theorem mantissa_round_near (m : ℕ) (n : ℤ) (f : ℕ) (X : ℝ) (mlt : m < 2
     rw [z, Int.cast_zero, zero_sub, abs_neg, abs_of_nonneg X0]
     have p : (2 : ℝ) ^ 129 ≤ 2 ^ s := pow_le_pow_right₀ one_le_two (by omega)
     have : X * 2 ^ 129 ≤ 2 ^ 128 := (mul_le_mul_of_nonneg_left p X0).trans hX
-    have : (0 : ℝ) ≤ 14 / 10 * 2 ^ (2 * f) / 2 ^ 72 := by positivity
+    have : (0 : ℝ) ≤ E * 2 ^ (2 * f) / 2 ^ (127 + j) := by positivity
     nlinarith
 
 /-- L4 on the code: `exp::exp2(raw, f)` with `1 ≤ f ≤ 32` never fails; it returns the mark
@@ -611,7 +612,8 @@ theorem exp2_spec (raw : Std.I64) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.val 
     rw [tR, hn]; exact_mod_cast (Int.mul_ediv_add_emod raw.val (2 ^ f.val)).symm
   have sc := exp2_scale raw.val n.val f.val s t.val (by exact_mod_cast split) sv
   rw [← hX] at sc
-  refine mantissa_round_near m.val n.val f.val X mlt hf (by omega) (by positivity) ?_ (by rw [sc]; exact_mod_cast hm)
+  refine (mantissa_round_near m.val n.val f.val 1 X (14 / 10 * 2 ^ 56) mlt hf (by omega) (by positivity) (by positivity)
+    ?_ (by rw [sc]; exact_mod_cast hm)).trans_eq (by ring)
   rw [sc]
   refine (mul_le_mul_of_nonneg_right ?_ (by positivity)).trans (by norm_num : (2 : ℝ) * 2 ^ 126 ≤ 2 ^ 128)
   calc (2 : ℝ) ^ ((t.val : ℝ) / 2 ^ f.val) ≤ 2 ^ (1 : ℝ) := Real.rpow_le_rpow_of_exponent_le one_le_two (by
@@ -991,7 +993,7 @@ theorem exp_spec (raw : Std.I64) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.val �
       exact div_le_div_of_nonneg_right (abs_le.mpr ⟨by linarith only [fl2], by linarith only [fl1]⟩) (by positivity)
     · rw [abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 112), div_le_iff₀ (by positivity)]
       exact jL.trans (by norm_num)
-  have es := exp_shift_near A Y _ dAY (by norm_num)
+  have es := exp_shift_near A Y _ (1 / 2 ^ 60) dAY (by norm_num) (by norm_num)
   have Ytop : (k.val : ℝ) / 256 * Real.log 2 + Y ≤ Real.log 2 + 1 / 2 ^ 90 := by
     have kk : (k.val : ℝ) ≤ 255 := by exact_mod_cast Nat.le_of_lt_succ k256
     have y1R : (y1.val : ℝ) < L := by exact_mod_cast y1L
@@ -1014,7 +1016,8 @@ theorem exp_spec (raw : Std.I64) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.val �
       _ ≤ 2 * (1 + 2 * |(1 : ℝ) / 2 ^ 90|) := by linarith only [this]
       _ ≤ 2 + 1 / 2 ^ 80 := by norm_num
   have T0 : (0 : ℝ) ≤ (2 : ℝ) ^ ((k.val : ℝ) / 256) := by positivity
-  refine mantissa_round_near m.val n.val f.val _ mlt hf nle (by positivity) ?_ ?_
+  refine (mantissa_round_near m.val n.val f.val 1 _ (14 / 10 * 2 ^ 56) mlt hf (by omega) (by positivity) (by positivity)
+    ?_ ?_).trans_eq (by ring)
   · rw [sc, mul_assoc]
     calc (2 : ℝ) ^ ((k.val : ℝ) / 256) * (Real.exp Y * 2 ^ 126) = (2 : ℝ) ^ ((k.val : ℝ) / 256) * Real.exp Y * 2 ^ 126 := by ring
       _ ≤ (2 + 1 / 2 ^ 80) * 2 ^ 126 := mul_le_mul_of_nonneg_right T2 (by positivity)
