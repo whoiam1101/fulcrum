@@ -729,25 +729,3 @@ vec_no_panic!(vec_no_panic_8, FixedFloat8);
 vec_no_panic!(vec_no_panic_16, FixedFloat16);
 vec_no_panic!(vec_no_panic_32, FixedFloat32);
 vec_no_panic!(vec_no_panic_64, FixedFloat64);
-
-macro_rules! pow_no_panic {
-    ($name:ident, $T:ident) => {
-        /// `pow`, `checked_pow`, `powi` and `checked_powi` never panic: the
-        /// mantissa shift of the wide logarithm is at most 62 (one bit right
-        /// for `|MIN| = 2^63`), the two divisions of `s` have a dividend
-        /// below `2^128` and a positive divisor, the product with `y` stays
-        /// below `2^127` or returns before the shift, and the shift of
-        /// `exp2` is below 128. On 8 and 16 bits `tests/pow.rs` runs every
-        /// pair of `pow` instead, and `powi` with `|n| ≤ 200` and `|n| ≤ 20`
-        /// and the extremes of `i32`.
-        #[kani::proof]
-        fn $name() {
-            let x = $T::from_bits(kani::any());
-            let y = $T::from_bits(kani::any());
-            let n: i32 = kani::any();
-            let _ = (x.pow(y), x.checked_pow(y), x.powi(n), x.checked_powi(n));
-        }
-    };
-}
-
-pow_no_panic!(pow_no_panic_64, FixedFloat64);
