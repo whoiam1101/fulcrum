@@ -19,6 +19,7 @@ import Fulcrum.Math.Fixed
 import Fulcrum.Math.Quarter
 import Fulcrum.Math.Cot
 import Fulcrum.Math.Atan
+import Fulcrum.Math.Log
 import Fulcrum.L1.ShrRound
 import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
@@ -43,6 +44,7 @@ import Fulcrum.L4.Tan
 import Fulcrum.L4.Atan
 import Fulcrum.L4.Angle
 import Fulcrum.L4.Vec
+import Fulcrum.L4.Log
 
 /-!
 # fulcrum
