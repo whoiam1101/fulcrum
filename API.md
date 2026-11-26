@@ -8,7 +8,7 @@ How to use the library: the types, how to create values, what operations do at t
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.7.1" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.0.0" }
 ```
 
 The crate is `no_std`, has no required dependencies, MSRV 1.60, and no `unsafe` outside the optional `bytemuck` feature. Features (all off by default):
@@ -574,7 +574,7 @@ For tests only:
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v0.7.1", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.0.0", features = ["strict-overflow"] }
 ```
 
 Cargo unifies features, so under `cargo test` of your crate the feature is enabled for the normal dependency too.
