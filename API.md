@@ -303,7 +303,9 @@ assert_eq!(ff32!(11).checked_exp(), None);
 
 ### Powers: `pow`, `powi`
 
-`x.pow(y)` is `2^(y · log₂ x)` with a logarithm of 120 fractional bits, so the error of the exponent stays far below an ulp for every `y` of the type; `x.powi(n)` is the same for an integer `n: i32`. Both are within 1 ulp on every width (within `½ + 2^-5.7` ulp on `FixedFloat64`, `½ + 2^-37` up to `FixedFloat32`). Every pair of `FixedFloat8` and `FixedFloat16` is checked to be correctly rounded, except where the exact power falls exactly halfway between two values (such as `(3/8)³` on `FixedFloat16`): such a tie may round either way, not always toward `+∞`. On `FixedFloat64` a result within `2^-5.7` ulp of a halfway point, which occurs near `MAX`, may also round the wrong way. A result that is exactly representable comes out exactly.
+`x.pow(y)` is `2^(y · log₂ x)` with a logarithm of 120 fractional bits, so the error of the exponent stays far below an ulp for every `y` of the type; `x.powi(n)` is the same for an integer `n: i32`. Both are within 1 ulp on every width: within `½ + 2^-5.7` ulp on `FixedFloat64` and `½ + 2^-37` up to `FixedFloat32`. A result that is exactly representable comes out exactly.
+
+Exhaustive tests show every pair of `FixedFloat8` and `FixedFloat16` correctly rounded, with one exception. When the exact power falls halfway between two values, as `(3/8)³` does on `FixedFloat16`, it may round down instead of toward `+∞`. On `FixedFloat64` a result within `2^-5.7` ulp of a halfway point may also round the wrong way; such results occur near `MAX`.
 
 | Method | Value | Out of the domain or range |
 |---|---|---|
@@ -328,7 +330,7 @@ assert_eq!(ff32!(10).checked_powi(5), None);
 
 ### Angles: `Angle8` … `Angle64`
 
-An angle kept as every bit of an unsigned integer, the fraction `raw / 2^BITS` of a turn: `Angle8` has 256 steps per turn, `Angle16` 65 536, `Angle32` and `Angle64` steps of `1.46·10⁻⁹` and `3.4·10⁻¹⁹` radians. `+`, `-` and unary `-` wrap modulo a turn, so an angle that keeps turning never needs a range reduction, never saturates, and a sum of rotations does not depend on the order. Each `AngleN` goes with `FixedFloatN`: its sine and cosine are `FixedFloatN`, within 1 ulp (on `Angle8`, `Angle16` and `Angle32` every result is checked to be correctly rounded and equal to `sin_turns` of the same angle).
+An angle uses every bit of an unsigned integer as the fraction `raw / 2^BITS` of a turn. `Angle8` has 256 steps per turn and `Angle16` 65 536; the steps of `Angle32` and `Angle64` are `1.46·10⁻⁹` and `3.4·10⁻¹⁹` radians. `+`, `-` and unary `-` wrap modulo a turn: an angle that keeps turning needs no range reduction and does not saturate, and a sum of rotations does not depend on the order. Each `AngleN` goes with `FixedFloatN`, which holds its sine and cosine within 1 ulp. On `Angle8`, `Angle16` and `Angle32` exhaustive tests show every result correctly rounded and equal to `sin_turns` of the same angle.
 
 | Method | Value |
 |---|---|
@@ -589,7 +591,9 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 
 ## 14. `serde`, `bytemuck`, `num-traits`
 
-`serde`: human-readable formats (JSON, YAML, TOML) get the exact decimal string of `Display`, so `parse` gives the same bits back: `ff64!(12.5)` is `"12.5"`, `ff64!(0.1)` is `"0.1000000000931322574615478515625"`. They also accept an integer number, converted exactly, and only together with `float-convert` a floating-point number such as `12.6` without quotes, rounded like `checked_from_f64`; without `float-convert` it is an error, so a float never sneaks into the logic. Binary formats (postcard, bincode, CBOR, MessagePack) get the raw integer, encoded as the format encodes the storage integer (`i64` for `FixedFloat64`): 8 fixed bytes in bincode, a varint in postcard.
+`serde`: human-readable formats (JSON, YAML, TOML) get the exact decimal string of `Display`, so `parse` gives the same bits back: `ff64!(12.5)` is `"12.5"`, `ff64!(0.1)` is `"0.1000000000931322574615478515625"`. They also accept an integer number, converted exactly. A floating-point number such as `12.6` without quotes is accepted only with `float-convert`, rounded like `checked_from_f64`, and is an error without it.
+
+Binary formats (postcard, bincode, CBOR, MessagePack) get the raw integer, encoded as the format encodes the storage integer (`i64` for `FixedFloat64`): 8 fixed bytes in bincode, a varint in postcard.
 
 `bytemuck`: `Pod` and `Zeroable`, so `bytemuck::cast_slice` turns `&[FixedFloat64]` into `&[i64]` or `&[u8]` and back without copying (structure-of-arrays data, buffers for a renderer). The bytes are in native order, like `to_bits().to_ne_bytes()`; for files and the network use `to_le_bytes` (§8).
 
