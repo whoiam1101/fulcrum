@@ -70,14 +70,6 @@ theorem mul_le_u128 {a b : ℕ} (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) : a * b ≤ 
   calc a * b ≤ (2 ^ 64 - 1) * (2 ^ 64 - 1) := Nat.mul_le_mul (Nat.le_pred_of_lt ha) (Nat.le_pred_of_lt hb)
     _ ≤ 2 ^ 128 - 1 := by norm_num
 
-/-- A `u64` widened to `u128` keeps its value. -/
-theorem cast_u128_val (x : Std.U64) : (UScalar.cast .U128 x).val = x.val :=
-  UScalar.cast_val_mod_pow_greater_numBits_eq _ _ (Nat.le_of_ble_eq_true rfl)
-
-/-- A `u128` narrowed to `u64` keeps its low word. -/
-theorem cast_u64_val (x : Std.U128) : (UScalar.cast .U64 x).val = x.val % 2 ^ 64 := by
-  rw [UScalar.cast_val_eq, UScalarTy.U64_numBits_eq]
-
 /-- `(a · c + y) mod (b · c) = (a mod b) · c + y` for `y < c`. -/
 theorem mul_add_mod_mul (a b c y : ℕ) (hy : y < c) : (a * c + y) % (b * c) = a % b * c + y := by
   rcases Nat.eq_zero_or_pos b with hb | hb

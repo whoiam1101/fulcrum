@@ -81,6 +81,14 @@ theorem usize_cast_val {U} (x : UScalar U) (h : x.val < 2 ^ 32) :
     rcases System.Platform.numBits_eq with e | e <;> rw [e]
     exacts [h, h.trans (Nat.pow_lt_pow_right one_lt_two (Nat.le_of_ble_eq_true rfl))])
 
+/-- A `u64` widened to `u128` keeps its value. -/
+theorem cast_u128_val (x : Std.U64) : (UScalar.cast .U128 x).val = x.val :=
+  UScalar.cast_val_mod_pow_greater_numBits_eq _ _ (Nat.le_of_ble_eq_true rfl)
+
+/-- A `u128` narrowed to `u64` keeps its low word. -/
+theorem cast_u64_val (x : Std.U128) : (UScalar.cast .U64 x).val = x.val % 2 ^ 64 := by
+  rw [UScalar.cast_val_eq, UScalarTy.U64_numBits_eq]
+
 /-- `x >>> k` of an unsigned `x` by an `i32` of value `n` below the width is
 `⌊x / 2^n⌋`. -/
 theorem shr_i32_spec {U} (x : UScalar U) (k : Std.I32) (n : ℕ) (hk : k.val = n)

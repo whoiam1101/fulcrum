@@ -2,14 +2,14 @@ module
 
 public import Fulcrum.L4.Exp
 public import Fulcrum.Math.Pow
+public import Fulcrum.Wide.Mul
 
 /-!
 # L4: `exp::mul_hi`, `log2_wide`, `exp2_wide`, `pow_magnitude`, `pow` (INTERNALS §3.16)
 
 On the code extracted by Aeneas, with `1 ≤ f ≤ 32`.
 
-- `widening_mul_u128` and `mul_hi`: the top word of four `u64 × u64` products is
-  `⌊a · b / 2^128⌋` (`widening_hi`).
+- `mul_hi`: the top word of `widening_mul_u128`, `⌊a · b / 2^128⌋` (`Wide/Mul.lean`).
 - `log2_wide(a, f)` of `0 < a ≤ 2^63` shifts `a` to the mantissa `U` exactly (right by one bit
   for `a = 2^63`), takes the quotient `s = ⌊(U - C) · 2^128 / (U + C)⌋` in two 64-bit steps
   (`div_two_words`) and is `log2WideN` of `Math/Pow.lean` shifted to 120 bits: within `1.05`
@@ -36,93 +36,12 @@ namespace Fulcrum
 
 set_option maxRecDepth 10000
 
-/-- The top word of `a · b` from four `u64 × u64` products: `a = a₁ 2^64 + a₀`,
-`b = b₁ 2^64 + b₀`, `mid = ⌊a₀b₀ / 2^64⌋ + (a₀b₁ mod 2^64) + (a₁b₀ mod 2^64)`. -/
-theorem widening_hi (a b : ℕ) :
-    a / 2 ^ 64 * (b / 2 ^ 64) + a % 2 ^ 64 * (b / 2 ^ 64) / 2 ^ 64 + a / 2 ^ 64 * (b % 2 ^ 64) / 2 ^ 64 +
-      (a % 2 ^ 64 * (b % 2 ^ 64) / 2 ^ 64 + a % 2 ^ 64 * (b / 2 ^ 64) % 2 ^ 64 +
-        a / 2 ^ 64 * (b % 2 ^ 64) % 2 ^ 64) / 2 ^ 64 = a * b / 2 ^ 128 := by
-  have ea := Nat.div_add_mod a (2 ^ 64)
-  have eb := Nat.div_add_mod b (2 ^ 64)
-  generalize a / 2 ^ 64 = a1 at ea ⊢
-  generalize a % 2 ^ 64 = a0 at ea ⊢
-  generalize b / 2 ^ 64 = b1 at eb ⊢
-  generalize b % 2 ^ 64 = b0 at eb ⊢
-  have p : a * b = a1 * b1 * 2 ^ 128 + a0 * b1 * 2 ^ 64 + a1 * b0 * 2 ^ 64 + a0 * b0 := by
-    rw [← ea, ← eb]; ring
-  rw [p]
-  generalize a1 * b1 = P11
-  generalize a0 * b1 = P01
-  generalize a1 * b0 = P10
-  generalize a0 * b0 = P00
-  omega
-
-/-- L4 on the code: the top word of `wide::widening_mul_u128(a, b)` is `⌊a · b / 2^128⌋`, and
-it never fails. -/
-theorem widening_mul_u128_spec (a b : Std.U128) :
-    fulcrum.wide.widening_mul_u128 a b ⦃ p => p.1.val = a.val * b.val / 2 ^ 128 ⦄ := by
-  have n128 : UScalarTy.U128.numBits = 128 := rfl
-  have mx : UScalar.max .U128 = 2 ^ 128 - 1 := U128_max_val
-  have al : a.val < 2 ^ 128 := a.bv.isLt
-  have bl : b.val < 2 ^ 128 := b.bv.isLt
-  unfold fulcrum.wide.widening_mul_u128
-  refine WP.spec_bind (shr_i32_spec a 64#i32 64 rfl (by rw [n128]; norm_num)) fun a1 ha1 => ?_
-  rw [lift, bind_ok, lift, bind_ok]
-  refine WP.spec_bind (shr_i32_spec b 64#i32 64 rfl (by rw [n128]; norm_num)) fun b1 hb1 => ?_
-  rw [lift, bind_ok, lift, bind_ok]
-  have a0v : (UScalar.cast .U128 (UScalar.cast .U64 a)).val = a.val % 2 ^ 64 := by
-    rw [cast_u128_val, cast_u64_val]
-  have b0v : (UScalar.cast .U128 (UScalar.cast .U64 b)).val = b.val % 2 ^ 64 := by
-    rw [cast_u128_val, cast_u64_val]
-  generalize UScalar.cast .U128 (UScalar.cast .U64 a) = a0 at a0v ⊢
-  generalize UScalar.cast .U128 (UScalar.cast .U64 b) = b0 at b0v ⊢
-  have a1l : a1.val < 2 ^ 64 := by rw [ha1, Nat.div_lt_iff_lt_mul (by positivity)]; omega
-  have b1l : b1.val < 2 ^ 64 := by rw [hb1, Nat.div_lt_iff_lt_mul (by positivity)]; omega
-  have a0l : a0.val < 2 ^ 64 := by rw [a0v]; omega
-  have b0l : b0.val < 2 ^ 64 := by rw [b0v]; omega
-  have pl : ∀ x y : ℕ, x < 2 ^ 64 → y < 2 ^ 64 → x * y ≤ 2 ^ 128 - 1 := fun x y hx hy => by
-    have := Nat.mul_le_mul (Nat.le_pred_of_lt hx) (Nat.le_pred_of_lt hy)
-    exact this.trans (by norm_num)
-  refine WP.spec_bind (UScalar.mul_spec (x := a0) (y := b0) (by rw [mx]; exact pl _ _ a0l b0l)) fun p00 h00 => ?_
-  refine WP.spec_bind (UScalar.mul_spec (x := a0) (y := b1) (by rw [mx]; exact pl _ _ a0l b1l)) fun p01 h01 => ?_
-  refine WP.spec_bind (UScalar.mul_spec (x := a1) (y := b0) (by rw [mx]; exact pl _ _ a1l b0l)) fun p10 h10 => ?_
-  refine WP.spec_bind (shr_i32_spec p00 64#i32 64 rfl (by rw [n128]; norm_num)) fun i2 h2 => ?_
-  rw [lift, bind_ok, lift, bind_ok]
-  have q00 : p00.val ≤ 2 ^ 128 - 1 := by rw [h00]; exact pl _ _ a0l b0l
-  refine WP.spec_bind (UScalar.add_spec (x := i2) (y := UScalar.cast .U128 (UScalar.cast .U64 p01))
-    (by rw [cast_u128_val, cast_u64_val, h2, mx]; omega)) fun i5 h5 => ?_
-  rw [cast_u128_val, cast_u64_val, h2] at h5
-  rw [lift, bind_ok, lift, bind_ok]
-  refine WP.spec_bind (UScalar.add_spec (x := i5) (y := UScalar.cast .U128 (UScalar.cast .U64 p10))
-    (by rw [cast_u128_val, cast_u64_val, h5, mx]; omega)) fun mid hmid => ?_
-  rw [cast_u128_val, cast_u64_val, h5] at hmid
-  rw [lift, bind_ok, lift, bind_ok]
-  refine WP.spec_bind (UScalar.ShiftLeft_IScalar_spec mid 64#i32 _ (by decide) (by rw [n128]; decide) rfl)
-    fun i10 _ => ?_
-  rw [lift, bind_ok]
-  have top := widening_hi a.val b.val
-  rw [← ha1, ← hb1, ← a0v, ← b0v] at top
-  have tl : a.val * b.val / 2 ^ 128 < 2 ^ 128 := by
-    rw [Nat.div_lt_iff_lt_mul (by positivity)]
-    exact (Nat.mul_lt_mul_of_lt_of_le al bl.le (by omega)).trans_le le_rfl
-  refine WP.spec_bind (UScalar.mul_spec (x := a1) (y := b1) (by rw [mx]; exact pl _ _ a1l b1l)) fun i11 h11 => ?_
-  refine WP.spec_bind (shr_i32_spec p01 64#i32 64 rfl (by rw [n128]; norm_num)) fun i12 h12 => ?_
-  refine WP.spec_bind (UScalar.add_spec (x := i11) (y := i12) (by rw [h11, h12, h01, mx]; omega)) fun i13 h13 => ?_
-  refine WP.spec_bind (shr_i32_spec p10 64#i32 64 rfl (by rw [n128]; norm_num)) fun i14 h14 => ?_
-  refine WP.spec_bind (UScalar.add_spec (x := i13) (y := i14) (by rw [h13, h11, h12, h14, h01, h10, mx]; omega))
-    fun i15 h15 => ?_
-  refine WP.spec_bind (shr_i32_spec mid 64#i32 64 rfl (by rw [n128]; norm_num)) fun i16 h16 => ?_
-  refine WP.spec_bind (UScalar.add_spec (x := i15) (y := i16)
-    (by rw [h15, h13, h11, h12, h14, h16, hmid, h01, h10, h00, mx]; omega)) fun hi hhi => ?_
-  rw [WP.spec_ok, hhi, h15, h13, h11, h12, h14, h16, hmid, h01, h10, h00]
-  exact top
-
 /-- L4 on the code: `exp::mul_hi(a, b)` never fails and is `⌊a · b / 2^128⌋`. -/
 theorem mul_hi_spec (a b : Std.U128) : fulcrum.exp.mul_hi a b ⦃ r => r.val = a.val * b.val / 2 ^ 128 ⦄ := by
   unfold fulcrum.exp.mul_hi
   refine WP.spec_bind (widening_mul_u128_spec a b) fun p hp => ?_
   obtain ⟨h, l⟩ := p
-  exact (WP.spec_ok _).mpr hp
+  exact (WP.spec_ok _).mpr hp.1
 
 /-- `u128::MAX` is `2^128 - 1`. -/
 theorem u128_max_val : core.num.U128.MAX.val = 2 ^ 128 - 1 := rfl

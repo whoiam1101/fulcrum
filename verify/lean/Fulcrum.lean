@@ -24,6 +24,13 @@ import Fulcrum.Math.Exp
 import Fulcrum.Math.Pow
 import Fulcrum.Math.RoundSqrt
 import Fulcrum.Math.Scale
+import Fulcrum.Math.MulWide
+import Fulcrum.Math.DivWide
+import Fulcrum.Math.DivU256
+import Fulcrum.Math.ScaleTo
+import Fulcrum.Wide.Mul
+import Fulcrum.Wide.Div3by2
+import Fulcrum.Wide.DivU256
 import Fulcrum.L1.ShrRound
 import Fulcrum.L1.RoundsUp
 import Fulcrum.L2.Narrow
@@ -56,6 +63,7 @@ import Fulcrum.L5.Shift
 import Fulcrum.L5.Round
 import Fulcrum.L5.Length
 import Fulcrum.L5.Scale
+import Fulcrum.L5.Scale64
 
 /-!
 # fulcrum
