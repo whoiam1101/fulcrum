@@ -1,6 +1,9 @@
 module
 
-public import Fulcrum.L3.Mul
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.L3.Mul
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # L5: `kernel::kN::det`
@@ -68,8 +71,8 @@ theorem det_shape {B W} (a b c d : IScalar B) (n k : ℕ) (hn : k + (k + 1) = n)
   have ⟨f2l, f2u⟩ := in_bounds_of_pow hW lo2 ((le_add_of_nonneg_right p0).trans_lt hi2)
   have ⟨dl, du⟩ := det_bounds a.val b.val c.val d.val n la ua lb ub lc uc ld ud
   have pk : (2 : ℤ) ^ k < 2 ^ n := pow_lt_pow_right₀ one_lt_two hk
-  have dhi : a.val * d.val - b.val * c.val + 2 ^ k < 2 ^ (n + n + 1) := by linarith
-  have ⟨fdl, fdu⟩ := in_bounds_of_pow hW (by linarith [pow_pos (zero_lt_two (α := ℤ)) n])
+  have dhi : a.val * d.val - b.val * c.val + 2 ^ k < 2 ^ (n + n + 1) := by linarith only [du, pk]
+  have ⟨fdl, fdu⟩ := in_bounds_of_pow hW (by linarith only [pow_pos (zero_lt_two (α := ℤ)) n, p0, dl, pk])
     ((le_add_of_nonneg_right p0).trans_lt dhi)
   rw [lift, bind_ok, lift, bind_ok]
   refine WP.spec_bind (IScalar.mul_spec (ca ▸ cd ▸ f1l) (ca ▸ cd ▸ f1u)) fun p hp => ?_

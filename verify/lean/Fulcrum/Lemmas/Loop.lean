@@ -1,7 +1,12 @@
 module
 
-public import Fulcrum.Lemmas.Nat
-public import Fulcrum.Lemmas.Scalar
+public import Aeneas.Std.Scalar.Bitwise
+public import Aeneas.Std.Scalar.Notations
+public import Aeneas.Std.Scalar.Ops.Div
+public import Aeneas.Std.Scalar.Ops.Mul
+public import Aeneas.Std.Scalar.Ops.Sub
+import Fulcrum.Lemmas.Nat
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # Loop specifications shared by every `isqrt`

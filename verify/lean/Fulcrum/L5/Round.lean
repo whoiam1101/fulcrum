@@ -1,8 +1,12 @@
 module
 
-public import Fulcrum.L3.Mul
-public import Fulcrum.L5.Shift
-public import Mathlib.Algebra.Order.Round
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.L3.Mul
+import Fulcrum.L5.Shift
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Round
 
 /-!
 # L5: `kernel::kN::ceil`, `kernel::kN::round_half_away`, `kernel::kN::round_ties_even`
@@ -52,9 +56,9 @@ theorem mask_split {w : ℕ} (x M : BitVec w) (F : ℕ) (hM : M.toNat = 2 ^ F - 
   have hx := BitVec.toInt_eq_msb_cond x
   refine ⟨?_, ?_⟩
   · rw [BitVec.toInt_eq_msb_cond (x &&& ~~~M), mhi]
-    have : ((x &&& ~~~M).toNat : ℤ) = x.toNat - ((x.toNat % 2 ^ F : ℕ) : ℤ) := by omega
+    have : ((x &&& ~~~M).toNat : ℤ) = x.toNat - ((x.toNat % 2 ^ F : ℕ) : ℤ) := by (clear * - hlo s1 s2 hn ha; omega)
     rw [this, ← emod]
-    split <;> simp_all <;> linarith
+    split <;> simp_all <;> linarith only [e]
   · rw [BitVec.toInt_eq_msb_cond (x &&& M), mlo, emod, hlo]; rfl
 
 /-- `w & !MASK` and `w & MASK` of a signed `w` of `m + 1` bits, for
@@ -103,9 +107,9 @@ theorem mask_shape {W} (o : Result (IScalar W)) (one : IScalar W) (F : ℕ)
   have lo : IScalar.min W ≤ i.val - one.val := by
     have hm : IScalar.min W ≤ 0 := by
       rw [IScalar.min_def]; exact neg_nonpos.mpr (pow_pos zero_lt_two _).le
-    rw [hi, hone]; linarith
+    rw [hi, hone]; linarith only [p1, hm]
   have hi' : i.val - one.val ≤ IScalar.max W := by
-    have := i.hmax; rw [IScalar.max_def, hone]; linarith
+    have := i.hmax; rw [IScalar.max_def, hone]; linarith only [this]
   refine WP.spec_mono (IScalar.sub_spec lo hi') fun r hr => ?_
   rw [hr, hi, hone]
 
@@ -121,9 +125,9 @@ theorem ceil_exact (x : ℤ) (F : ℕ) : ⌈exact F x⌉ = (x + 2 ^ F - 1) / 2 ^
   have : -x / 2 ^ F = -((x + 2 ^ F - 1) / 2 ^ F) := by
     refine ((Int.ediv_emod_unique (a := -x) (r := 2 ^ F - 1 - (x + 2 ^ F - 1) % 2 ^ F) hP).mpr
       ⟨?_, ?_, ?_⟩).1
-    · linarith
-    · linarith
-    · linarith
+    · linarith only [h1]
+    · linarith only [h3]
+    · linarith only [h2]
   rw [this, neg_neg]
 
 /-- The body of `kernel::kN::ceil`: `(a + MASK) & !MASK` fits the wide type and
@@ -144,13 +148,13 @@ theorem ceil_shape {B W} (a : IScalar B) (n k : ℕ) (hn : k + (k + 1) = n)
   have ⟨la, ua⟩ := val_bounds a hB
   have pF : (2 : ℤ) ^ (k + 1) ≤ 2 ^ n := pow_le_pow_right₀ one_le_two (by omega)
   have hpow : (2 : ℤ) ^ n + 2 ^ n ≤ 2 ^ (n + n + 1) := by
-    rw [pow_succ, pow_add]; nlinarith [one_le_pow₀ (M₀ := ℤ) one_le_two (n := n)]
+    rw [pow_succ, pow_add]; nlinarith only [one_le_pow₀ (M₀ := ℤ) one_le_two (n := n), la, ua]
   rw [lift, bind_ok]
   refine WP.spec_bind hmask fun m hm => ?_
   have q1 : (1 : ℤ) ≤ 2 ^ (k + 1) := one_le_pow₀ one_le_two
   have q2 : (0 : ℤ) < 2 ^ n := pow_pos zero_lt_two n
-  have ⟨fl, fu⟩ := in_bounds_of_pow hW (x := a.val + m.val) (by rw [hm]; linarith)
-    (by rw [hm]; linarith)
+  have ⟨fl, fu⟩ := in_bounds_of_pow hW (x := a.val + m.val) (by rw [hm]; linarith only [la, pF, hpow, q1])
+    (by rw [hm]; linarith only [ua, pF, hpow])
   refine WP.spec_bind (IScalar.add_spec (ca ▸ fl) (ca ▸ fu)) fun s hs => ?_
   rw [lift, bind_ok, WP.spec_ok, (mask_val s m (k + 1) (n + n + 1) hW hk hm).1, hs, ca, hm,
     ceil_exact]
@@ -187,7 +191,7 @@ theorem round_half_away_shape {B W} (a : IScalar B) (zero : IScalar W) (n k : �
   have pk : (2 : ℤ) ^ k < 2 ^ n := pow_lt_pow_right₀ one_lt_two (by omega)
   have p0 : (0 : ℤ) < 2 ^ k := pow_pos zero_lt_two k
   have hpow : (2 : ℤ) ^ n + 2 ^ n ≤ 2 ^ (n + n + 1) := by
-    rw [pow_succ, pow_add]; nlinarith [one_le_pow₀ (M₀ := ℤ) one_le_two (n := n)]
+    rw [pow_succ, pow_add]; nlinarith only [one_le_pow₀ (M₀ := ℤ) one_le_two (n := n), la, ua]
   have q2 : (0 : ℤ) < 2 ^ n := pow_pos zero_lt_two n
   rw [lift, bind_ok]
   have up : ∀ v : ℤ, ((v + 2 ^ k) / 2 ^ (k + 1)) * 2 ^ (k + 1) =
@@ -197,8 +201,8 @@ theorem round_half_away_shape {B W} (a : IScalar B) (zero : IScalar W) (n k : �
   · have h0 : 0 ≤ a.val := by have : zero.val ≤ (IScalar.cast W a).val := h; rwa [hzero, ca] at this
     rw [ite_eq_left h]
     refine WP.spec_bind hhalf fun i hi => ?_
-    have ⟨fl, fu⟩ := in_bounds_of_pow hW (x := a.val + i.val) (by rw [hi]; linarith)
-      (by rw [hi]; linarith)
+    have ⟨fl, fu⟩ := in_bounds_of_pow hW (x := a.val + i.val) (by rw [hi]; linarith only [la, pk, p0, hpow])
+      (by rw [hi]; linarith only [ua, pk, hpow])
     refine WP.spec_bind (IScalar.add_spec (ca ▸ fl) (ca ▸ fu)) fun s hs => ?_
     refine WP.spec_bind hmask fun m hm => ?_
     rw [lift, bind_ok, WP.spec_ok, (mask_val s m (k + 1) (n + n + 1) hW hk hm).1, hs, ca, hi,
@@ -207,8 +211,8 @@ theorem round_half_away_shape {B W} (a : IScalar B) (zero : IScalar W) (n k : �
       show zero.val ≤ (IScalar.cast W a).val; rw [hzero, ca]; exact h0)
     rw [ite_eq_right h]
     refine WP.spec_bind hhalf fun i hi => ?_
-    have ⟨fl, fu⟩ := in_bounds_of_pow hW (x := i.val - a.val) (by rw [hi]; linarith)
-      (by rw [hi]; linarith)
+    have ⟨fl, fu⟩ := in_bounds_of_pow hW (x := i.val - a.val) (by rw [hi]; linarith only [pk, p0, hpow, h0])
+      (by rw [hi]; linarith only [la, pk, hpow])
     refine WP.spec_bind (IScalar.sub_spec (ca ▸ fl) (ca ▸ fu)) fun s hs => ?_
     refine WP.spec_bind hmask fun m hm => ?_
     rw [lift, bind_ok, lift, bind_ok]
@@ -216,7 +220,7 @@ theorem round_half_away_shape {B W} (a : IScalar B) (zero : IScalar W) (n k : �
     have hv : (s &&& ~~~m).val = roundHalfUp (exact (k + 1) (-a.val)) * 2 ^ (k + 1) := by
       rw [v, hs, ca, hi, ← up]; ring_nf
     have q0 : 0 ≤ roundHalfUp (exact (k + 1) (-a.val)) := by
-      rw [← add_half_shr, shr_eq_div]; exact Int.ediv_nonneg (by linarith) (by positivity)
+      rw [← add_half_shr, shr_eq_div]; exact Int.ediv_nonneg (by linarith only [p0, h0]) (by positivity)
     have hmin : ((s &&& ~~~m : IScalar W) : ℤ) ≠ IScalar.min W := by
       intro this
       rw [hv, IScalar.min_def] at this
@@ -262,7 +266,7 @@ theorem round_ties_even_shape {B W} (a : IScalar B) (one1 : IScalar W) (sh : Std
   have pkF : (2 : ℤ) ^ (k + 1) = 2 * 2 ^ k := pow_succ' 2 k
   have pFn : (2 : ℤ) ^ (k + 1) ≤ 2 ^ n := pow_le_pow_right₀ one_le_two (by omega)
   have hpow : (2 : ℤ) ^ n + 2 ^ n ≤ 2 ^ (n + n + 1) := by
-    rw [pow_succ, pow_add]; nlinarith [one_le_pow₀ (M₀ := ℤ) one_le_two (n := n)]
+    rw [pow_succ, pow_add]; nlinarith only [one_le_pow₀ (M₀ := ℤ) one_le_two (n := n), la, ua]
   rw [lift, bind_ok]
   refine WP.spec_bind hmask fun m hm => ?_
   rw [lift, bind_ok, lift, bind_ok, lift, bind_ok]
@@ -285,7 +289,7 @@ theorem round_ties_even_shape {B W} (a : IScalar B) (one1 : IScalar W) (sh : Std
   have fit : q * 2 ^ (k + 1) + 2 ^ (k + 1) ≤ IScalar.max W ∧
       IScalar.min W ≤ q * 2 ^ (k + 1) + 2 ^ (k + 1) := by
     have ⟨l, u⟩ := in_bounds_of_pow hW (x := q * 2 ^ (k + 1) + 2 ^ (k + 1))
-      (by linarith) (by linarith)
+      (by linarith only [la, pF, pFn, hpow, dec, r1]) (by linarith only [ua, pFn, hpow, dec, r0])
     exact ⟨u, l⟩
   have up : ∀ o : Result (IScalar W), o ⦃ h => h.val = 2 ^ (k + 1) ⦄ →
       (do let i5 ← o; ((IScalar.cast W a) &&& ~~~m) + i5)
@@ -297,15 +301,15 @@ theorem round_ties_even_shape {B W} (a : IScalar B) (one1 : IScalar W) (sh : Std
     rw [Int.mul_ediv_cancel _ pF.ne', Int.even_iff]
   have goal_up : 2 ^ (k + 1) ∣ (q + 1) * 2 ^ (k + 1) := dvd_mul_left _ _
   have goal_dn : 2 ^ (k + 1) ∣ q * 2 ^ (k + 1) := dvd_mul_left _ _
-  have dup : a.val - (q + 1) * 2 ^ (k + 1) = rem - 2 ^ (k + 1) := by linarith
-  have ddn : a.val - q * 2 ^ (k + 1) = rem := by linarith
+  have dup : a.val - (q + 1) * 2 ^ (k + 1) = rem - 2 ^ (k + 1) := by linarith only [dec]
+  have ddn : a.val - q * 2 ^ (k + 1) = rem := by linarith only [dec]
   have hfrv : ((IScalar.cast W a) &&& m).val = rem := hfr
   by_cases g : ((IScalar.cast W a) &&& m) > h
   · rw [ite_eq_left g]
     have g' : 2 ^ k < rem := by have : h.val < _ := g; rwa [hh, hfrv] at this
     refine WP.spec_mono (up one hone) fun r hr => ?_
-    rw [hr, dup, abs_of_neg (by linarith)]
-    exact ⟨goal_up, by linarith, fun e => by linarith⟩
+    rw [hr, dup, abs_of_neg (by linarith only [r1])]
+    exact ⟨goal_up, by linarith only [pkF, g'], fun e => by linarith only [pkF, g', e]⟩
   rw [ite_eq_right g]
   have g' : rem ≤ 2 ^ k := by
     have : ¬ h.val < _ := g; rw [hh, hfrv] at this; exact not_lt.mp this
@@ -324,8 +328,8 @@ theorem round_ties_even_shape {B W} (a : IScalar B) (one1 : IScalar W) (sh : Std
           simp [Nat.not_le.mpr this]
         rwa [v1] at this
       refine WP.spec_mono (up one hone) fun r hr => ?_
-      rw [hr, dup, abs_of_neg (by linarith), t']
-      refine ⟨goal_up, by linarith, fun _ => (even_div _).2 (by omega)⟩
+      rw [hr, dup, abs_of_neg (by linarith only [r1]), t']
+      refine ⟨goal_up, by linarith only [pkF], fun _ => (even_div _).2 (by omega)⟩
     · rw [ite_eq_right o, WP.spec_ok, hfl', ddn, abs_of_nonneg r0, t']
       have o' : q % 2 = 0 := by
         by_contra c
@@ -338,11 +342,11 @@ theorem round_ties_even_shape {B W} (a : IScalar B) (one1 : IScalar W) (sh : Std
             rw [hW]; exact Nat.one_lt_two_pow (by omega)
           simp [Nat.not_le.mpr this]
         rw [v1]; omega
-      exact ⟨goal_dn, by linarith, fun _ => (even_div _).2 o'⟩
+      exact ⟨goal_dn, by linarith only [pkF], fun _ => (even_div _).2 o'⟩
   · rw [ite_eq_right t, WP.spec_ok, hfl', ddn, abs_of_nonneg r0]
     have t' : rem ≠ 2 ^ k := fun e => t (IScalar.eq_of_val_eq (by rw [hh, hfrv]; exact e))
     have : rem < 2 ^ k := lt_of_le_of_ne g' t'
-    exact ⟨goal_dn, by linarith, fun e => by linarith⟩
+    exact ⟨goal_dn, by linarith only [pkF, this], fun e => by linarith only [pkF, this, e]⟩
 
 /-- `kernel::k8::ONE` is `2^4`. -/
 theorem k8_one_spec : fulcrum.kernel.k8.ONE ⦃ h => h.val = 2 ^ 4 ⦄ := by

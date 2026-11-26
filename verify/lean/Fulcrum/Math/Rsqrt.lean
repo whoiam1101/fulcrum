@@ -1,8 +1,9 @@
 module
 
-public import Mathlib.Algebra.Order.Ring.Abs
-public import Mathlib.Tactic.LinearCombination
-public import Mathlib.Tactic.Ring
+public import Mathlib.Algebra.Group.Int.Defs
+import Mathlib.Algebra.Order.Ring.Abs
+import Mathlib.Tactic.LinearCombination
+import Mathlib.Tactic.Ring.RingNF
 
 /-!
 # The reciprocal-root start of `isqrt` of `k32`

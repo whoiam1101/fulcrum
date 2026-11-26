@@ -1,7 +1,11 @@
 module
 
-public import Fulcrum.L1.ShrRound
-public import Fulcrum.Math.Range
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.L1.ShrRound
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Range
+import Fulcrum.Math.Round
 
 /-!
 # L3: `kernel::kN::mul`

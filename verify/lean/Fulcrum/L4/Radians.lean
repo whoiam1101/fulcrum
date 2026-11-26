@@ -1,6 +1,16 @@
 module
 
-public import Fulcrum.L4.Turns
+public import Fulcrum.Kernel.Funs
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
+import Fulcrum.L1.ShrRound
+import Fulcrum.L4.SinQuarter
+import Fulcrum.L4.Turns
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Round
+import Fulcrum.Tables.Trig
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Analysis.Real.Pi.Bounds
 
 /-!
 # L4: `trig::reduce`, `position`, `sin`, `cos`, `sin_cos` (INTERNALS §3.12)
@@ -263,21 +273,21 @@ theorem position_angle (m f s : ℕ) (hm : m < 2 ^ 64) :
       (((posN m f + s) % 2 ^ 64 : ℕ) : ℝ) / 2 ^ 62 * (Real.pi / 2) =
         (m / 2 ^ f + s / 2 ^ 62 * (Real.pi / 2) + δ * Real.pi / 2 ^ 63) - K * (2 * Real.pi) := by
   have hC : |(frac2PiN : ℝ) - 2 / Real.pi * 2 ^ 192| ≤ 1 / 2 := frac_2_pi_entry
-  set N := m * frac2PiN / 2 ^ (f + 64) with hN
-  set R := (N % 2 ^ 130 + 2 ^ 65) / 2 ^ 66 with hR
+  set! N := m * frac2PiN / 2 ^ (f + 64) with hN
+  set! R := (N % 2 ^ 130 + 2 ^ 65) / 2 ^ 66 with hR
   set u := (posN m f + s) % 2 ^ 64 with hu
   have eN := Nat.mod_add_div N (2 ^ 130)
   have eR := Nat.mod_add_div R (2 ^ 64)
   have eu := Nat.mod_add_div (posN m f + s) (2 ^ 64)
   rw [← hu] at eu
   have pR : posN m f = R % 2 ^ 64 := rfl
-  set K := R / 2 ^ 64 + N / 2 ^ 130 + (posN m f + s) / 2 ^ 64 with hK
+  set! K := R / 2 ^ 64 + N / 2 ^ 130 + (posN m f + s) / 2 ^ 64 with hK
   have hR' := floor_div_near (N % 2 ^ 130 + 2 ^ 65) (2 ^ 66) (by positivity)
   have hN' := floor_div_near (m * frac2PiN) (2 ^ (f + 64)) (by positivity)
   rw [← hR] at hR'
   rw [← hN] at hN'
   have mR : (m : ℝ) < 2 ^ 64 := by exact_mod_cast hm
-  set δ : ℝ := u - s + 2 ^ 64 * K - m * (2 / Real.pi) * 2 ^ 62 / 2 ^ f with hδ
+  set! δ : ℝ := u - s + 2 ^ 64 * K - m * (2 / Real.pi) * 2 ^ 62 / 2 ^ f with hδ
   have eδ : δ = (R - (N % 2 ^ 130 : ℕ) / 2 ^ 66) + (N - m * frac2PiN / 2 ^ (f + 64)) / 2 ^ 66 +
       m * (frac2PiN - 2 / Real.pi * 2 ^ 192) / 2 ^ (f + 130) := by
     have eN' : ((N % 2 ^ 130 : ℕ) : ℝ) + 2 ^ 130 * (N / 2 ^ 130 : ℕ) = N := by exact_mod_cast eN
@@ -290,11 +300,11 @@ theorem position_angle (m f s : ℕ) (hm : m < 2 ^ 64) :
   have b1 : |(R : ℝ) - (N % 2 ^ 130 : ℕ) / 2 ^ 66| ≤ 1 / 2 := by
     simp only [Nat.cast_add, Nat.cast_pow, Nat.cast_ofNat] at hR'
     rw [add_div, show (2 : ℝ) ^ 65 / 2 ^ 66 = 1 / 2 by norm_num] at hR'
-    exact abs_le.mpr ⟨by linarith [hR'.2], by linarith [hR'.1]⟩
+    exact abs_le.mpr ⟨by linarith only [hR'.2], by linarith only [hR'.1]⟩
   have b2 : |((N : ℝ) - m * frac2PiN / 2 ^ (f + 64)) / 2 ^ 66| ≤ 1 / 2 ^ 66 := by
     simp only [Nat.cast_mul, Nat.cast_pow, Nat.cast_ofNat] at hN'
     rw [abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 66)]
-    exact div_le_div_of_nonneg_right (abs_le.mpr ⟨by linarith [hN'.2], by linarith [hN'.1]⟩) (by positivity)
+    exact div_le_div_of_nonneg_right (abs_le.mpr ⟨by linarith only [hN'.2], by linarith only [hN'.1]⟩) (by positivity)
   have b3 : |(m : ℝ) * (frac2PiN - 2 / Real.pi * 2 ^ 192) / 2 ^ (f + 130)| ≤ 1 / 2 ^ 67 := by
     rw [abs_div, abs_mul, Nat.abs_cast, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ (f + 130)),
       div_le_iff₀ (by positivity)]
@@ -370,8 +380,8 @@ theorem sin_position_radians (t : Std.U64) (m s : ℕ) (f : Std.U32) (hm : m < 2
     have := mul_le_mul_of_nonneg_right S1
       (by positivity : (0 : ℝ) ≤ 2 ^ f.val)
     have pf : (2 : ℝ) ^ f.val ≤ 2 ^ 62 := pow_le_pow_right₀ one_le_two hf
-    linarith
-  have : -(2 : ℝ) ^ 63 < r.val := by linarith [(abs_le.mp (err.trans e7)).1]
+    linarith only [this, pf]
+  have : -(2 : ℝ) ^ 63 < r.val := by linarith only [(abs_le.mp (err.trans e7)).1, sl]
   exact_mod_cast this
 
 /-- `|raw|` as a real is `raw` or `-raw` by the sign. -/

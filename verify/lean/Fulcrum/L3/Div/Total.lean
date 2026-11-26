@@ -1,6 +1,9 @@
 module
 
-public import Fulcrum.L3.Div.Signed
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.L3.Div.Magnitude
+import Fulcrum.L3.Div.Signed
 
 /-!
 # L3: `kernel::div_total`

@@ -1,8 +1,10 @@
 module
 
-public import Fulcrum.Math.Series
-public import Fulcrum.Math.Round
-public import Mathlib.Analysis.Real.Pi.Bounds
+public import Fulcrum.Spec
+public import Mathlib.Basic.Real.Basic
+import Mathlib.Algebra.Order.Archimedean.Real.Basic
+import Mathlib.Data.Nat.Cast.Order.Field
+import Mathlib.Tactic.Bound
 
 /-!
 # Errors of fixed-point arithmetic with 62 fractional bits
@@ -12,7 +14,8 @@ a floor division, a truncated product `⌊a · b / 2^62⌋` and `2^62 - a`. Give
 how far each operand is from its ideal real value, these lemmas bound how far
 the result is from the ideal result; `two_term_le` is Cauchy–Schwarz for the
 sum `x · sin a + y · cos a` of two such errors, and `round_shift_near` the one
-rounding by `shr_round` at the end. No code here: the math of L4.
+rounding by `shr_round` at the end, `round_div_near` one rounding of `h / 2^k`, and
+`angle_scale_up` the index of a table at `k / 256` as `p / 2^bits`. No code here: the math of L4.
 -/
 
 @[expose] public section
@@ -109,6 +112,29 @@ theorem round_shift_near (m : ℤ) (s f : ℕ) (hs : s + f = 62) (S E : ℝ)
         refine add_le_add r' ?_
         rw [e, abs_div, abs_of_pos p]
         exact div_le_div_of_nonneg_right h p.le
+
+/-- Rounding `h / 2^k` once, for `h` within `E` of `S · 2^k`, is within `½ + E / 2^k` of `S`. -/
+theorem round_div_near (h : ℤ) (k : ℕ) (S E : ℝ) (hh : |(h : ℝ) - S * 2 ^ k| ≤ E) :
+    |((roundHalfUp (exact k h) : ℤ) : ℝ) - S| ≤ 1 / 2 + E / 2 ^ k := by
+  have r := roundHalfUp_near (exact k h)
+  have r' : |((roundHalfUp (exact k h) : ℤ) : ℝ) - (h : ℝ) / 2 ^ k| ≤ 1 / 2 := by
+    have := (Rat.cast_le (K := ℝ)).mpr r
+    push_cast [exact] at this
+    exact this
+  have p : (0 : ℝ) < 2 ^ k := by positivity
+  have e : (h : ℝ) / 2 ^ k - S = ((h : ℝ) - S * 2 ^ k) / 2 ^ k := by field_simp
+  calc _ ≤ |((roundHalfUp (exact k h) : ℤ) : ℝ) - (h : ℝ) / 2 ^ k| + |(h : ℝ) / 2 ^ k - S| := abs_sub_le _ _ _
+    _ ≤ 1 / 2 + E / 2 ^ k := by
+        refine add_le_add r' ?_
+        rw [e, abs_div, abs_of_pos p]
+        exact div_le_div_of_nonneg_right hh p.le
+
+/-- `k / 256 = p / 2^bits` for `k = p · 2^(8 - bits)` and `bits ≤ 8`. -/
+theorem angle_scale_up (p bits : ℕ) (hb : bits ≤ 8) :
+    ((p * 2 ^ (8 - bits) : ℕ) : ℝ) / 256 = p / 2 ^ bits := by
+  have e : (256 : ℝ) = 2 ^ (8 - bits) * 2 ^ bits := by
+    rw [← pow_add, Nat.sub_add_cancel hb]; norm_num
+  rw [e]; push_cast; field_simp
 
 end Fulcrum
 

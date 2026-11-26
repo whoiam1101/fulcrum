@@ -1,10 +1,8 @@
 module
 
-public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Series
-public import Mathlib.Analysis.SpecialFunctions.Complex.Arctan
-public import Mathlib.Analysis.SpecialFunctions.Log.Deriv
-public import Mathlib.Analysis.SpecialFunctions.Exponential
-public import Mathlib.Analysis.SpecificLimits.Basic
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Arctan
+import Mathlib.Analysis.SpecialFunctions.Complex.Arctan
+import Mathlib.Analysis.SpecialFunctions.Trigonometric.Series
 
 /-!
 # Series of `sin`, `cos`, `arctan`, `log` and `exp` with bounded tails

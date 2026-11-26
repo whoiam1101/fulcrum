@@ -1,6 +1,10 @@
 module
 
-public import Fulcrum.L3.Sqrt.Common
+public import Fulcrum.Kernel.Funs
+import Fulcrum.L3.Sqrt.Common
+import Fulcrum.Lemmas.Loop
+import Fulcrum.Lemmas.Nat
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # L3: `kernel::k8::isqrt`

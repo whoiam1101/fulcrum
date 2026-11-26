@@ -1,6 +1,10 @@
 module
 
-public import Fulcrum.L3.Mul
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.L3.Mul
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Round
 
 /-!
 # L3: `kernel::kN::mul_add` and `kernel::kN::lerp`

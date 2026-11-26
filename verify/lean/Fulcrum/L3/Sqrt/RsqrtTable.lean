@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Lemmas.List
-public import Fulcrum.Lemmas.Scalar
+public import Fulcrum.Kernel.Funs
+import Fulcrum.Lemmas.List
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # L3: the table `RSQRT_START`

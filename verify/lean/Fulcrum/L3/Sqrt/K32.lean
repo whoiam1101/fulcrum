@@ -1,9 +1,12 @@
 module
 
-public import Fulcrum.L3.Sqrt.RsqrtTable
-public import Fulcrum.Math.Rsqrt
-public import Fulcrum.Lemmas.Loop
-public import Fulcrum.Lemmas.Int
+public import Fulcrum.Kernel.Funs
+import Fulcrum.L3.Sqrt.RsqrtTable
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Loop
+import Fulcrum.Lemmas.Nat
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Rsqrt
 
 /-!
 # L3: `kernel::k32::isqrt`
@@ -219,17 +222,17 @@ theorem k32_isqrt_spec (n : Std.U64) (hn : n.val ≤ 3 * 2 ^ 62) :
     rw [core.num.U64.wrapping_sub_val_eq, core.num.U64.wrapping_mul_val_eq, hsc, UScalar.size_def,
       UScalarTy.U64_numBits_eq, heZ, sq]
     push_cast
-    omega
+    (clear * - heZ; omega)
   have he : (UScalar.hcast .I64 (core.num.U64.wrapping_sub m (core.num.U64.wrapping_mul sc sc))).val
       = eZ := by
     rw [UScalar.hcast_val_eq, IScalarTy.I64_numBits_eq, bmod_congr _ _ _ hw]
-    exact Int.bmod_eq_of_le (by omega) (by omega)
+    exact Int.bmod_eq_of_le (by (clear * - G4 G5 heZ hw; omega)) (by (clear * - G4 G5 heZ hw; omega))
   have hs16 : (UScalar.hcast .I64 sc).val = sN := by
     rw [UScalar.hcast_val_eq, hsc, IScalarTy.I64_numBits_eq]
-    exact Int.bmod_eq_of_le (by omega) (by omega)
+    exact Int.bmod_eq_of_le (by (clear * - hsN hsc; omega)) (by (clear * - hsN G2 hi13 hsc; omega))
   have hy17 : (UScalar.hcast .I128 y1).val = y1.val := by
     rw [UScalar.hcast_val_eq, IScalarTy.I128_numBits_eq]
-    exact Int.bmod_eq_of_le (by omega) (by omega)
+    exact Int.bmod_eq_of_le (by (clear * - hy1; omega)) (by (clear * - Yi hi12 hy1; omega))
   have he18 : (IScalar.cast .I128 (UScalar.hcast .I64 (core.num.U64.wrapping_sub m
       (core.num.U64.wrapping_mul sc sc)))).val = eZ := by
     rw [IScalar.val_mod_pow_greater_numBits _ _ (Nat.le_of_ble_eq_true rfl), he]
@@ -246,7 +249,7 @@ theorem k32_isqrt_spec (n : Std.U64) (hn : n.val ≤ 3 * 2 ^ 62) :
   have hc21 : (IScalar.cast .I64 i20).val = cZ := by
     rw [IScalar.cast_val_eq, hi20, IScalarTy.I64_numBits_eq, IScalarTy.I128_numBits_eq,
       show min 64 128 = 64 from rfl]
-    exact Int.bmod_eq_of_le (by push_cast; omega) (by push_cast; omega)
+    exact Int.bmod_eq_of_le (by push_cast; (clear * - hcZ k5 k6 hi20; omega)) (by push_cast; (clear * - hcZ k5 k6 hi20; omega))
   have b22 := in_bounds_of_pow (W := .I64) (m := 63) rfl
     ((neg_nonpos.mpr (pow_pos zero_lt_two 63).le).trans k7) k8
   rw [← hs16, ← hc21] at b22
@@ -255,7 +258,7 @@ theorem k32_isqrt_spec (n : Std.U64) (hn : n.val ≤ 3 * 2 ^ 62) :
   rw [hs16, hc21] at hi22
   rw [lift, bind_ok]
   have hs1 : ((IScalar.hcast .U64 i22).val : ℤ) = sN + cZ := by
-    rw [IScalar.hcast_val_eq, hi22, UScalarTy.U64_numBits_eq, Int.emod_eq_of_lt (by omega) (by omega)]
+    rw [IScalar.hcast_val_eq, hi22, UScalarTy.U64_numBits_eq, Int.emod_eq_of_lt (by (clear * - k7; omega)) (by omega)]
     exact Int.toNat_of_nonneg k7
   obtain ⟨S1, hS1⟩ : ∃ S1 : ℕ, S1 = (IScalar.hcast .U64 i22).val := ⟨_, rfl⟩
   rw [← hS1] at hs1
@@ -266,9 +269,9 @@ theorem k32_isqrt_spec (n : Std.U64) (hn : n.val ≤ 3 * 2 ^ 62) :
     (y := 2#u32) (Nat.succ_ne_zero _)
   rw [hi23, bind_ok]
   rw [hz, lit_val] at hi23v
-  have zh : 2 ^ (i23.val) * 2 ^ (i23.val) = 2 ^ z := by rw [← pow_add]; congr 1; omega
+  have zh : 2 ^ (i23.val) * 2 ^ (i23.val) = 2 ^ z := by rw [← pow_add]; congr 1; (clear * - hzd hi23v; omega)
   refine WP.spec_bind (UScalar.ShiftRight_spec (IScalar.hcast .U64 i22) i23
-    (by rw [UScalarTy.U64_numBits_eq]; omega)) fun x ⟨hx, _⟩ => ?_
+    (by rw [UScalarTy.U64_numBits_eq]; (clear * - hL L63 hzd z1 z2 hi23v; omega))) fun x ⟨hx, _⟩ => ?_
   rw [← hS1, Nat.shiftRight_eq_div_pow] at hx
   have xsq : x.val * x.val ≤ n.val + 2 ^ 57 := by
     have h1 : x.val * 2 ^ i23.val ≤ S1 := hx ▸ Nat.div_mul_le_self _ _

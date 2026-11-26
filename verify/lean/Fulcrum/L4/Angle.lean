@@ -1,7 +1,17 @@
 module
 
-public import Fulcrum.L4.Turns
-public import Fulcrum.L4.Atan
+public import Fulcrum.L4.Radians
+public import Fulcrum.Spec
+import Fulcrum.L1.ShrRound
+import Fulcrum.L4.Turns
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Quarter
+import Fulcrum.Math.Range
+import Fulcrum.Math.Round
+import Fulcrum.Tables.Trig
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Analysis.Real.Pi.Bounds
 
 /-!
 # L4: `trig::angle_sin`, `angle_cos`, `angle_scale`, `angle_to_radians`, `angle_from_radians` (INTERNALS §3.14)
@@ -159,12 +169,6 @@ theorem signed_angle_spec {α} (t : Std.U64) (n : Std.U32) (hn1 : 1 ≤ n.val) (
   push_cast
   rw [Int.emod_emod_of_dvd _ (dvd_refl _)]
 
-/-- An `i64` widened to `i128` keeps its value. -/
-theorem cast_i128_val (x : Std.I64) : (IScalar.cast .I128 x).val = x.val := by
-  rw [IScalar.cast_val_eq, IScalarTy.I128_numBits_eq, IScalarTy.I64_numBits_eq]
-  have ⟨l, u⟩ := val_bounds x IScalarTy.I64_numBits_eq
-  exact Int.bmod_eq_of_le (by push_cast; norm_num at l ⊢; omega) (by push_cast; norm_num at u ⊢; omega)
-
 /-- L4 on the code: `trig::angle_scale(t, n, raw, f)` with `1 ≤ n ≤ 64` never fails
 and is `rnd(s · raw / 2^f) mod 2^n`, `s` the angle `t` read as signed on `n` bits:
 exact, one rounding, ties up. -/
@@ -220,23 +224,7 @@ theorem pi_product_near (m P : ℕ) (hm : m ≤ 2 ^ 63) (hP : |(P : ℝ) - Real.
           mul_le_mul mR hP (abs_nonneg _) (by positivity)
       _ = 1 / 4 * 2 ^ 64 := by norm_num
   have ⟨dl, du⟩ := abs_le.mp d
-  exact abs_le.mpr ⟨by linarith, by linarith⟩
-
-/-- Rounding `h / 2^k` once, for `h` within `E` of `S · 2^k`, is within `½ + E / 2^k` of `S`. -/
-theorem round_div_near (h : ℤ) (k : ℕ) (S E : ℝ) (hh : |(h : ℝ) - S * 2 ^ k| ≤ E) :
-    |((roundHalfUp (exact k h) : ℤ) : ℝ) - S| ≤ 1 / 2 + E / 2 ^ k := by
-  have r := roundHalfUp_near (exact k h)
-  have r' : |((roundHalfUp (exact k h) : ℤ) : ℝ) - (h : ℝ) / 2 ^ k| ≤ 1 / 2 := by
-    have := (Rat.cast_le (K := ℝ)).mpr r
-    push_cast [exact] at this
-    exact this
-  have p : (0 : ℝ) < 2 ^ k := by positivity
-  have e : (h : ℝ) / 2 ^ k - S = ((h : ℝ) - S * 2 ^ k) / 2 ^ k := by field_simp
-  calc _ ≤ |((roundHalfUp (exact k h) : ℤ) : ℝ) - (h : ℝ) / 2 ^ k| + |(h : ℝ) / 2 ^ k - S| := abs_sub_le _ _ _
-    _ ≤ 1 / 2 + E / 2 ^ k := by
-        refine add_le_add r' ?_
-        rw [e, abs_div, abs_of_pos p]
-        exact div_le_div_of_nonneg_right hh p.le
+  exact abs_le.mpr ⟨by linarith only [u, dl], by linarith only [l, du]⟩
 
 /-- The value of `tables::trig::PI_126`. -/
 theorem pi_126_lt : fulcrum.tables.trig.PI_126.val < 2 ^ 128 := fulcrum.tables.trig.PI_126.bv.isLt
@@ -259,7 +247,7 @@ theorem angle_to_radians_spec (t : Std.U64) (n f : Std.U32) (hn1 : 1 ≤ n.val) 
   have ml : s.val.natAbs ≤ 2 ^ (n.val - 1) := hs ▸ bmod_natAbs_le _ _ hn1
   have m63 : s.val.natAbs ≤ 2 ^ 63 := ml.trans (Nat.pow_le_pow_right two_pos (by omega))
   generalize UScalar.cast .U128 i3 = m at mv ⊢
-  set P := fulcrum.tables.trig.PI_126.val with hP
+  set! P := fulcrum.tables.trig.PI_126.val with hP
   have Pl : P < 2 ^ 128 := pi_126_lt
   refine WP.spec_bind (shr_i32_spec fulcrum.tables.trig.PI_126 64#i32 64 rfl (by rw [n128]; norm_num))
     fun i4 h4 => ?_
@@ -282,13 +270,13 @@ theorem angle_to_radians_spec (t : Std.U64) (n f : Std.U32) (hn1 : 1 ≤ n.val) 
     rw [Nat.div_lt_iff_lt_mul (Nat.two_pow_pos _)]
     calc s.val.natAbs * P < 2 ^ 63 * 2 ^ 128 := Nat.mul_lt_mul_of_le_of_lt m63 Pl (by positivity)
       _ = 2 ^ 127 * 2 ^ 64 := by norm_num
-  refine WP.spec_bind (UScalar.add_spec (x := i5) (y := i9) (by rw [u128, hv]; omega)) fun high hh => ?_
+  refine WP.spec_bind (UScalar.add_spec (x := i5) (y := i9) (by rw [u128, hv]; (clear * - hl; omega))) fun high hh => ?_
   rw [hv] at hh
-  refine WP.spec_bind (UScalar.add_spec (x := 125#u32) (y := n) (by rw [lit_val, U32_max_val]; omega))
+  refine WP.spec_bind (UScalar.add_spec (x := 125#u32) (y := n) (by rw [lit_val, U32_max_val]; (clear * - hn1 hn; omega)))
     fun i10 h10 => ?_
   rw [lit_val] at h10
-  refine WP.spec_bind (UScalar.sub_spec (x := i10) (y := f) (by rw [h10]; omega)) fun i11 ⟨h11, _⟩ => ?_
-  refine WP.spec_bind (UScalar.sub_spec (x := i11) (y := 64#u32) (by rw [h11, h10, lit_val]; omega))
+  refine WP.spec_bind (UScalar.sub_spec (x := i10) (y := f) (by rw [h10]; (clear * - hn1 hn hf h10; omega))) fun i11 ⟨h11, _⟩ => ?_
+  refine WP.spec_bind (UScalar.sub_spec (x := i11) (y := 64#u32) (by rw [h11, h10, lit_val]; (clear * - hn1 hn hf h10; omega)))
     fun k ⟨hk, _⟩ => ?_
   rw [h11, h10, lit_val] at hk
   rw [lift, bind_ok]
@@ -298,15 +286,15 @@ theorem angle_to_radians_spec (t : Std.U64) (n f : Std.U32) (hn1 : 1 ≤ n.val) 
       ((by exact_mod_cast (hh ▸ hl) : (high.val : ℤ) < 2 ^ 127).trans_le (by norm_num))
   refine WP.spec_bind (shr_round_spec _ k) fun i13 h13 => ?_
   rw [hc, hk] at h13
-  have kv : 125 + n.val - f.val - 64 = 61 + n.val - f.val := by omega
+  have kv : 125 + n.val - f.val - 64 = 61 + n.val - f.val := by (clear * - hn1 hn hf h10 hk; omega)
   rw [kv] at h13
-  set S : ℝ := (s.val.natAbs : ℝ) * Real.pi * 2 ^ (1 + f.val) / 2 ^ n.val with hS
+  set! S : ℝ := (s.val.natAbs : ℝ) * Real.pi * 2 ^ (1 + f.val) / 2 ^ n.val with hS
   have near := round_div_near (high.val : ℤ) (61 + n.val - f.val) S (5 / 4) (by
     push_cast
     rw [hh]
     have e : S * 2 ^ (61 + n.val - f.val) = s.val.natAbs * Real.pi * 2 ^ 62 := by
       have : (2 : ℝ) ^ (1 + f.val) * 2 ^ (61 + n.val - f.val) = 2 ^ n.val * 2 ^ 62 := by
-        rw [← pow_add, ← pow_add]; congr 1; omega
+        rw [← pow_add, ← pow_add]; congr 1; (clear * - hn1 hn hf h10; omega)
       rw [hS, div_mul_eq_mul_div, mul_assoc, this]; field_simp
     rw [e]
     exact pi_product_near _ P m63 pi_126_entry)
@@ -315,26 +303,26 @@ theorem angle_to_radians_spec (t : Std.U64) (n f : Std.U32) (hn1 : 1 ≤ n.val) 
     have m1 : (s.val.natAbs : ℝ) ≤ 2 ^ (n.val - 1) := by exact_mod_cast ml
     have e : (2 : ℝ) ^ (n.val - 1) * 2 ^ (1 + f.val) / 2 ^ n.val = 2 ^ f.val := by
       have : (2 : ℝ) ^ (n.val - 1) * 2 ^ (1 + f.val) = 2 ^ f.val * 2 ^ n.val := by
-        rw [← pow_add, ← pow_add]; congr 1; omega
+        rw [← pow_add, ← pow_add]; congr 1; (clear * - hn1 hn h10; omega)
       rw [this]; field_simp
     have pf : (2 : ℝ) ^ f.val ≤ 2 ^ 32 := pow_le_pow_right₀ one_le_two hf
     calc S ≤ 2 ^ (n.val - 1) * 4 * 2 ^ (1 + f.val) / 2 ^ n.val := by
           rw [hS]
           refine div_le_div_of_nonneg_right (mul_le_mul_of_nonneg_right ?_ (by positivity)) (by positivity)
-          exact mul_le_mul m1 (by linarith [Real.pi_lt_d2]) Real.pi_pos.le (by positivity)
+          exact mul_le_mul m1 (by linarith only [Real.pi_lt_d2]) Real.pi_pos.le (by positivity)
       _ = 4 * 2 ^ f.val := by rw [mul_comm _ (4 : ℝ), mul_assoc, mul_div_assoc, e]
-      _ ≤ 2 ^ 34 := by nlinarith
+      _ ≤ 2 ^ 34 := by nlinarith only [pf]
   have S0 : 0 ≤ S := by positivity
   have err : 1 / 2 + 5 / 4 / 2 ^ (61 + n.val - f.val) ≤ (1 : ℝ) := by
     have : (5 / 4 : ℝ) / 2 ^ (61 + n.val - f.val) ≤ 5 / 4 / 2 ^ 2 :=
-      div_le_div_of_nonneg_left (by norm_num) (by norm_num) (pow_le_pow_right₀ one_le_two (by omega))
-    linarith
+      div_le_div_of_nonneg_left (by norm_num) (by norm_num) (pow_le_pow_right₀ one_le_two (by (clear * - hn1 hn hf h10 hk kv; omega)))
+    linarith only [this]
   have ib : -(2 ^ 35) ≤ i13.val ∧ i13.val ≤ 2 ^ 35 := by
     have ⟨l, u⟩ := abs_le.mp (near.trans err)
     constructor
-    · have : -(2 : ℝ) ^ 35 ≤ i13.val := by linarith
+    · have : -(2 : ℝ) ^ 35 ≤ i13.val := by linarith only [S0, l]
       exact_mod_cast this
-    · have : (i13.val : ℝ) ≤ 2 ^ 35 := by linarith
+    · have : (i13.val : ℝ) ≤ 2 ^ 35 := by linarith only [Sb, u]
       exact_mod_cast this
   have inr : InRange 63 i13.val :=
     ⟨(by unfold minOf; norm_num : minOf 63 ≤ -(2 ^ 35)).trans ib.1, ib.2.trans (by unfold maxOf; norm_num)⟩
@@ -351,7 +339,7 @@ theorem angle_to_radians_spec (t : Std.U64) (n f : Std.U32) (hn1 : 1 ≤ n.val) 
     rw [ite_eq_left hn', ite_eq_left hv]
     refine WP.spec_mono (IScalar.neg_step _ (fun e => ?_)) fun r hr => ?_
     · rw [cv, IScalar.min_def, IScalarTy.I64_numBits_eq] at e
-      have := ib.1; omega
+      have := ib.1; (clear * - h13 ib cv e; omega)
     · rw [hr, cv]; push_cast
       rw [show -(i13.val : ℝ) - -S = -((i13.val : ℝ) - S) by ring, abs_neg]
       exact near
@@ -427,10 +415,10 @@ theorem from_radians_near (m f n : ℕ) (hm : m ≤ 2 ^ 63) (hn2 : 2 ≤ n) (hn 
     rw [e1, e2, e3, ← eN', eG']; ring
   rw [key]
   have b1 : |(P : ℝ) - (fr / 2 ^ (130 - n) + 1 / 2) + 1 / 2| ≤ 1 / 2 :=
-    abs_le.mpr ⟨by linarith, by linarith⟩
+    abs_le.mpr ⟨by linarith only [u], by linarith only [l]⟩
   have b2 : |((N : ℝ) - m / 2 ^ f * (2 / Real.pi) * 2 ^ 128) / 2 ^ (130 - n)| ≤ 5 / 4 / 2 ^ (130 - n) := by
     rw [abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ (130 - n))]
-    exact div_le_div_of_nonneg_right (abs_le.mpr ⟨by linarith, by linarith⟩) (by positivity)
+    exact div_le_div_of_nonneg_right (abs_le.mpr ⟨by linarith only [nu, dl], by linarith only [nl, du]⟩) (by positivity)
   exact (abs_add_le _ _).trans (add_le_add b1 b2)
 
 /-- Wrapping `v` to `n` bits keeps it within `E` of `X` modulo whole turns. -/
@@ -441,7 +429,7 @@ theorem wrap_turns (v n : ℕ) (X E : ℝ) (h : ∃ K : ℤ, |(v : ℝ) - (X + K
   have e : ((v % 2 ^ n : ℕ) : ℝ) = v - 2 ^ n * ((v / 2 ^ n : ℕ) : ℝ) := by
     have := Nat.mod_add_div v (2 ^ n)
     have : ((v % 2 ^ n : ℕ) : ℝ) + 2 ^ n * ((v / 2 ^ n : ℕ) : ℝ) = v := by exact_mod_cast this
-    linarith
+    linarith only [this]
   rw [e, Int.cast_sub, Int.cast_natCast]
   rw [show (v : ℝ) - 2 ^ n * ((v / 2 ^ n : ℕ) : ℝ) - (X + (K - ((v / 2 ^ n : ℕ) : ℝ)) * 2 ^ n) =
     (v : ℝ) - (X + K * 2 ^ n) by ring]
@@ -519,7 +507,7 @@ theorem angle_from_radians_spec (raw : Std.I64) (f n : Std.U32) (hf : f.val ≤ 
   refine WP.spec_bind (angle_mask_spec n hn) fun msk hmsk => ?_
   rw [lift, bind_ok]
   have dv : 2 ^ n.val ∣ 2 ^ 64 := Nat.pow_dvd_pow 2 hn
-  set v := q.val * 2 ^ (n.val - 2) + pos.val with hv
+  set! v := q.val * 2 ^ (n.val - 2) + pos.val with hv
   have tv : (core.num.U64.wrapping_add i6 pos &&& msk).val = v % 2 ^ n.val := by
     rw [and_mask_val _ _ _ hmsk, show core.num.U64.wrapping_add i6 pos = UScalar.wrapping_add i6 pos from rfl,
       UScalar.wrapping_add_val_eq, h6, UScalar.size_def, UScalarTy.U64_numBits_eq, Nat.mod_add_mod,

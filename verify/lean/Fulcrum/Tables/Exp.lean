@@ -1,15 +1,17 @@
 module
 
-public import Fulcrum.Tables.Trig
-public import Mathlib.Analysis.SpecialFunctions.Pow.Real
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Math.Const
+public import Fulcrum.Math.Series
 public import Mathlib.Analysis.SpecialFunctions.Log.Base
 
 /-!
-# The tables of `src/tables/exp.rs`, within half a unit
+# The constants of `src/tables/exp.rs`, within half a unit
 
-Every constant and every entry of `EXP2`, `LOG2` and `LOG2_WIDE`, as Aeneas
-extracts them, is within `½` of the true value times `2^62`, `2^104` or `2^126`:
-correctly rounded. `ln 2` comes from `log_two_near`; `2 / ln 2` and
+Every constant, as Aeneas extracts it, is within `½` of the true value times `2^62`, `2^104`
+or `2^126`: correctly rounded. Here also the bounds the tables rest on, each table in its own
+file so that its users wait only for it: `EXP2` in `Exp2.lean`, `LOG2` in `Log2.lean`,
+`LOG2_WIDE` in `Log2Wide.lean`. `ln 2` comes from `log_two_near`; `2 / ln 2` and
 `log₂ (1 + k/256) = log (1 + k/256) / ln 2` from a quotient of two near values
 (`quotient_near`), the logarithm by the series of `log (1 + x) - log (1 - x)` at
 `x = k / (512 + k)`; `2^(k/256) = exp (k/256 · ln 2)` by the series of `exp` at
@@ -111,16 +113,6 @@ theorem exp2_near (k : ℕ) (hk : k ≤ 256) (n : ℕ) (hq : |(k * ln2Q / 256 : 
   push_cast
   exact (abs_sub_le _ _ _).trans ((add_le_add d b).trans_eq (add_comm _ _))
 
-/-- `EXP2` is `2^(k/256) · 2^126` rounded to nearest at every `k < 256`. -/
-theorem exp2_entry (k : ℕ) (hk : k < 256) :
-    |((fulcrum.tables.exp.EXP2.val[k]!).val : ℝ) - (2 : ℝ) ^ ((k : ℝ) / 256) * 2 ^ 126| ≤ 1 / 2 := by
-  have all : ∀ k : ℕ, k < 256 → (|(k * ln2Q / 256 : ℚ)| < 35 + 1 ∧
-      expSum (k * ln2Q / 256) 35 + expRem (k * ln2Q / 256) 35 ≤ 3 ∧
-      |((fulcrum.tables.exp.EXP2.val[k]!).val : ℚ) - expSum (k * ln2Q / 256) 35 * 2 ^ 126| +
-        (expRem (k * ln2Q / 256) 35 + 6 / 2 ^ 270) * 2 ^ 126 ≤ 1 / 2) := by decide +kernel
-  have ⟨hq, h3, h⟩ := all k hk
-  exact entry_near _ 126 _ _ _ (exp2_near k (by omega) 35 (by exact_mod_cast hq) h3) h
-
 /-- `log (1 + x) - log (1 - x) = log (1 + k/256)` at `x = k / (512 + k)`. -/
 theorem log_artanh_point (k : ℕ) :
     Real.log (1 + ((k / (512 + k) : ℚ) : ℝ)) - Real.log (1 - ((k / (512 + k) : ℚ) : ℝ)) =
@@ -145,26 +137,6 @@ theorem log2_near (k n : ℕ) (hx : |(k / (512 + k) : ℚ)| < 1) (hS : |logSum (
   push_cast
   rw [mul_one_div] at h
   exact h
-
-/-- `LOG2` is `log₂ (1 + k/256) · 2^62` rounded to nearest at every `k < 256`. -/
-theorem log2_entry (k : ℕ) (hk : k < 256) :
-    |((fulcrum.tables.exp.LOG2.val[k]!).val : ℝ) - Real.logb 2 (1 + (k : ℝ) / 256) * 2 ^ 62| ≤
-      1 / 2 := by
-  have all : ∀ k : ℕ, k < 256 → (|(k / (512 + k) : ℚ)| < 1 ∧ |logSum (k / (512 + k)) 30| ≤ 2 ∧
-      |((fulcrum.tables.exp.LOG2.val[k]!).val : ℚ) - logSum (k / (512 + k)) 30 / ln2Q * 2 ^ 62| +
-        (2 * logRem (k / (512 + k)) 30 + 5 / 2 ^ 270) * 2 ^ 62 ≤ 1 / 2) := by decide +kernel
-  have ⟨hx, hS, h⟩ := all k hk
-  exact entry_near _ 62 _ _ _ (log2_near k 30 hx hS) h
-
-/-- `LOG2_WIDE` is `log₂ (1 + k/256) · 2^126` rounded to nearest at every `k < 256`. -/
-theorem log2_wide_entry (k : ℕ) (hk : k < 256) :
-    |((fulcrum.tables.exp.LOG2_WIDE.val[k]!).val : ℝ) - Real.logb 2 (1 + (k : ℝ) / 256) * 2 ^ 126| ≤
-      1 / 2 := by
-  have all : ∀ k : ℕ, k < 256 → (|(k / (512 + k) : ℚ)| < 1 ∧ |logSum (k / (512 + k)) 48| ≤ 2 ∧
-      |((fulcrum.tables.exp.LOG2_WIDE.val[k]!).val : ℚ) - logSum (k / (512 + k)) 48 / ln2Q * 2 ^ 126| +
-        (2 * logRem (k / (512 + k)) 48 + 5 / 2 ^ 270) * 2 ^ 126 ≤ 1 / 2) := by decide +kernel
-  have ⟨hx, hS, h⟩ := all k hk
-  exact entry_near _ 126 _ _ _ (log2_near k 48 hx hS) h
 
 end Fulcrum
 

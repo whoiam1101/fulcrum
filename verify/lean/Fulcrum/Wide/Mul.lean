@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Lemmas.Scalar
-public import Fulcrum.Math.MulWide
+public import Fulcrum.Kernel.Funs
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.MulWide
 
 /-!
 # `wide::widening_mul_u128`
@@ -52,11 +53,11 @@ theorem widening_mul_u128_spec (a b : Std.U128) :
   rw [lift, bind_ok, lift, bind_ok]
   have q00 : p00.val ≤ 2 ^ 128 - 1 := by rw [h00]; exact pl _ _ a0l b0l
   refine WP.spec_bind (UScalar.add_spec (x := i2) (y := UScalar.cast .U128 (UScalar.cast .U64 p01))
-    (by rw [cast_u128_val, cast_u64_val, h2, mx]; omega)) fun i5 h5 => ?_
+    (by rw [cast_u128_val, cast_u64_val, h2, mx]; (clear * - h00 h01 q00; omega))) fun i5 h5 => ?_
   rw [cast_u128_val, cast_u64_val, h2] at h5
   rw [lift, bind_ok, lift, bind_ok]
   refine WP.spec_bind (UScalar.add_spec (x := i5) (y := UScalar.cast .U128 (UScalar.cast .U64 p10))
-    (by rw [cast_u128_val, cast_u64_val, h5, mx]; omega)) fun mid hmid => ?_
+    (by rw [cast_u128_val, cast_u64_val, h5, mx]; (clear * - h00 h01 h10 q00 h5; omega))) fun mid hmid => ?_
   rw [cast_u128_val, cast_u64_val, h5] at hmid
   rw [lift, bind_ok, lift, bind_ok]
   refine WP.spec_bind (UScalar.ShiftLeft_IScalar_spec mid 64#i32 _ (by decide) (by rw [n128]; decide) rfl)
@@ -76,7 +77,7 @@ theorem widening_mul_u128_spec (a b : Std.U128) :
   rw [← ha1, ← hb1, ← a0v, ← b0v] at top
   have tl : a.val * b.val / 2 ^ 128 < 2 ^ 128 := by
     rw [Nat.div_lt_iff_lt_mul (by positivity)]
-    exact (Nat.mul_lt_mul_of_lt_of_le al bl.le (by omega)).trans_le le_rfl
+    exact (Nat.mul_lt_mul_of_lt_of_le al bl.le (by (clear * -; omega))).trans_le le_rfl
   refine WP.spec_bind (UScalar.mul_spec (x := a1) (y := b1) (by rw [mx]; exact pl _ _ a1l b1l)) fun i11 h11 => ?_
   refine WP.spec_bind (shr_i32_spec p01 64#i32 64 rfl (by rw [n128]; norm_num)) fun i12 h12 => ?_
   refine WP.spec_bind (UScalar.add_spec (x := i11) (y := i12) (by rw [h11, h12, h01, mx]; omega)) fun i13 h13 => ?_
@@ -85,7 +86,7 @@ theorem widening_mul_u128_spec (a b : Std.U128) :
     fun i15 h15 => ?_
   refine WP.spec_bind (shr_i32_spec mid 64#i32 64 rfl (by rw [n128]; norm_num)) fun i16 h16 => ?_
   refine WP.spec_bind (UScalar.add_spec (x := i15) (y := i16)
-    (by rw [h15, h13, h11, h12, h14, h16, hmid, h01, h10, h00, mx]; omega)) fun hi hhi => ?_
+    (by rw [h15, h13, h11, h12, h14, h16, hmid, h01, h10, h00, mx]; (clear * - top tl; omega))) fun hi hhi => ?_
   rw [WP.spec_ok]
   refine ⟨?_, ?_⟩
   · rw [hhi, h15, h13, h11, h12, h14, h16, hmid, h01, h10, h00]

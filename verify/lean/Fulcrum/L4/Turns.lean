@@ -1,8 +1,12 @@
 module
 
-public import Fulcrum.L4.SinQuarter
-public import Fulcrum.L1.ShrRound
-public import Fulcrum.Math.Range
+public import Fulcrum.Kernel.Funs
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
+import Fulcrum.L1.ShrRound
+import Fulcrum.L4.SinQuarter
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Quarter
+import Fulcrum.Math.Range
 
 /-!
 # L4: `trig::sin_position`, `sin_turns`, `cos_turns` (INTERNALS §3.11)
@@ -57,8 +61,8 @@ theorem sin_position_spec (t : Std.U64) (bits f : Std.U32) (hb : bits.val ≤ 62
   rw [lift, bind_ok]
   have i2v : (q &&& 1#u64).val = q.val % 2 := by rw [UScalar.val_and, lit_val, Nat.and_one_is_mod]
   generalize q &&& 1#u64 = i2 at i2v ⊢
-  set p' : ℕ := if q.val % 2 = 0 then p.val else 2 ^ bits.val - p.val with hp'
-  set S : ℝ := Real.sin (p' / 2 ^ bits.val * (Real.pi / 2)) with hS
+  set! p' : ℕ := if q.val % 2 = 0 then p.val else 2 ^ bits.val - p.val with hp'
+  set! S : ℝ := Real.sin (p' / 2 ^ bits.val * (Real.pi / 2)) with hS
   refine WP.spec_bind (Pₘ := fun m : Std.U64 => |(m.val : ℝ) - S * 2 ^ 62| ≤ 61 / 10) ?_ fun m hm => ?_
   · by_cases h0 : i2 = 0#u64
     · have e : q.val % 2 = 0 := by rw [← i2v, h0]; rfl

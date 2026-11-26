@@ -1,6 +1,10 @@
 module
 
 public import Fulcrum.Math.Fixed
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
+import Fulcrum.Math.Series
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Analysis.Real.Pi.Bounds
 
 /-!
 # `sin (a + θ)` of the quarter table (INTERNALS §3.11)
@@ -89,7 +93,7 @@ theorem quarter_near (s c B P : ℕ) (a : ℝ) (ha0 : 0 ≤ a) (ha1 : a ≤ Real
     calc (B : ℝ) * P ≤ 2 ^ 54 * (2 ^ 62 * (63 / 40) + 1 / 2) :=
           mul_le_mul hB' hP' (Nat.cast_nonneg P) (by positivity)
       _ ≤ (2 ^ 54 * (63 / 40) + 1) * 2 ^ 62 := by norm_num
-  set Z : ℝ := Θ * Θ / 2 ^ 62 with hZ
+  set! Z : ℝ := Θ * Θ / 2 ^ 62 with hZ
   have Z0 : 0 ≤ Z := by positivity
   have ZM : Z ≤ 2 ^ 46 * (5 / 2) := by
     exact (div_le_iff₀ (by positivity : (0 : ℝ) < 2 ^ 62)).mpr ((mul_le_mul ΘM ΘM Θ0 (by positivity)).trans (by norm_num))

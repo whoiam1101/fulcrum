@@ -1,6 +1,9 @@
 module
 
-public import Fulcrum.Spec
+public import Mathlib.Algebra.Group.Nat.Defs
+import Mathlib.Tactic.NormNum.Basic
+import Mathlib.Tactic.Positivity.Core
+import Fulcrum.Spec
 
 /-!
 # One step of Knuth's algorithm D with a two-digit divisor

@@ -1,6 +1,7 @@
 module
 
-public import Fulcrum.Spec
+public import Mathlib.Data.Nat.Notation
+import Mathlib.Tactic.Ring.RingNF
 
 /-!
 # The rounding of `scale_to` on 64 bits

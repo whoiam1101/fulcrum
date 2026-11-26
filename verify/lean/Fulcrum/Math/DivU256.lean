@@ -1,7 +1,10 @@
 module
 
-public import Fulcrum.Spec
+public import Mathlib.Algebra.Group.Nat.Defs
 public import Mathlib.Data.Nat.Log
+import Mathlib.Tactic.NormNum.Basic
+import Mathlib.Tactic.Positivity.Core
+import Fulcrum.Spec
 
 /-!
 # Dividing `hi · 2^128 + lo` by `d` in two digits

@@ -1,7 +1,11 @@
 module
 
-public import Fulcrum.L3.Sqrt.K32
-public import Fulcrum.Math.Newton
+public import Fulcrum.Kernel.Funs
+import Fulcrum.L3.Sqrt.K32
+import Fulcrum.Lemmas.Loop
+import Fulcrum.Lemmas.Nat
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Newton
 
 /-!
 # L3: `kernel::k64::isqrt`

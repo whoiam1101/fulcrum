@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Lemmas.Scalar
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.DivWide
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # `wide::div_rem_3by2`

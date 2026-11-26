@@ -1,8 +1,10 @@
 module
 
-public import Fulcrum.Lemmas.Nat
+public import Mathlib.Algebra.Group.Nat.Defs
 public import Mathlib.Data.Nat.Log
-public import Mathlib.Tactic.Ring
+import Fulcrum.Lemmas.Nat
+import Mathlib.Algebra.Order.Ring.Nat
+import Mathlib.Tactic.Ring.RingNF
 
 /-!
 # The start of `isqrt` of `k8` and `k16`

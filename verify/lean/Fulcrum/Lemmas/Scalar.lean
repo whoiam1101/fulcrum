@@ -1,6 +1,6 @@
 module
 
-public import Fulcrum.Kernel.Funs
+public import Fulcrum.Kernel.FunsExternal
 
 /-!
 # Facts about the scalars of Aeneas used by several modules
@@ -9,8 +9,9 @@ The values of literals, the largest value of the unsigned types as a power of
 two, `MIN`, `MAX` and the values of a signed type of `m + 1` bits, casts that
 keep the value, the bound of `usize`, shifts of an unsigned value by an `i32`
 amount, the last bit of an `i128`, `leading_zeros` of every unsigned width as
-`BITS - 1 - ⌊log₂ n⌋`, and the `unsigned_abs` of `FunsExternal.lean` as the
-natural absolute value.
+`BITS - 1 - ⌊log₂ n⌋`, the `unsigned_abs` of `FunsExternal.lean` as the
+natural absolute value, an `i64` widened to `i128`, the division of a `u64` by a literal and
+the read of an entry of an array of three `i64`.
 -/
 
 @[expose] public section
@@ -112,7 +113,7 @@ theorem and_one_val {W} (x one : IScalar W) (hone : one.bv.toNat = 1) (m : ℕ)
     (hW : W.numBits = m + 2) : (x &&& one).val = x.val % 2 := by
   have d : (2 : ℤ) ∣ ((2 ^ W.numBits : ℕ) : ℤ) := ⟨2 ^ (m + 1), by rw [hW, pow_succ]; push_cast; ring⟩
   have four : (4 : ℤ) ≤ ((2 ^ W.numBits : ℕ) : ℤ) := by
-    rw [hW, pow_add]; push_cast; nlinarith [one_le_pow₀ (M₀ := ℤ) one_le_two (n := m)]
+    rw [hW, pow_add]; push_cast; nlinarith only [one_le_pow₀ (M₀ := ℤ) one_le_two (n := m)]
   have small : ((x.bv.toNat % 2 : ℕ) : ℤ).bmod (2 ^ W.numBits) = ((x.bv.toNat % 2 : ℕ) : ℤ) := by
     have b : ((x.bv.toNat % 2 : ℕ) : ℤ) < 2 := by omega
     exact Int.bmod_eq_of_le (by omega) (by omega)
@@ -158,6 +159,26 @@ theorem leading_zeros_val {U} (n : UScalar U) (hn : n.val ≠ 0) (hU : U.numBits
   rw [UScalar.val, BitVec.leadingZeros, ite_eq_right hb, show n.bv.toNat = n.val from rfl]
   exact Nat.mod_eq_of_lt (Nat.lt_of_le_of_lt (Nat.sub_le _ _)
     (Nat.lt_of_le_of_lt (Nat.sub_le _ _) hU))
+
+/-- An `i64` widened to `i128` keeps its value. -/
+theorem cast_i128_val (x : Std.I64) : (IScalar.cast .I128 x).val = x.val := by
+  rw [IScalar.cast_val_eq, IScalarTy.I128_numBits_eq, IScalarTy.I64_numBits_eq]
+  have ⟨l, u⟩ := val_bounds x IScalarTy.I64_numBits_eq
+  exact Int.bmod_eq_of_le (by push_cast; norm_num at l ⊢; omega) (by push_cast; norm_num at u ⊢; omega)
+
+/-- A division of a `u64` by a non-zero literal. -/
+theorem u64_div_spec (x y : Std.U64) (d : ℕ) (hy : y.val = d) (hd : 0 < d) :
+    (x / y) ⦃ r => r.val = x.val / d ⦄ := by
+  obtain ⟨z, hz, hv⟩ := UScalar.div_spec x (y := y) (by omega)
+  rw [hz, WP.spec_ok, hv, hy]
+
+/-- An entry `k < 3` of an array of three `i64`, read by `index_usize`. -/
+theorem arr3_read (a : Std.Array Std.I64 3#usize) (i : Std.Usize) (k : ℕ) (hi : i.val = k) (hk : k < 3) :
+    Array.index_usize a i ⦃ x => x = a.val[k]! ⦄ := by
+  have hl : i.val < a.length := by rw [Array.length, a.property, hi]; exact hk
+  refine WP.spec_mono (Array.index_usize_spec a i hl) fun x hx => ?_
+  rw [hx, getElem!_pos a.val k (show k < a.val.length by rw [a.property]; exact hk)]
+  congr 1
 
 end Fulcrum
 

@@ -1,6 +1,8 @@
 module
 
-public import Mathlib.Data.List.Basic
+public import Mathlib.Data.Nat.Notation
+import Mathlib.Tactic.Attr.Core
+import Mathlib.Tactic.ToDual
 
 /-!
 # List facts used by the table proofs

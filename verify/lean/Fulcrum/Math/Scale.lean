@@ -1,8 +1,7 @@
 module
 
 public import Mathlib.Analysis.Real.Sqrt
-public import Mathlib.Algebra.Order.Round
-public import Mathlib.Data.Nat.Prime.Basic
+import Mathlib.Data.Nat.Prime.Basic
 
 /-!
 # A component of a vector scaled to a length
@@ -77,13 +76,13 @@ theorem scaleRound_eq (p s m : ℕ) (hs : 0 < s) (h : ScaleRound p s m) :
     by_contra c
     have c := not_lt.mp c
     have := mul_self_le_mul_self (by positivity) c
-    nlinarith
+    nlinarith only [tt, hu', this]
   rw [round_eq, Int.floor_eq_iff]
   have pt : 0 ≤ (p : ℝ) / t := by positivity
   constructor
   · have key : (m : ℝ) - 1 / 2 ≤ p / t := by
       rcases Nat.eq_zero_or_pos m with h0 | m1
-      · subst h0; push_cast; linarith
+      · subst h0; push_cast; linarith only [pt]
       rcases hl with h0 | hl
       · omega
       have c : ((2 * m - 1 : ℕ) : ℝ) = 2 * m - 1 := by
@@ -96,12 +95,12 @@ theorem scaleRound_eq (p s m : ℕ) (hs : 0 < s) (h : ScaleRound p s m) :
         by_contra c
         have c := (not_le.mp c).le
         have := mul_self_le_mul_self (by positivity) c
-        nlinarith
-      rw [le_div_iff₀ t0]; linarith
-    push_cast; linarith
+        nlinarith only [tt, hl', this]
+      rw [le_div_iff₀ t0]; linarith only [lo]
+    push_cast; linarith only [key]
   · push_cast
-    have : (p : ℝ) / t < m + 1 / 2 := by rw [div_lt_iff₀ t0]; linarith
-    linarith
+    have : (p : ℝ) / t < m + 1 / 2 := by rw [div_lt_iff₀ t0]; linarith only [up]
+    linarith only [this]
 
 /-- The component `x` of a vector with squared length `s`, scaled to the length
 `k`: `round (|x| · k / √s)` with the sign of `x`. -/

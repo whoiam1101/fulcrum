@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Math.Series
-public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Arctan
+public import Mathlib.Analysis.SpecialFunctions.Log.Basic
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
+import Fulcrum.Math.Series
 
 /-!
 # `π` and `ln 2` to `2^-270`
@@ -11,7 +12,8 @@ The tables of `src/tables/trig.rs` and `src/tables/exp.rs` hold `π`, `2/π` and
 Mathlib are not enough. `π` comes from Machin's formula
 `π = 16 arctan (1/5) - 4 arctan (1/239)` with 60 and 18 terms of the series,
 `ln 2 = log (1 + 1/3) - log (1 - 1/3)` with 87 terms; the kernel checks the
-rational sums (`decide +kernel`).
+rational sums (`decide +kernel`). `entry_near` turns such a rational bound into the bound of
+a table entry, for the tables of trig and exp alike.
 -/
 
 @[expose] public section
@@ -70,6 +72,19 @@ theorem log_two_near : |Real.log 2 - ln2Q| ≤ 1 / 2 ^ 270 := by
         abs_sub_le _ _ _
     _ ≤ logRem (1 / 3) 87 + |(logSum (1 / 3) 87 : ℝ) - ln2Q| := add_le_add h le_rfl
     _ ≤ 1 / 2 ^ 270 := by rw [add_comm]; exact key'
+
+/-- A natural `T` is within `½` of `v · 2^N` when `v` is within `R` of a rational
+`S` and `|T - S · 2^N| + R · 2^N ≤ ½`. -/
+theorem entry_near (T N : ℕ) (v : ℝ) (S R : ℚ) (hv : |v - S| ≤ R)
+    (h : |(T : ℚ) - S * 2 ^ N| + R * 2 ^ N ≤ 1 / 2) : |(T : ℝ) - v * 2 ^ N| ≤ 1 / 2 := by
+  have h' := (Rat.cast_le (K := ℝ)).mpr h
+  push_cast at h'
+  have p : (0 : ℝ) < 2 ^ N := pow_pos two_pos N
+  have e : (T : ℝ) - v * 2 ^ N = ((T : ℝ) - S * 2 ^ N) + (S - v) * 2 ^ N := by ring
+  rw [e]
+  refine (abs_add_le _ _).trans ((add_le_add le_rfl ?_).trans h')
+  rw [abs_mul, abs_of_pos p, abs_sub_comm]
+  exact mul_le_mul_of_nonneg_right hv p.le
 
 end Fulcrum
 

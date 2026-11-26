@@ -1,11 +1,13 @@
 module
 
-public import Fulcrum.L3.Div.Magnitude
-public import Fulcrum.L3.Sqrt.K8
-public import Fulcrum.L3.Sqrt.K16
-public import Fulcrum.L3.Sqrt.K32
-public import Fulcrum.L3.Sqrt.K64
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.RoundSqrt
+import Fulcrum.L3.Div.Magnitude
+import Fulcrum.L3.Sqrt.K16
+import Fulcrum.L3.Sqrt.K32
+import Fulcrum.L3.Sqrt.K64
+import Fulcrum.L3.Sqrt.K8
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # L5: square roots and lengths of `kernel::kN`
@@ -296,35 +298,35 @@ theorem rsqrt_shape {B U} (a : IScalar B) (three fF two : Std.I32) (one twoU : U
         ok (UScalar.hcast B i9))
       ⦃ r => r.val = round (Real.sqrt ((2 : ℝ) ^ (3 * F) / a.val)) ⦄ := by
   have ⟨_, ua⟩ := val_bounds a hB
-  set A := a.val.toNat with hAdef
+  set! A := a.val.toNat with hAdef
   have aA : (A : ℤ) = a.val := Int.toNat_of_nonneg ha.le
-  have A1 : 1 ≤ A := by omega
+  have A1 : 1 ≤ A := by (clear * - ha aA; omega)
   have Ab : A < 2 ^ b := by
     have : a.val < ((2 ^ b : ℕ) : ℤ) := by exact_mod_cast ua
-    omega
+    (clear * - aA this; omega)
   have mx : UScalar.max U = 2 ^ U.numBits - 1 := UScalar.max_def U
   set N := 2 ^ (3 * F) with hN
-  have hmax : a.val ≤ ((UScalar.max U : ℕ) : ℤ) := by rw [mx]; omega
+  have hmax : a.val ≤ ((UScalar.max U : ℕ) : ℤ) := by rw [mx]; (clear * - hD aA Ab mx hfit; omega)
   refine WP.spec_bind (IScalar.hcast_inBounds_spec U a ⟨ha.le, hmax⟩) fun u hu => ?_
-  have uv : u.val = A := by omega
+  have uv : u.val = A := by (clear * - aA hu; omega)
   have ⟨ml, mu⟩ := in_bounds_of_pow (W := .I32) (m := 31) rfl (x := three.val * fF.val)
-    (by rw [hthree, hfF]; omega) (by rw [hthree, hfF]; omega)
+    (by rw [hthree, hfF]; (clear * -; omega)) (by rw [hthree, hfF]; (clear * - hU h3; omega))
   refine WP.spec_bind (IScalar.mul_spec ml mu) fun i hi => ?_
   have iv : i.val = ((3 * F : ℕ) : ℤ) := by rw [hi, hthree, hfF]; push_cast; ring
-  have N1 : N < 2 ^ U.numBits := by omega
-  refine WP.spec_bind (shl_i32_spec one i (3 * F) iv (by omega) (by rw [hone]; omega))
+  have N1 : N < 2 ^ U.numBits := by (clear * - hD hdom; omega)
+  refine WP.spec_bind (shl_i32_spec one i (3 * F) iv (by (clear * - h3; omega)) (by rw [hone]; (clear * - N1; omega)))
     fun i1 hi1 => ?_
   rw [hone, one_mul] at hi1
-  obtain ⟨i2, hi2, hi2v⟩ := UScalar.div_spec i1 (y := u) (by rw [uv]; omega)
+  obtain ⟨i2, hi2, hi2v⟩ := UScalar.div_spec i1 (y := u) (by rw [uv]; (clear * - ha aA hu; omega))
   rw [hi2, bind_ok]
   rw [hi1, uv, ← hN] at hi2v
   have q : N / A ≤ N := Nat.div_le_self _ _
-  refine WP.spec_bind (hisq i2 (by rw [hi2v]; omega)) fun s hs => ?_
+  refine WP.spec_bind (hisq i2 (by rw [hi2v]; (clear * - hdom hi1 q; omega))) fun s hs => ?_
   rw [hi2v] at hs
   have ss : s.val * s.val ≤ N / A := hs ▸ Nat.sqrt_le _
   have e1 : s.val * s.val * A ≤ N := (Nat.mul_le_mul_right A ss).trans (Nat.div_mul_le_self N A)
   have e2 : s.val * A ≤ s.val * s.val * A + A := by
-    have : s.val ≤ s.val * s.val + 1 := by nlinarith
+    have : s.val ≤ s.val * s.val + 1 := by nlinarith only []
     calc s.val * A ≤ (s.val * s.val + 1) * A := Nat.mul_le_mul_right A this
       _ = s.val * s.val * A + A := by ring
   have e3 : (2 * s.val + 1) * (2 * s.val + 1) * A =
@@ -334,17 +336,17 @@ theorem rsqrt_shape {B U} (a : IScalar B) (three fF two : Std.I32) (one twoU : U
     Nat.le_mul_of_pos_right _ A1
   have b2 : 2 * s.val + 1 ≤ (2 * s.val + 1) * (2 * s.val + 1) :=
     Nat.le_mul_of_pos_left _ (Nat.succ_pos _)
-  refine WP.spec_bind (UScalar.mul_spec (by rw [htwoU]; omega)) fun i3 hi3 => ?_
-  refine WP.spec_bind (UScalar.add_spec (by rw [hi3, htwoU, hone]; omega)) fun o ho => ?_
+  refine WP.spec_bind (UScalar.mul_spec (by rw [htwoU]; (clear * - mx hs b5 b4 b2; omega))) fun i3 hi3 => ?_
+  refine WP.spec_bind (UScalar.add_spec (by rw [hi3, htwoU, hone]; (clear * - mx hs b5 b4 b2; omega))) fun o ho => ?_
   have ov : o.val = 2 * s.val + 1 := by rw [ho, hi3, htwoU, hone]
-  refine WP.spec_bind (UScalar.mul_spec (by rw [ov]; omega)) fun i4 hi4 => ?_
-  refine WP.spec_bind (UScalar.mul_spec (by rw [hi4, ov, uv]; omega)) fun i5 hi5 => ?_
+  refine WP.spec_bind (UScalar.mul_spec (by rw [ov]; (clear * - mx b5 b4; omega))) fun i4 hi4 => ?_
+  refine WP.spec_bind (UScalar.mul_spec (by rw [hi4, ov, uv]; (clear * - b5; omega))) fun i5 hi5 => ?_
   have ⟨al, au⟩ := in_bounds_of_pow (W := .I32) (m := 31) rfl (x := i.val + two.val)
-    (by rw [iv, htwo]; omega) (by rw [iv, htwo]; omega)
+    (by rw [iv, htwo]; (clear * -; omega)) (by rw [iv, htwo]; (clear * - hU h3; omega))
   refine WP.spec_bind (IScalar.add_spec al au) fun i6 hi6 => ?_
   have i6v : i6.val = ((3 * F + 2 : ℕ) : ℤ) := by rw [hi6, iv, htwo]; push_cast; ring
   have N4 : 2 ^ (3 * F + 2) = 4 * N := by rw [pow_add, hN]; ring
-  refine WP.spec_bind (shl_i32_spec one i6 (3 * F + 2) i6v h3 (by rw [hone]; rw [N4]; omega))
+  refine WP.spec_bind (shl_i32_spec one i6 (3 * F + 2) i6v h3 (by rw [hone]; rw [N4]; (clear * - hfit N1 hi1; omega)))
     fun i7 hi7 => ?_
   rw [hone, one_mul, N4] at hi7
   rw [lift, bind_ok]
@@ -360,10 +362,10 @@ theorem rsqrt_shape {B U} (a : IScalar B) (three fF two : Std.I32) (one twoU : U
     · rw [ite_eq_left g, decide_eq_true (this.mpr g)]; rfl
     · rw [ite_eq_right g, decide_eq_false (fun h => g (this.mp h))]; rfl
   have bnd : s.val + (UScalar.cast_fromBool U (decide (i5 < i7))).val < 2 ^ b := by
-    rw [hc, hcv]; split <;> omega
+    rw [hc, hcv]; split <;> (clear * - ha aA Ab hu hs e3 sb; omega)
   refine WP.spec_bind (UScalar.add_spec (by rw [mx]; omega)) fun i9 hi9 => ?_
   rw [WP.spec_ok, hcast_small i9 b hB (hi9 ▸ bnd), hi9, hc, hcv, hs]
-  have r := round_sqrt_pow_div (3 * F) A (by omega) (by omega)
+  have r := round_sqrt_pow_div (3 * F) A (by (clear * - ha aA hu e3; omega)) (by (clear * - aA Ab hab hu hi1 e3; omega))
   have cA : ((A : ℕ) : ℝ) = (a.val : ℝ) := by exact_mod_cast aA
   rw [Nat.cast_pow, Nat.cast_ofNat, cA] at r
   rw [r, ← hN]

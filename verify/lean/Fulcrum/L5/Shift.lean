@@ -1,7 +1,11 @@
 module
 
-public import Fulcrum.L1.ShrRound
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.Range
+import Fulcrum.L1.ShrRound
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Round
 
 /-!
 # L5: `kernel::kN::midpoint`, `kernel::kN::shr` and `kernel::kN::shl`
@@ -140,10 +144,10 @@ theorem shl_big (a : ℤ) (n m : ℕ) (hn : m + 1 ≤ n) (la : -2 ^ m ≤ a) (ua
   · rintro ⟨lo, hi⟩
     by_contra h
     rcases lt_or_gt_of_ne h with h | h
-    · nlinarith [mul_le_mul_of_nonneg_right (show a ≤ -1 by omega)
-        (show (0 : ℤ) ≤ 2 ^ j * (2 * 2 ^ m) by positivity)]
-    · nlinarith [mul_le_mul_of_nonneg_right (show 1 ≤ a by omega)
-        (show (0 : ℤ) ≤ 2 ^ j * (2 * 2 ^ m) by positivity)]
+    · nlinarith only [mul_le_mul_of_nonneg_right (show a ≤ -1 by omega)
+        (show (0 : ℤ) ≤ 2 ^ j * (2 * 2 ^ m) by positivity), p0, hT, lo]
+    · nlinarith only [mul_le_mul_of_nonneg_right (show 1 ≤ a by omega)
+        (show (0 : ℤ) ≤ 2 ^ j * (2 * 2 ^ m) by positivity), ua, hT, hi]
   · rintro rfl
     simp only [zero_mul]
     exact ⟨neg_nonpos.mpr p0.le, sub_nonneg.mpr (one_le_pow₀ one_le_two)⟩
@@ -162,15 +166,15 @@ theorem shl_back_iff (a : ℤ) (n m : ℕ) (hn : n ≤ m) :
   have hw : wrap (n + j) (a * 2 ^ n) = (a - q * 2 ^ (j + 1)) * 2 ^ n := by
     have : ((2 ^ (n + j + 1) : ℕ) : ℤ) = 2 ^ n * 2 ^ (j + 1) := by
       push_cast; rw [← pow_add]; ring_nf
-    rw [this] at hq; linarith
+    rw [this] at hq; linarith only [hq]
   rw [hw, shr_eq_div, Int.mul_ediv_cancel _ hpow.ne']
   constructor
   · intro h
-    have : q * 2 ^ (j + 1) = 0 := by linarith
+    have : q * 2 ^ (j + 1) = 0 := by linarith only [h]
     have hq0 : q = 0 := (mul_eq_zero.mp this).resolve_right pj.ne'
     rw [hq0]; ring
   · intro h
-    have : (q * 2 ^ (j + 1)) * 2 ^ n = 0 := by linarith
+    have : (q * 2 ^ (j + 1)) * 2 ^ n = 0 := by linarith only [h]
     have hq0 : q = 0 := (mul_eq_zero.mp ((mul_eq_zero.mp this).resolve_right hpow.ne')).resolve_right
       pj.ne'
     rw [hq0]; ring

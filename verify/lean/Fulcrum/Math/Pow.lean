@@ -1,6 +1,9 @@
 module
 
-public import Fulcrum.Math.Log
+public import Mathlib.Analysis.SpecialFunctions.Log.Base
+import Fulcrum.Math.Log
+import Fulcrum.Math.Series
+import Mathlib.Algebra.Order.Ring.Star
 
 /-!
 # The wide logarithm of `pow` (INTERNALS §3.16)
@@ -55,7 +58,7 @@ theorem coeff128_near (n : ℕ) (hn : 3 ≤ n) :
   have i : 1 / (n : ℝ) ≤ 1 / 3 := one_div_le_one_div_of_le (by norm_num) n3
   have e : ((2 : ℝ) ^ 128 - 1) / n = 2 ^ 128 / n - 1 / n := by ring
   rw [e] at l u
-  exact abs_le.mpr ⟨by linarith, by linarith [show (0 : ℝ) < 1 / n by positivity]⟩
+  exact abs_le.mpr ⟨by linarith only [u, i], by linarith only [show (0 : ℝ) < 1 / n by positivity, l]⟩
 
 /-- One Horner step of `atanhWideN`: `⌊(2^128 - 1)/n⌋ + ⌊z g / 2^128⌋` against
 `2^128 / n + Z G / 2^128`, for `z` within `1.004` of `Z ≤ 2^110` and `g` within `3` of
@@ -74,7 +77,7 @@ theorem horner128_step (z g n : ℕ) (Z G : ℝ) (hn : 3 ≤ n) (hz : |(z : ℝ)
   have ZG : Z * G / 2 ^ 128 ≤ 2 ^ 109 := by
     rw [div_le_iff₀ (by positivity)]
     exact (mul_le_mul ZM GM G0 (by positivity)).trans (by norm_num)
-  refine ⟨?_, ?_, by positivity, by linarith⟩
+  refine ⟨?_, ?_, by positivity, by linarith only [cM, ZG]⟩
   · rw [Nat.cast_add, show (((2 ^ 128 - 1) / n : ℕ) : ℝ) + (mul128 z g : ℝ) - (2 ^ 128 / n + Z * G / 2 ^ 128) =
       ((((2 ^ 128 - 1) / n : ℕ) : ℝ) - 2 ^ 128 / n) + ((mul128 z g : ℝ) - Z * G / 2 ^ 128) by ring]
     exact (abs_add_le _ _).trans ((add_le_add c m).trans (by norm_num))
@@ -110,15 +113,15 @@ theorem log2_wide_series_near (T s K : ℕ) (c σ : ℝ) (hT : |(T : ℝ) - Real
       3 := by
   have U0 : (0 : ℝ) < 2 ^ 128 := by positivity
   have ln2 := log_two_ge'
-  have ln0 : 0 < Real.log 2 := by linarith
+  have ln0 : 0 < Real.log 2 := by linarith only [ln2]
   set Sg : ℝ := σ * 2 ^ 128 with hSg
   have Sg0 : 0 ≤ Sg := by positivity
   have SgM : Sg ≤ 2 ^ 119 := by
     rw [hSg]; exact (mul_le_mul_of_nonneg_right hσ U0.le).trans (by norm_num)
   have sM : (s : ℝ) ≤ 2 ^ 119 := hs.trans SgM
   have sl : s ≤ 2 ^ 119 := by exact_mod_cast sM
-  have es : |(s : ℝ) - Sg| ≤ 1 := abs_le.mpr ⟨by linarith, by linarith⟩
-  set Z : ℝ := Sg * Sg / 2 ^ 128 with hZ
+  have es : |(s : ℝ) - Sg| ≤ 1 := abs_le.mpr ⟨by linarith only [hs1], by linarith only [hs]⟩
+  set! Z : ℝ := Sg * Sg / 2 ^ 128 with hZ
   have Z0 : 0 ≤ Z := by positivity
   have ZM : Z ≤ 2 ^ 110 := by
     rw [hZ, div_le_iff₀ U0]; exact (mul_le_mul SgM SgM Sg0 (by positivity)).trans (by norm_num)
@@ -127,7 +130,7 @@ theorem log2_wide_series_near (T s K : ℕ) (c σ : ℝ) (hT : |(T : ℝ) - Real
   have ez : |(z : ℝ) - Z| ≤ 1004 / 1000 := by
     have h := mul128_near s s Sg Sg 1 1 (2 ^ 119) (2 ^ 119) es es Sg0 SgM sM
     rw [hz] at h; exact h.trans (by norm_num)
-  set G13 : ℝ := 2 ^ 128 / 13
+  set! G13 : ℝ := 2 ^ 128 / 13
   have e13 : |((((2 ^ 128 - 1) / 13 : ℕ)) : ℝ) - G13| ≤ 3 := (coeff128_near 13 (by norm_num)).trans (by norm_num)
   have h11 := horner128_step z ((2 ^ 128 - 1) / 13) 11 Z G13 (by norm_num) ez Z0 ZM zl e13 (by norm_num)
     (by positivity) (by norm_num)
@@ -154,14 +157,14 @@ theorem log2_wide_series_near (T s K : ℕ) (c σ : ℝ) (hT : |(T : ℝ) - Real
     rw [hI22, div_le_iff₀ U0]; exact (mul_le_mul ZM G3M G30 (by positivity)).trans (by norm_num)
   have e23 := mul128_near s _ Sg I22 1 _ (2 ^ 119) (2 ^ 109) es e22' Sg0 SgM i22M
   have e23' := e23.trans (show _ ≤ (101 / 100 : ℝ) by norm_num)
-  set Sr : ℝ := Sg + Sg * I22 / 2 ^ 128 with hSr
+  set! Sr : ℝ := Sg + Sg * I22 / 2 ^ 128 with hSr
   have eser : |((s + mul128 s (mul128 z g) : ℕ) : ℝ) - Sr| ≤ 201 / 100 := by
     rw [Nat.cast_add, hSr, show (s : ℝ) + mul128 s (mul128 z g) - (Sg + Sg * I22 / 2 ^ 128) =
       ((s : ℝ) - Sg) + ((mul128 s (mul128 z g) : ℝ) - Sg * I22 / 2 ^ 128) by ring]
     exact (abs_add_le _ _).trans ((add_le_add es e23').trans (by norm_num))
-  set L : ℝ := (Real.log (1 + σ) - Real.log (1 - σ)) / 2 * 2 ^ 128 with hL
+  set! L : ℝ := (Real.log (1 + σ) - Real.log (1 - σ)) / 2 * 2 ^ 128 with hL
   have tail : |L - Sr| ≤ 1 / 100 := by
-    have h := log_sub_sum_le σ 7 (by rw [abs_of_nonneg hσ0]; linarith)
+    have h := log_sub_sum_le σ 7 (by rw [abs_of_nonneg hσ0]; linarith only [hσ])
     norm_num [sum_range_succ, abs_of_nonneg hσ0] at h
     have poly : Sr = 2 ^ 128 * (σ + σ ^ 3 / 3 + σ ^ 5 / 5 + σ ^ 7 / 7 + σ ^ 9 / 9 + σ ^ 11 / 11 + σ ^ 13 / 13) := by
       rw [hSr, hI22]; simp only [G3, G5, G7, G9, G11, G13, hZ, hSg]; push_cast; field_simp; ring
@@ -172,7 +175,7 @@ theorem log2_wide_series_near (T s K : ℕ) (c σ : ℝ) (hT : |(T : ℝ) - Real
       abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 128 / 2)]
     have s2 : σ ^ 2 ≤ (1 / 512) ^ 2 := pow_le_pow_left₀ hσ0 hσ 2
     have s15 : σ ^ 15 ≤ (1 / 512) ^ 15 := pow_le_pow_left₀ hσ0 hσ 15
-    have d : (99 / 100 : ℝ) ≤ 1 - σ ^ 2 := by linarith [show ((1 : ℝ) / 512) ^ 2 ≤ 1 / 100 by norm_num]
+    have d : (99 / 100 : ℝ) ≤ 1 - σ ^ 2 := by linarith only [show ((1 : ℝ) / 512) ^ 2 ≤ 1 / 100 by norm_num, hZ, ZM]
     have hh : |(Real.log (1 + σ) - Real.log (1 - σ)) - (2 * σ + 2 * (1 / 3) * σ ^ 3 + 2 * (1 / 5) * σ ^ 5 +
         2 * (1 / 7) * σ ^ 7 + 2 * (1 / 9) * σ ^ 9 + 2 * (1 / 11) * σ ^ 11 + 2 * (1 / 13) * σ ^ 13)| ≤
         2 * σ ^ 15 / 15 / (1 - σ ^ 2) := by
@@ -181,7 +184,7 @@ theorem log2_wide_series_near (T s K : ℕ) (c σ : ℝ) (hT : |(T : ℝ) - Real
           2 * (1 / 7) * σ ^ 7 + 2 * (1 / 9) * σ ^ 9 + 2 * (1 / 11) * σ ^ 11 + 2 * (1 / 13) * σ ^ 13)|
         ≤ 2 ^ 128 / 2 * (2 * (1 / 512) ^ 15 / 15 / (99 / 100)) :=
           mul_le_mul_of_nonneg_left (hh.trans (div_le_div₀ (by positivity)
-            (div_le_div_of_nonneg_right (by linarith) (by norm_num)) (by norm_num) d)) (by positivity)
+            (div_le_div_of_nonneg_right (by linarith only [s15]) (by norm_num)) (by norm_num) d)) (by positivity)
       _ ≤ 1 / 100 := by norm_num
   have eL : |((s + mul128 s (mul128 z g) : ℕ) : ℝ) - L| ≤ 202 / 100 := by
     calc _ ≤ |((s + mul128 s (mul128 z g) : ℕ) : ℝ) - Sr| + |Sr - L| := abs_sub_le _ _ _
@@ -189,21 +192,21 @@ theorem log2_wide_series_near (T s K : ℕ) (c σ : ℝ) (hT : |(T : ℝ) - Real
       _ ≤ 202 / 100 := by norm_num
   have L0 : 0 ≤ L := by
     rw [hL]
-    have : Real.log (1 - σ) ≤ Real.log (1 + σ) := Real.log_le_log (by linarith) (by linarith)
-    have : 0 ≤ (Real.log (1 + σ) - Real.log (1 - σ)) / 2 := by linarith
+    have : Real.log (1 - σ) ≤ Real.log (1 + σ) := Real.log_le_log (by linarith only [hσ]) (by linarith only [hσ0])
+    have : 0 ≤ (Real.log (1 + σ) - Real.log (1 - σ)) / 2 := by linarith only [this]
     positivity
   have SrM : Sr ≤ 2 ^ 119 + 2 ^ 100 := by
     rw [hSr]
     have : Sg * I22 / 2 ^ 128 ≤ 2 ^ 100 := by
       rw [div_le_iff₀ U0]
       exact (mul_le_mul SgM I22M I220 (by positivity)).trans (by norm_num)
-    linarith
-  have LM : L ≤ 2 ^ 119 + 2 ^ 101 := by linarith [(abs_le.mp tail).2]
+    linarith only [hσ, this]
+  have LM : L ≤ 2 ^ 119 + 2 ^ 101 := by linarith only [(abs_le.mp tail).2, SrM]
   have KM : (K : ℝ) ≤ 28855 / 10000 * 2 ^ 126 := by
-    have h1 : 2 / Real.log 2 ≤ 288545 / 100000 := by rw [div_le_iff₀ ln0]; linarith
+    have h1 : 2 / Real.log 2 ≤ 288545 / 100000 := by rw [div_le_iff₀ ln0]; linarith only [ln2, ln0]
     have h2 := (abs_le.mp hK).2
     have h3 : 2 / Real.log 2 * 2 ^ 126 ≤ 288545 / 100000 * 2 ^ 126 := mul_le_mul_of_nonneg_right h1 (by positivity)
-    linarith
+    linarith only [h1, h2]
   have e18 := mul128_near _ K L (2 / Real.log 2 * 2 ^ 126) _ _ (2 ^ 119 + 2 ^ 101) _ eL hK L0 LM KM
   have e18' := e18.trans (show _ ≤ (246 / 100 : ℝ) by norm_num)
   have av : atanhWideN s = s + mul128 s (mul128 z g) := by

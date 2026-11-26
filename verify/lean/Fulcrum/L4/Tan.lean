@@ -1,8 +1,16 @@
 module
 
 public import Fulcrum.L4.Radians
-public import Fulcrum.Math.Cot
-public import Mathlib.Analysis.Real.Pi.Irrational
+public import Fulcrum.Spec
+import Fulcrum.L1.ShrRound
+import Fulcrum.L4.SinQuarter
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Cot
+import Fulcrum.Math.Round
+import Fulcrum.Tables.Trig
+import Mathlib.Analysis.Real.Pi.Bounds
+import Mathlib.Analysis.Real.Pi.Irrational
 
 /-!
 # L4: `trig::tan` and `frac_2_pi_div` (INTERNALS §3.12)
@@ -229,34 +237,34 @@ theorem quarter_sin_lower (e : ℝ) (h1 : 2 ^ 52 ≤ e) (h2 : e ≤ 2 ^ 62) :
     rw [this]; gcongr
   have hy2 : e / 2 ^ 62 * (Real.pi / 2) ≤ Real.pi / 2 := by
     have : e / 2 ^ 62 ≤ 1 := by rw [div_le_one (by positivity)]; exact h2
-    nlinarith [Real.pi_pos]
+    nlinarith only [Real.pi_pos, h2, p1]
   have s0 : Real.sin (Real.pi / 2 ^ 11) ≤ Real.sin (e / 2 ^ 62 * (Real.pi / 2)) :=
-    Real.sin_le_sin_of_le_of_le_pi_div_two (by linarith [Real.pi_pos]) hy2 hy
+    Real.sin_le_sin_of_le_of_le_pi_div_two (by linarith only [Real.pi_pos, p1, p2]) hy2 hy
   have s1 := Real.sin_ge_sub_cube (show 0 ≤ Real.pi / 2 ^ 11 by positivity)
   have c3 : (Real.pi / 2 ^ 11) ^ 3 ≤ (3.15 / 2 ^ 11) ^ 3 := by gcongr
   have : 7070 * 10 ^ 12 ≤ (Real.pi / 2 ^ 11 - (Real.pi / 2 ^ 11) ^ 3 / 6) * 2 ^ 62 := by
-    nlinarith
+    nlinarith only [p1, p2, c3]
   exact this.trans (mul_le_mul_of_nonneg_right (s1.trans s0) (by positivity))
 
 /-- The quotient of two values within `6.1` of `A ≥ 0` and `B ≥ 7.07 · 10^15`,
 `A² + B² = 2^124`, is within `8 · 10^-13` of `A / B`. -/
 theorem tan_quotient_near (n d A B : ℝ) (hA : 0 ≤ A) (hB : 7070 * 10 ^ 12 ≤ B) (hn : |n - A| ≤ 61 / 10)
     (hd : |d - B| ≤ 61 / 10) (hAB : A ^ 2 + B ^ 2 = 2 ^ 124) : |n / d - A / B| ≤ 8 / 10 ^ 13 := by
-  have dl : B - 61 / 10 ≤ d := by linarith [(abs_le.mp hd).1]
+  have dl : B - 61 / 10 ≤ d := by linarith only [(abs_le.mp hd).1]
   have Bp : 0 < B := lt_of_lt_of_le (by norm_num) hB
-  have dp : 0 < d := lt_of_lt_of_le (by linarith) dl
+  have dp : 0 < d := lt_of_lt_of_le (by linarith only [hB]) dl
   have sum : A + B ≤ 14143 / 10000 * 2 ^ 62 := by
-    nlinarith [sq_nonneg (A - B), sq_nonneg (A + B - 14143 / 10000 * 2 ^ 62)]
+    nlinarith only [sq_nonneg (A - B), sq_nonneg (A + B - 14143 / 10000 * 2 ^ 62), hAB]
   rw [div_sub_div _ _ dp.ne' Bp.ne', abs_div, abs_of_pos (mul_pos dp Bp)]
   have num : |n * B - d * A| ≤ 61 / 10 * (A + B) := by
     rw [show n * B - d * A = (n - A) * B - (d - B) * A by ring]
     refine (abs_sub _ _).trans ?_
     rw [abs_mul, abs_mul, abs_of_pos Bp, abs_of_nonneg hA]
-    nlinarith [abs_nonneg (n - A), abs_nonneg (d - B)]
+    nlinarith only [abs_nonneg (n - A), abs_nonneg (d - B), hA, hB, hn, hd]
   have den : (7070 * 10 ^ 12 - 61 / 10) * (7070 * 10 ^ 12) ≤ d * B :=
-    mul_le_mul (by linarith) hB (by norm_num) dp.le
+    mul_le_mul (by linarith only [hB, dl]) hB (by norm_num) dp.le
   rw [div_le_iff₀ (mul_pos dp Bp)]
-  calc |n * B - d * A| ≤ 61 / 10 * (14143 / 10000 * 2 ^ 62) := num.trans (by linarith)
+  calc |n * B - d * A| ≤ 61 / 10 * (14143 / 10000 * 2 ^ 62) := num.trans (by linarith only [sum])
     _ ≤ 8 / 10 ^ 13 * ((7070 * 10 ^ 12 - 61 / 10) * (7070 * 10 ^ 12)) := by norm_num
     _ ≤ 8 / 10 ^ 13 * (d * B) := by gcongr
 
@@ -270,11 +278,11 @@ theorem tan_shift (u x e c η : ℝ) (hu : u = x + e) (hc : c ≤ |Real.cos u|) 
     have h1 := Real.abs_cos_sub_cos_le (x + e) x
     rw [add_sub_cancel_left] at h1
     have h2 := abs_sub_abs_le_abs_sub (Real.cos (x + e)) (Real.cos x)
-    linarith
-  have cp : 0 < c - η := by linarith
-  have c0 : 0 < c := by linarith
-  have cu : Real.cos (x + e) ≠ 0 := fun h => by rw [h, abs_zero] at hc; linarith
-  have cxn : Real.cos x ≠ 0 := fun h => by rw [h, abs_zero] at cx; linarith
+    linarith only [he, hc, h1, h2]
+  have cp : 0 < c - η := by linarith only [hη]
+  have c0 : 0 < c := by linarith only [hη, η0]
+  have cu : Real.cos (x + e) ≠ 0 := fun h => by rw [h, abs_zero] at hc; linarith only [hη, hc, η0]
+  have cxn : Real.cos x ≠ 0 := fun h => by rw [h, abs_zero] at cx; linarith only [hη, cx]
   rw [Real.tan_eq_sin_div_cos, Real.tan_eq_sin_div_cos, div_sub_div _ _ cu cxn,
     show Real.sin (x + e) * Real.cos x - Real.cos (x + e) * Real.sin x = Real.sin (x + e - x) by
       rw [Real.sin_sub],
@@ -308,7 +316,7 @@ theorem round_quot (n d k : ℕ) (hd : 0 < d) :
   have X : ((n * 2 ^ (k + 1) + d : ℕ) : ℝ) / ((d * 2 : ℕ) : ℝ) = n * 2 ^ k / d + 1 / 2 := by
     push_cast; field_simp; ring
   rw [X] at l u
-  exact abs_le.mpr ⟨by linarith, by linarith⟩
+  exact abs_le.mpr ⟨by linarith only [u], by linarith only [l]⟩
 
 /-- The quotient of `trig::tan` away from a pole: `n · 2^(f+1) / d` and one bit of
 `shr_round` give `r` within `½ + 2^f · 8 · 10^-13` of `A / B · 2^f` when `n`, `d`
@@ -328,11 +336,11 @@ theorem quot_round_spec {α} (n d : Std.U128) (f : Std.U32) (hf : f.val ≤ 32) 
       k r) ⦃ P ⦄ := by
   have n128 : UScalarTy.U128.numBits = 128 := rfl
   have Bp : (0 : ℝ) < B := lt_of_lt_of_le (by norm_num) hB
-  have A1 : A ≤ 2 ^ 62 := by nlinarith
+  have A1 : A ≤ 2 ^ 62 := by nlinarith only [hA, hAB]
   have nl : n.val ≤ 2 ^ 62 + 7 := by
-    have : (n.val : ℝ) ≤ 2 ^ 62 + 7 := by linarith [(abs_le.mp hn).2]
+    have : (n.val : ℝ) ≤ 2 ^ 62 + 7 := by linarith only [(abs_le.mp hn).2, A1]
     exact_mod_cast this
-  have dl : (7069 * 10 ^ 12 : ℝ) ≤ d.val := by linarith [(abs_le.mp hd).1]
+  have dl : (7069 * 10 ^ 12 : ℝ) ≤ d.val := by linarith only [(abs_le.mp hd).1, hB]
   have dl' : 7069 * 10 ^ 12 ≤ d.val := by exact_mod_cast dl
   have dpos : 0 < d.val := lt_of_lt_of_le (by norm_num) dl'
   refine WP.spec_bind (UScalar.add_spec (x := f) (y := 1#u32) (by rw [lit_val, U32_max_val]; omega))
@@ -443,14 +451,14 @@ theorem tan_far_spec (t : Std.U64) (f : Std.U32) (hf : f.val ≤ 32) (hden : 2 ^
   have φ1 : φ ≤ Real.pi / 2 := by
     have : (p.val : ℝ) / 2 ^ 62 ≤ 1 := by
       rw [div_le_one (by positivity)]; exact_mod_cast pl
-    rw [hφ]; nlinarith [Real.pi_pos]
+    rw [hφ]; nlinarith only [Real.pi_pos, this]
   have e7 : (i6.val : ℝ) / 2 ^ 62 * (Real.pi / 2) = Real.pi / 2 - φ := by
     rw [h6, Nat.cast_sub pl, hφ]; push_cast; field_simp; ring
   rw [e7, Real.sin_pi_div_two_sub] at h7
   set A : ℝ := Real.sin φ * 2 ^ 62
   set B : ℝ := Real.cos φ * 2 ^ 62
-  have A0 : 0 ≤ A := mul_nonneg (Real.sin_nonneg_of_nonneg_of_le_pi φ0 (by linarith [Real.pi_pos])) (by positivity)
-  have B0 : 0 ≤ B := mul_nonneg (Real.cos_nonneg_of_mem_Icc ⟨by linarith [Real.pi_pos], φ1⟩) (by positivity)
+  have A0 : 0 ≤ A := mul_nonneg (Real.sin_nonneg_of_nonneg_of_le_pi φ0 (by linarith only [Real.pi_pos, φ0, φ1])) (by positivity)
+  have B0 : 0 ≤ B := mul_nonneg (Real.cos_nonneg_of_mem_Icc ⟨by linarith only [Real.pi_pos, φ0, φ1], φ1⟩) (by positivity)
   have AB : A ^ 2 + B ^ 2 = 2 ^ 124 := by
     have := Real.sin_sq_add_cos_sq φ
     rw [show A ^ 2 + B ^ 2 = (Real.sin φ ^ 2 + Real.cos φ ^ 2) * 2 ^ 124 by ring, this, one_mul]
@@ -504,8 +512,8 @@ theorem frac2PiN_ge : 2 ^ 191 ≤ frac2PiN := by
   have h : |(frac2PiN : ℝ) - 2 / Real.pi * 2 ^ 192| ≤ 1 / 2 := frac_2_pi_entry
   have p2 := Real.pi_lt_d2
   have : (2 : ℝ) ^ 191 + 1 ≤ 2 / Real.pi * 2 ^ 192 := by
-    rw [div_mul_eq_mul_div, le_div_iff₀ Real.pi_pos]; nlinarith
-  have : (2 : ℝ) ^ 191 ≤ frac2PiN := by linarith [(abs_le.mp h).1]
+    rw [div_mul_eq_mul_div, le_div_iff₀ Real.pi_pos]; nlinarith only [p2]
+  have : (2 : ℝ) ^ 191 ≤ frac2PiN := by linarith only [(abs_le.mp h).1, this]
   exact_mod_cast this
 
 theorem words3_lt (a b c : ℕ) (ha : a < 2 ^ 64) (hb : b < 2 ^ 64) (hc : c < 2 ^ 64) :
@@ -689,7 +697,7 @@ theorem thetaN_near (D : ℕ) (hD : D < 2 ^ 118) : |(thetaN D : ℝ) - D * Real.
         D / 2 ^ 64 * ((7244019458077122842 - Real.pi / 2 * 2 ^ 62) / 2 ^ 62) := by ring
   have b1 : |(D1 - D / 2 ^ 64) * (7244019458077122842 / 2 ^ 62)| ≤ 1576 / 1000 := by
     rw [abs_mul, abs_of_pos (by norm_num : (0 : ℝ) < 7244019458077122842 / 2 ^ 62)]
-    have : |D1 - D / 2 ^ 64| ≤ 1 := abs_le.mpr ⟨by linarith, by linarith⟩
+    have : |D1 - D / 2 ^ 64| ≤ 1 := abs_le.mpr ⟨by linarith only [u1], by linarith only [p2, l1, hF2]⟩
     calc |D1 - D / 2 ^ 64| * (7244019458077122842 / 2 ^ 62) ≤ 1 * (7244019458077122842 / 2 ^ 62) := by gcongr
       _ ≤ 1576 / 1000 := by norm_num
   have b2 : |D / 2 ^ 64 * ((7244019458077122842 - Real.pi / 2 * 2 ^ 62) / 2 ^ 62)| ≤ 1 / 500 := by
@@ -698,12 +706,12 @@ theorem thetaN_near (D : ℕ) (hD : D < 2 ^ 118) : |(thetaN D : ℝ) - D * Real.
     calc (D : ℝ) / 2 ^ 64 * (|(7244019458077122842 : ℝ) - Real.pi / 2 * 2 ^ 62| / 2 ^ 62)
         ≤ 2 ^ 54 * ((1 / 2) / 2 ^ 62) := by
           gcongr
-          rw [div_le_iff₀ (by positivity)]; linarith
+          rw [div_le_iff₀ (by positivity)]; linarith only [Dl]
       _ ≤ 1 / 500 := by norm_num
   have h3 := (abs_add_le _ _).trans (add_le_add b1 b2)
   rw [← e] at h3
   have := abs_le.mp h3
-  exact abs_le.mpr ⟨by linarith, by linarith⟩
+  exact abs_le.mpr ⟨by linarith only [p2, u2, hF2, this], by linarith only [p2, l2, hF2, this]⟩
 
 /-- `theta3N D` is within `1.02` of `T³ / 2^128` when `thetaN D` is within `2.6`
 of `T ∈ [0, 2^55]`. -/
@@ -720,19 +728,19 @@ theorem theta3N_near (D : ℕ) (T : ℝ) (hD : D < 2 ^ 118) (hT : |(thetaN D : �
   have b1 : |v * u / 2 ^ 64 - u ^ 3 / 2 ^ 128| ≤ 1 / 500 := by
     rw [show v * u / 2 ^ 64 - u ^ 3 / 2 ^ 128 = (v - u * u / 2 ^ 64) * (u / 2 ^ 64) by ring, abs_mul,
       abs_of_nonneg (by positivity : 0 ≤ u / 2 ^ 64)]
-    have : |v - u * u / 2 ^ 64| ≤ 1 := abs_le.mpr ⟨by linarith, by linarith⟩
+    have : |v - u * u / 2 ^ 64| ≤ 1 := abs_le.mpr ⟨by linarith only [u1], by linarith only [l1]⟩
     calc |v - u * u / 2 ^ 64| * (u / 2 ^ 64) ≤ 1 * (2 ^ 55 / 2 ^ 64) := by gcongr
       _ ≤ 1 / 500 := by norm_num
   have b2 : |u ^ 3 / 2 ^ 128 - T ^ 3 / 2 ^ 128| ≤ 1 / 5000 := by
     rw [← sub_div, abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 128),
       show u ^ 3 - T ^ 3 = (u - T) * (u ^ 2 + u * T + T ^ 2) by ring, abs_mul,
       abs_of_nonneg (by positivity : 0 ≤ u ^ 2 + u * T + T ^ 2), div_le_iff₀ (by positivity)]
-    have : u ^ 2 + u * T + T ^ 2 ≤ 3 * 2 ^ 110 := by nlinarith
+    have : u ^ 2 + u * T + T ^ 2 ≤ 3 * 2 ^ 110 := by nlinarith only [T0, Tl, ul, u0]
     calc |u - T| * (u ^ 2 + u * T + T ^ 2) ≤ 26 / 10 * (3 * 2 ^ 110) := by gcongr
       _ ≤ 1 / 5000 * 2 ^ 128 := by norm_num
   have b3 := (abs_sub_le (v * u / 2 ^ 64) (u ^ 3 / 2 ^ 128) (T ^ 3 / 2 ^ 128)).trans (add_le_add b1 b2)
   have := abs_le.mp b3
-  exact abs_le.mpr ⟨by linarith, by linarith⟩
+  exact abs_le.mpr ⟨by linarith only [u2, this], by linarith only [l2, this]⟩
 
 /-- `cotN D` is within `512` of `2^64 · cot θ`, `θ = (D + ε) · π / 2^129` the
 distance `D + ε` to the pole in radians, for `2^94 ≤ D < 2^118` and `|ε| ≤ 3/2`:
@@ -747,14 +755,14 @@ theorem cotN_near (D : ℕ) (ε : ℝ) (h1 : 2 ^ 94 ≤ D) (h2 : D < 2 ^ 118) (h
   have D2 : (D : ℝ) < 2 ^ 118 := by exact_mod_cast h2
   have ⟨e1, e2⟩ := abs_le.mp he
   set θ : ℝ := (D + ε) * Real.pi / 2 ^ 129 with hθ
-  set T : ℝ := (D + ε) * Real.pi / 2 ^ 65 with hT
-  set K : ℝ := 2 / Real.pi * 2 ^ 192 with hK
-  have Dε : (2 : ℝ) ^ 94 - 3 / 2 ≤ D + ε := by linarith
+  set! T : ℝ := (D + ε) * Real.pi / 2 ^ 65 with hT
+  set! K : ℝ := 2 / Real.pi * 2 ^ 192 with hK
+  have Dε : (2 : ℝ) ^ 94 - 3 / 2 ≤ D + ε := by linarith only [D1, e1]
   have θ0 : 0 < θ := by
-    have : (0 : ℝ) < D + ε := by linarith
+    have : (0 : ℝ) < D + ε := by linarith only [p1, p2, D1, e1]
     rw [hθ]; exact div_pos (mul_pos this Real.pi_pos) (by positivity)
   have θ1 : θ ≤ 1 / 650 := by
-    rw [hθ, div_le_iff₀ (by positivity)]; nlinarith
+    rw [hθ, div_le_iff₀ (by positivity)]; nlinarith only [p1, p2, D2, e2, hθ, θ0]
   have cn := cot_near θ θ0 (θ1.trans (by norm_num))
   have hTθ : T = 2 ^ 64 * θ := by rw [hT, hθ]; ring
   have hKθ : K / (D + ε) = 2 ^ 64 * (1 / θ) := by
@@ -768,19 +776,19 @@ theorem cotN_near (D : ℕ) (ε : ℝ) (h1 : 2 ^ 94 ≤ D) (h2 : D < 2 ^ 118) (h
       _ ≤ 408 := by norm_num
   have hC : |(frac2PiN : ℝ) - K| ≤ 1 / 2 := frac_2_pi_entry
   have Kl : K ≤ 2 ^ 192 := by
-    rw [hK]; have : 2 / Real.pi ≤ 1 := by rw [div_le_one Real.pi_pos]; linarith
-    nlinarith
+    rw [hK]; have : 2 / Real.pi ≤ 1 := by rw [div_le_one Real.pi_pos]; linarith only [p1, θ0, θ1]
+    nlinarith only [this]
   have K0 : 0 ≤ K := by positivity
-  have a1 := div_near frac2PiN D K (1 / 2) (by omega) hC
+  have a1 := div_near frac2PiN D K (1 / 2) (by (clear * - h1 h2; omega)) hC
   have a2 : |K / D - K / (D + ε)| ≤ 25 := by
-    rw [div_sub_div _ _ (ne_of_gt (by linarith)) (ne_of_gt (by linarith)), abs_div,
+    rw [div_sub_div _ _ (ne_of_gt (by linarith only [D1, θ0, θ1])) (ne_of_gt (by linarith only [D1, e1, θ0, θ1])), abs_div,
       show K * (D + ε) - D * K = K * ε by ring, abs_mul, abs_of_nonneg K0,
-      abs_of_pos (by nlinarith : (0 : ℝ) < D * (D + ε)), div_le_iff₀ (by nlinarith)]
+      abs_of_pos (by nlinarith only [D1, e1, θ0, θ1] : (0 : ℝ) < D * (D + ε)), div_le_iff₀ (by nlinarith only [D1, e1, θ0, θ1])]
     calc K * |ε| ≤ 2 ^ 192 * (3 / 2) := mul_le_mul Kl he (abs_nonneg _) (by positivity)
       _ ≤ 25 * (2 ^ 94 * (2 ^ 94 - 3 / 2)) := by norm_num
       _ ≤ 25 * (D * (D + ε)) := by gcongr
   have A : |((frac2PiN / D : ℕ) : ℝ) - K / (D + ε)| ≤ 27 := by
-    have : (1 / 2 : ℝ) / D ≤ 1 / 2 := div_le_self (by norm_num) (by linarith)
+    have : (1 / 2 : ℝ) / D ≤ 1 / 2 := div_le_self (by norm_num) (by linarith only [D1, θ0, θ1])
     have := (abs_sub_le _ (K / D) _).trans (add_le_add a1 a2)
     linarith
   have tn := thetaN_near D h2
@@ -788,24 +796,24 @@ theorem cotN_near (D : ℕ) (ε : ℝ) (h1 : 2 ^ 94 ≤ D) (h2 : D < 2 ^ 118) (h
     have : |(D : ℝ) * Real.pi / 2 ^ 65 - T| ≤ 1 / 50 := by
       rw [hT, ← sub_div, show (D : ℝ) * Real.pi - (D + ε) * Real.pi = -(ε * Real.pi) by ring, abs_div, abs_neg,
         abs_mul, abs_of_pos Real.pi_pos, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 65), div_le_iff₀ (by positivity)]
-      nlinarith [abs_nonneg ε]
+      nlinarith only [abs_nonneg ε, he, p1, p2, θ0, θ1]
     have := (abs_sub_le _ _ _).trans (add_le_add tn this)
-    linarith
+    linarith only [this]
   have T0 : 0 ≤ T := by rw [hTθ]; positivity
-  have Tl : T ≤ 2 ^ 55 := by rw [hTθ]; nlinarith
+  have Tl : T ≤ 2 ^ 55 := by rw [hTθ]; nlinarith only [θ0, θ1]
   have B := div_near (thetaN D) 3 T (26 / 10) (by norm_num) tT
   have w := theta3N_near D T h2 tT T0 Tl
   have Cw := div_near (theta3N D) 45 (T ^ 3 / 2 ^ 128) (102 / 100) (by norm_num) w
   have tl : thetaN D / 3 < 2 ^ 55 := (Nat.div_le_self _ _).trans_lt (thetaN_lt D h2)
   have t3l : theta3N D / 45 < 2 ^ 37 := (Nat.div_le_self _ _).trans_lt (theta3N_lt D h2)
   have Cd : 2 ^ 73 ≤ frac2PiN / D := by
-    rw [Nat.le_div_iff_mul_le (by omega)]
+    rw [Nat.le_div_iff_mul_le (by (clear * - h1 h2; omega))]
     calc 2 ^ 73 * D ≤ 2 ^ 73 * 2 ^ 118 := Nat.mul_le_mul_left _ h2.le
       _ = 2 ^ 191 := by norm_num
       _ ≤ frac2PiN := frac2PiN_ge
   have cast : (cotN D : ℝ) = ((frac2PiN / D : ℕ) : ℝ) - ((thetaN D / 3 : ℕ) : ℝ) - ((theta3N D / 45 : ℕ) : ℝ) := by
     unfold cotN
-    rw [Nat.cast_sub (by omega), Nat.cast_sub (by omega)]
+    rw [Nat.cast_sub (by (clear * - tl t3l Cd; omega)), Nat.cast_sub (by (clear * - tl Cd; omega))]
   rw [cast]
   push_cast at B Cw
   have := abs_le.mp A
@@ -851,7 +859,7 @@ theorem quarters_near (m f : ℕ) (hm : m < 2 ^ 64) :
       _ ≤ 1 / 2 * 2 ^ (f + 64) := by gcongr; exact one_le_two; omega
   rw [e]
   have := abs_le.mp b
-  exact abs_le.mpr ⟨by linarith, by linarith⟩
+  exact abs_le.mpr ⟨by linarith only [l, this], by linarith only [u, this]⟩
 
 /-- `|cot Δ| ≥ 2^(f+1)` for `0 < |Δ| ≤ 0.4 / 2^f`: the saturation of `trig::tan`. -/
 theorem cot_big (Δ : ℝ) (f : ℕ) (h0 : Δ ≠ 0) (h : |Δ| ≤ 4 / 10 / 2 ^ f) :
@@ -859,7 +867,7 @@ theorem cot_big (Δ : ℝ) (f : ℕ) (h0 : Δ ≠ 0) (h : |Δ| ≤ 4 / 10 / 2 ^ 
   set a := |Δ|
   have a0 : 0 < a := abs_pos.mpr h0
   have a4 : a ≤ 4 / 10 := h.trans (div_le_self (by norm_num) (one_le_pow₀ one_le_two))
-  have sn : 0 ≤ Real.sin a := Real.sin_nonneg_of_nonneg_of_le_pi a0.le (by linarith [Real.pi_gt_three])
+  have sn : 0 ≤ Real.sin a := Real.sin_nonneg_of_nonneg_of_le_pi a0.le (by linarith only [Real.pi_gt_three, a0, a4])
   have sa : |Real.sin Δ| = Real.sin a := by
     rcases le_or_gt 0 Δ with hd | hd
     · have ha : a = Δ := abs_of_nonneg hd
@@ -868,17 +876,17 @@ theorem cot_big (Δ : ℝ) (f : ℕ) (h0 : Δ ≠ 0) (h : |Δ| ≤ 4 / 10 / 2 ^ 
       rw [show Real.sin Δ = -Real.sin a by rw [ha, Real.sin_neg, neg_neg], abs_neg, abs_of_nonneg sn]
   have ca : |Real.cos Δ| = Real.cos a := by
     rw [show Real.cos a = Real.cos Δ from Real.cos_abs Δ]
-    exact abs_of_nonneg (Real.cos_nonneg_of_mem_Icc ⟨by linarith [Real.pi_gt_three, neg_abs_le Δ],
-      by linarith [Real.pi_gt_three, le_abs_self Δ]⟩)
+    exact abs_of_nonneg (Real.cos_nonneg_of_mem_Icc ⟨by linarith only [Real.pi_gt_three, neg_abs_le Δ, a0, a4],
+      by linarith only [Real.pi_gt_three, le_abs_self Δ, a0, a4]⟩)
   have s1 : Real.sin a ≤ a := Real.sin_le a0.le
-  have s0 : 0 < Real.sin a := Real.sin_pos_of_pos_of_lt_pi a0 (by linarith [Real.pi_gt_three])
-  have c1 : 92 / 100 ≤ Real.cos a := by nlinarith [Real.one_sub_sq_div_two_le_cos (x := a)]
+  have s0 : 0 < Real.sin a := Real.sin_pos_of_pos_of_lt_pi a0 (by linarith only [Real.pi_gt_three, a0, a4])
+  have c1 : 92 / 100 ≤ Real.cos a := by nlinarith only [Real.one_sub_sq_div_two_le_cos (x := a), a0, a4]
   rw [abs_div, sa, ca, le_div_iff₀ s0]
   have : 2 ^ (f + 1) * a ≤ 92 / 100 := by
     rw [pow_succ]
-    have : (2 : ℝ) ^ f * a ≤ 4 / 10 := by rw [le_div_iff₀ (by positivity)] at h; linarith
-    linarith
-  nlinarith [pow_pos (two_pos : (0 : ℝ) < 2) (f + 1)]
+    have : (2 : ℝ) ^ f * a ≤ 4 / 10 := by rw [le_div_iff₀ (by positivity)] at h; linarith only [h]
+    linarith only [a0, a4, this]
+  nlinarith only [pow_pos (two_pos : (0 : ℝ) < 2) (f + 1), a0, sn, s1, c1, this]
 
 /-- `Δ` with `m / 2^f = j · π/2 + Δ`, `j` odd, is not zero: `π` is irrational. -/
 theorem pole_offset_ne (m f j : ℕ) (Δ : ℝ) (hj : j % 2 = 1) (h : (m : ℝ) / 2 ^ f = j * (Real.pi / 2) + Δ) :
@@ -936,11 +944,11 @@ theorem tanOk_neg (f : ℕ) (x : ℝ) (r : ℤ) (h : tanOk f x r) : tanOk f (-x)
 /-- Away from a pole the cosine at the position `t` is at least `7.07 · 10^15 / 2^62`. -/
 theorem cos_quadrant_lower (t : ℕ) (hden : 2 ^ 52 ≤ tanDen t) :
     7070 * 10 ^ 12 / 2 ^ 62 ≤ |Real.cos ((t : ℝ) / 2 ^ 62 * (Real.pi / 2))| := by
-  set p := t % 2 ^ 62
-  set q := t / 2 ^ 62
+  set! p := t % 2 ^ 62
+  set! q := t / 2 ^ 62
   have pl : p < 2 ^ 62 := Nat.mod_lt _ (by norm_num)
   have tq : t = q * 2 ^ 62 + p := (Nat.div_add_mod' t _).symm
-  set φ : ℝ := (p : ℝ) / 2 ^ 62 * (Real.pi / 2) with hφ
+  set! φ : ℝ := (p : ℝ) / 2 ^ 62 * (Real.pi / 2) with hφ
   have ang : (t : ℝ) / 2 ^ 62 * (Real.pi / 2) = φ + q * (Real.pi / 2) := by
     rw [show (t : ℝ) = ((q * 2 ^ 62 + p : ℕ) : ℝ) by rw [← tq], hφ]; push_cast; field_simp; ring
   have e7 : ((2 ^ 62 - p : ℕ) : ℝ) / 2 ^ 62 * (Real.pi / 2) = Real.pi / 2 - φ := by
@@ -949,7 +957,7 @@ theorem cos_quadrant_lower (t : ℕ) (hden : 2 ^ 52 ≤ tanDen t) :
   have φ0 : 0 ≤ φ := by positivity
   have φ1 : φ ≤ Real.pi / 2 := by
     have : (p : ℝ) / 2 ^ 62 ≤ 1 := by rw [div_le_one (by positivity)]; exact_mod_cast pl.le
-    rw [hφ]; nlinarith [Real.pi_pos]
+    rw [hφ]; nlinarith only [Real.pi_pos, this]
   unfold tanDen at hden
   have one : ∀ j : ℕ, |((-1 : ℝ)) ^ ((j : ℤ))| = 1 := fun j => by rw [abs_zpow, abs_neg, abs_one, one_zpow]
   obtain ⟨j, hj | hj⟩ := Nat.even_or_odd' q
@@ -959,13 +967,13 @@ theorem cos_quadrant_lower (t : ℕ) (hden : 2 ^ 52 ≤ tanDen t) :
     rw [e7, Real.sin_pi_div_two_sub] at L
     rw [hj, show φ + ((2 * j : ℕ) : ℝ) * (Real.pi / 2) = φ + ((j : ℤ) : ℝ) * Real.pi by push_cast; ring,
       Real.cos_add_int_mul_pi, abs_mul, one, one_mul,
-      abs_of_nonneg (Real.cos_nonneg_of_mem_Icc ⟨by linarith [Real.pi_pos], φ1⟩)]
+      abs_of_nonneg (Real.cos_nonneg_of_mem_Icc ⟨by linarith only [Real.pi_pos, φ0, φ1], φ1⟩)]
     exact L
   · rw [ite_eq_right (show ¬ t / 2 ^ 62 % 2 = 0 by rw [← show q = t / 2 ^ 62 from rfl, hj]; omega)] at hden
     have L := quarter_sin_lower (p : ℝ) (by exact_mod_cast hden) (by exact_mod_cast pl.le)
     rw [hj, show φ + ((2 * j + 1 : ℕ) : ℝ) * (Real.pi / 2) = (φ + Real.pi / 2) + ((j : ℤ) : ℝ) * Real.pi by
       push_cast; ring, Real.cos_add_int_mul_pi, Real.cos_add_pi_div_two, abs_mul, one, one_mul, abs_neg,
-      abs_of_nonneg (Real.sin_nonneg_of_nonneg_of_le_pi φ0 (by linarith))]
+      abs_of_nonneg (Real.sin_nonneg_of_nonneg_of_le_pi φ0 (by linarith only [φ0, φ1]))]
     exact L
 
 /-- The bound of `tan_far_spec` at the position `t = posN m f` carries over to
@@ -1005,7 +1013,7 @@ theorem far_ok (m f : ℕ) (r : ℤ) (hm : m < 2 ^ 64) (hden : 2 ^ 52 ≤ tanDen
     _ ≤ 1 / 2 + 2 ^ f * (8 / 10 ^ 13) + 2 ^ f * (8 / 10 ^ 14) := add_le_add hr this
     _ ≤ 1 / 2 + 2 ^ f / 10 ^ 12 := by
         have : (0 : ℝ) ≤ 2 ^ f := by positivity
-        nlinarith
+        nlinarith only [this]
 
 /-- The angle `m / 2^f` is `j · π/2` plus `(fr + ε) · π / 2^129`, `j` and `fr` the
 quarter turns `⌊N / 2^128⌋` and the fraction `N mod 2^128` of `trig::reduce`,
@@ -1046,11 +1054,11 @@ theorem sat_offset (D f : ℕ) (ε : ℝ) (hf : f ≤ 32) (hD : D < 2 ^ (126 - f
     div_le_div_iff₀ (by positivity) (by positivity), P]
   have hDe : |(D : ℝ) + ε| ≤ 2 ^ (126 - f) + 1 / 2 := by
     have : (0 : ℝ) ≤ D := Nat.cast_nonneg _
-    exact abs_le.mpr ⟨by linarith, by linarith⟩
+    exact abs_le.mpr ⟨by linarith only [Dl, e1], by linarith only [Dl, e2]⟩
   have A : (0 : ℝ) < 2 ^ (126 - f) := by positivity
   have : (2 : ℝ) ^ 94 ≤ 2 ^ (126 - f) := pow_le_pow_right₀ one_le_two (by omega)
   calc |(D : ℝ) + ε| * Real.pi * 2 ^ f ≤ (2 ^ (126 - f) + 1 / 2) * 3.15 * 2 ^ f := by gcongr
-    _ ≤ 4 / 10 * (2 ^ (126 - f) * 2 ^ f * 8) := by nlinarith
+    _ ≤ 4 / 10 * (2 ^ (126 - f) * 2 ^ f * 8) := by nlinarith only [P, pf]
 
 /-- The cotangent branch in an odd quadrant: `m / 2^f = j · π/2 + θ`,
 `θ = (D + ε) · π / 2^129`, `tan = -cot θ`, and `trig::tan` returns `-r`. -/
@@ -1148,13 +1156,13 @@ theorem round_cot_bounds (D f : ℕ) (h1 : 2 ^ 94 ≤ D) :
     have : ((cotN D : ℤ) : ℚ) ≤ 2 ^ 98 - 1 := by
       have : cotN D + 1 ≤ 2 ^ 98 := cl
       have : ((cotN D : ℕ) : ℚ) + 1 ≤ 2 ^ 98 := by exact_mod_cast this
-      push_cast; linarith
-    nlinarith [one_le_pow₀ (one_le_two : (1 : ℚ) ≤ 2) (n := 64 - f)]
+      push_cast; linarith only [this]
+    nlinarith only [one_le_pow₀ (one_le_two : (1 : ℚ) ≤ 2) (n := 64 - f), this]
   unfold roundHalfUp
   constructor
-  · exact Int.floor_nonneg.mpr (by linarith)
+  · exact Int.floor_nonneg.mpr (by linarith only [e0])
   · have := Int.floor_le (exact (64 - f) (cotN D) + 1 / 2)
-    have : ((⌊exact (64 - f) (cotN D) + 1 / 2⌋ : ℤ) : ℚ) < 2 ^ 98 + 1 := by linarith
+    have : ((⌊exact (64 - f) (cotN D) + 1 / 2⌋ : ℤ) : ℚ) < 2 ^ 98 + 1 := by linarith only [e1, this]
     have : ⌊exact (64 - f) (cotN D) + 1 / 2⌋ < 2 ^ 98 + 1 := by exact_mod_cast this
     omega
 

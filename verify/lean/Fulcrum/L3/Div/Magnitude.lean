@@ -1,8 +1,10 @@
 module
 
-public import Fulcrum.Math.Div
-public import Fulcrum.Lemmas.Scalar
-public import Fulcrum.Lemmas.Nat
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.Lemmas.Nat
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Div
 
 /-!
 # L3: `mul_div` of every width, `div` and `div_int` of `k8` and `k64`

@@ -1,6 +1,7 @@
 module
 
-public import Fulcrum.Spec
+public import Mathlib.Algebra.Group.Nat.Defs
+import Mathlib.Tactic.Ring.RingNF
 
 /-!
 # The product of two 128-bit words from four `u64 × u64` products

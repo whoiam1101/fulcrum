@@ -1,8 +1,11 @@
 module
 
-public import Fulcrum.L3.Div.Magnitude
-public import Fulcrum.Math.Range
-public import Fulcrum.Lemmas.Scalar
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Div
+import Fulcrum.Math.Range
 
 /-!
 # L3: `div` and `div_int` of `k16` and `k32`

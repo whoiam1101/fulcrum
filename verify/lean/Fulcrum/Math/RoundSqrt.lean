@@ -1,8 +1,7 @@
 module
 
 public import Mathlib.Analysis.Real.Sqrt
-public import Mathlib.Algebra.Order.Round
-public import Mathlib.Data.Nat.Prime.Basic
+import Mathlib.Data.Nat.Prime.Basic
 
 /-!
 # Rounding a square root
@@ -27,16 +26,16 @@ theorem round_sqrt_of_bounds (X : ℝ) (s : ℕ) (h1 : (s : ℝ) ^ 2 ≤ X) (h2 
   rw [round_eq, Int.floor_eq_iff]
   split
   · next h =>
-    have l : (s : ℝ) + 1 / 2 ≤ Real.sqrt X := (Real.le_sqrt (by linarith) (by nlinarith)).2 h.le
-    have u : Real.sqrt X < s + 1 := (Real.sqrt_lt' (by linarith)).2 h2
+    have l : (s : ℝ) + 1 / 2 ≤ Real.sqrt X := (Real.le_sqrt (by linarith only [h2, h]) (by nlinarith only [h2, h])).2 h.le
+    have u : Real.sqrt X < s + 1 := (Real.sqrt_lt' (by linarith only [h2, h])).2 h2
     push_cast
-    constructor <;> linarith
+    constructor <;> linarith only [l, u]
   · next h =>
-    have l : (s : ℝ) ≤ Real.sqrt X := (Real.le_sqrt s0 (by nlinarith)).2 h1
+    have l : (s : ℝ) ≤ Real.sqrt X := (Real.le_sqrt s0 (by nlinarith only [h1])).2 h1
     have u : Real.sqrt X < s + 1 / 2 :=
-      (Real.sqrt_lt' (by linarith)).2 (lt_of_le_of_ne (not_lt.mp h) hne)
+      (Real.sqrt_lt' (by linarith only [])).2 (lt_of_le_of_ne (not_lt.mp h) hne)
     push_cast
-    constructor <;> linarith
+    constructor <;> linarith only [l, u]
 
 /-- `kernel::kN::sqrt_round` on naturals: `s = ⌊√n⌋`, plus one when
 `n - s² > s`. -/
@@ -60,13 +59,13 @@ theorem round_sqrt_nat (n : ℕ) : round (Real.sqrt n) = (sqrtRound n : ℤ) := 
   have e : (((Nat.sqrt n : ℝ) + 1 / 2) ^ 2 < n) ↔ Nat.sqrt n * Nat.sqrt n + Nat.sqrt n < n := by
     constructor
     · intro h
-      have : (4 * (Nat.sqrt n * Nat.sqrt n + Nat.sqrt n) + 1 : ℝ) < 4 * n := by nlinarith
+      have : (4 * (Nat.sqrt n * Nat.sqrt n + Nat.sqrt n) + 1 : ℝ) < 4 * n := by nlinarith only [h]
       have : 4 * (Nat.sqrt n * Nat.sqrt n + Nat.sqrt n) + 1 < 4 * n := by exact_mod_cast this
       omega
     · intro h
       have : Nat.sqrt n * Nat.sqrt n + Nat.sqrt n + 1 ≤ n := h
       have : (Nat.sqrt n * Nat.sqrt n + Nat.sqrt n + 1 : ℝ) ≤ n := by exact_mod_cast this
-      nlinarith
+      nlinarith only [this]
   simp only [e]
 
 /-- `round √(N / a) = s + [(2s + 1)² · a < 4N]` for `s = ⌊√⌊N / a⌋⌋`, with
@@ -83,28 +82,28 @@ theorem round_sqrt_pow_div (e a : ℕ) (ha : 0 < a) (hlt : a < 4 * 2 ^ e) :
   have h2 : N / a < (s + 1) * (s + 1) := Nat.lt_succ_sqrt _
   have d1 : (N / a) * a ≤ N := Nat.div_mul_le_self N a
   have d2 : N < (N / a + 1) * a := by
-    have := Nat.lt_div_mul_add (a := N) ha; nlinarith
+    have := Nat.lt_div_mul_add (a := N) ha; nlinarith only [this]
   have b1 : (s : ℝ) ^ 2 ≤ (N : ℝ) / a := by
     rw [le_div_iff₀ aR]
     have : s * s * a ≤ N := (Nat.mul_le_mul_right a h1).trans d1
     have : ((s * s * a : ℕ) : ℝ) ≤ N := by exact_mod_cast this
-    push_cast at this; nlinarith
+    push_cast at this; nlinarith only [this]
   have b2 : (N : ℝ) / a < ((s : ℝ) + 1) ^ 2 := by
     rw [div_lt_iff₀ aR]
     have : N < (s + 1) * (s + 1) * a :=
       d2.trans_le (Nat.mul_le_mul_right a (Nat.succ_le_of_lt h2))
     have : (N : ℝ) < (((s + 1) * (s + 1) * a : ℕ) : ℝ) := by exact_mod_cast this
-    push_cast at this; nlinarith
+    push_cast at this; nlinarith only [this]
   have iff : ((s : ℝ) + 1 / 2) ^ 2 < (N : ℝ) / a ↔ (2 * s + 1) * (2 * s + 1) * a < 4 * N := by
     rw [lt_div_iff₀ aR]
     constructor
     · intro h
       have : (((2 * s + 1) * (2 * s + 1) * a : ℕ) : ℝ) < ((4 * N : ℕ) : ℝ) := by
-        push_cast; nlinarith
+        push_cast; nlinarith only [h]
       exact_mod_cast this
     · intro h
       have : (((2 * s + 1) * (2 * s + 1) * a : ℕ) : ℝ) < ((4 * N : ℕ) : ℝ) := by exact_mod_cast h
-      push_cast at this; nlinarith
+      push_cast at this; nlinarith only [this]
   have tie : (N : ℝ) / a ≠ ((s : ℝ) + 1 / 2) ^ 2 := by
     intro t
     rw [div_eq_iff aR.ne'] at t

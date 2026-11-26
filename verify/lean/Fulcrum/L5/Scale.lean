@@ -1,8 +1,11 @@
 module
 
-public import Fulcrum.L5.Length
-public import Fulcrum.L4.Vec
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.Scale
+import Fulcrum.L3.Sqrt.K32
+import Fulcrum.L5.Length
+import Fulcrum.Lemmas.List
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # L5: `kernel::kN::scale_vec`
@@ -233,24 +236,24 @@ theorem narrow_body_spec (v out : Std.Array Std.I64 3#usize) (k s inv : Std.U64)
   have ci := UScalar.cast_val_mod_pow_greater_numBits_eq .U128 inv (by decide)
   have pp : P * P < 2 ^ 124 := by
     have := Nat.mul_lt_mul'' hp hp; rwa [← pow_add] at this
-  refine WP.spec_bind (UScalar.mul_spec (by rw [cp, hp', U128_max_val]; omega)) fun i4 hi4 => ?_
-  refine WP.spec_bind (UScalar.mul_spec (by rw [hi4, cp, hp', lit_val, U128_max_val]; omega))
+  refine WP.spec_bind (UScalar.mul_spec (by rw [cp, hp', U128_max_val]; (clear * - pp; omega))) fun i4 hi4 => ?_
+  refine WP.spec_bind (UScalar.mul_spec (by rw [hi4, cp, hp', lit_val, U128_max_val]; (clear * - pp; omega)))
     fun four hfour => ?_
   rw [hi4, cp, hp', lit_val, ← mul_assoc] at hfour
   rw [bind_ok, bind_ok]
   have pinv : P * inv.val < 2 ^ 126 := by
     have := Nat.mul_lt_mul'' hp inv.hBounds; rwa [← pow_add] at this
-  refine WP.spec_bind (UScalar.mul_spec (by rw [cp, ci, hp', U128_max_val]; omega)) fun i7 hi7 => ?_
+  refine WP.spec_bind (UScalar.mul_spec (by rw [cp, ci, hp', U128_max_val]; (clear * - pinv; omega))) fun i7 hi7 => ?_
   rw [cp, ci, hp'] at hi7
-  refine WP.spec_bind (UScalar.sub_spec (by rw [lit_val]; omega)) fun i8 ⟨hi8, _⟩ => ?_
+  refine WP.spec_bind (UScalar.sub_spec (by rw [lit_val]; (clear * - hsh1; omega))) fun i8 ⟨hi8, _⟩ => ?_
   rw [lit_val] at hi8
-  refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u128 i8 _ (by rw [UScalarTy.U128_numBits_eq]; omega) rfl) fun i9 ⟨hi9, _⟩ => ?_
+  refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u128 i8 _ (by rw [UScalarTy.U128_numBits_eq]; (clear * - hsh1 hsh hi8; omega)) rfl) fun i9 ⟨hi9, _⟩ => ?_
   have i9v : i9.val = 2 ^ i8.val := by
     rw [hi9, lit_val, Nat.shiftLeft_eq, one_mul, UScalar.size_def]
-    exact Nat.mod_eq_of_lt (Nat.pow_lt_pow_right (by norm_num) (by rw [UScalarTy.U128_numBits_eq]; omega))
-  have i9b : i9.val ≤ 2 ^ 93 := i9v ▸ Nat.pow_le_pow_right two_pos (by omega)
-  refine WP.spec_bind (UScalar.add_spec (by rw [hi7, U128_max_val]; omega)) fun i10 _ => ?_
-  refine WP.spec_bind (UScalar.ShiftRight_spec i10 shift (by rw [UScalarTy.U128_numBits_eq]; omega)) fun i11 _ => ?_
+    exact Nat.mod_eq_of_lt (Nat.pow_lt_pow_right (by norm_num) (by rw [UScalarTy.U128_numBits_eq]; (clear * - hsh1 hsh hi8; omega)))
+  have i9b : i9.val ≤ 2 ^ 93 := i9v ▸ Nat.pow_le_pow_right two_pos (by (clear * - hsh1 hsh hi8; omega))
+  refine WP.spec_bind (UScalar.add_spec (by rw [hi7, U128_max_val]; (clear * - pinv hi7 i9v i9b; omega))) fun i10 _ => ?_
+  refine WP.spec_bind (UScalar.ShiftRight_spec i10 shift (by rw [UScalarTy.U128_numBits_eq]; (clear * - hsh1 hsh; omega))) fun i11 _ => ?_
   rw [lift, bind_ok]
   set m := UScalar.cast .U64 i11
   refine WP.spec_bind (Pₘ := fun m1 : Std.U64 => m1.val ≤ k.val) ?_ fun m1 hm1 => ?_
@@ -260,7 +263,7 @@ theorem narrow_body_spec (v out : Std.Array Std.I64 3#usize) (k s inv : Std.U64)
   have F : 4 * P * P = four.val := by rw [hfour]
   have hpk : P * P ≤ k.val * k.val * s.val := by
     have := Nat.mul_le_mul_right (k.val * k.val) hxs
-    rw [hP]; nlinarith
+    rw [hP]; nlinarith only [this]
   have hnt' : ∀ o, Odd o → o * o * s.val ≠ 4 * P * P := hnt
   have fin : ∀ m3 : Std.U64, m3.val ≤ k.val → ScaleRound P s.val m3.val →
       (do
@@ -273,81 +276,81 @@ theorem narrow_body_spec (v out : Std.Array Std.I64 3#usize) (k s inv : Std.U64)
         ok (ControlFlow.cont (β := Std.Array Std.I64 3#usize) (a, i'))) ⦃ r =>
         ∃ w : Std.I64, ScaleOut X.val k.val s.val w.val ∧
           ∃ i' : Std.Usize, i'.val = i.val + 1 ∧ r = ControlFlow.cont (out.set i w, i') ⦄ :=
-    fun m3 hm3 sr => WP.spec_mono (sign_update_spec X m3 out i hi (by omega))
+    fun m3 hm3 sr => WP.spec_mono (sign_update_spec X m3 out i hi (by (clear * - hk hm3; omega)))
       fun r ⟨w, hw, rest⟩ => ⟨w, ⟨m3.val, sr, hm3, hw⟩, rest⟩
   have walk := scaleRound_of_walk P s.val k.val
   by_cases lt : m1 < k
   · have lt' : m1.val < k.val := lt
     rw [ite_eq_left lt]
-    refine WP.spec_bind (UScalar.mul_spec (by rw [lit_val, U64_max_val]; omega)) fun j hj => ?_
+    refine WP.spec_bind (UScalar.mul_spec (by rw [lit_val, U64_max_val]; (clear * - hk lt'; omega))) fun j hj => ?_
     rw [lit_val] at hj
-    refine WP.spec_bind (UScalar.add_spec (by rw [hj, lit_val, U64_max_val]; omega)) fun j1 hj1 => ?_
-    refine WP.spec_bind (UScalar.add_spec (by rw [hj, lit_val, U64_max_val]; omega)) fun j2 hj2 => ?_
+    refine WP.spec_bind (UScalar.add_spec (by rw [hj, lit_val, U64_max_val]; (clear * - hk lt'; omega))) fun j1 hj1 => ?_
+    refine WP.spec_bind (UScalar.add_spec (by rw [hj, lit_val, U64_max_val]; (clear * - hk lt'; omega))) fun j2 hj2 => ?_
     rw [lit_val, hj] at hj1 hj2
-    refine sq_s_bind j1 j2 s (2 * m1.val + 1) hj1 hj2 (by omega) hs _ _ fun t ht => ?_
+    refine sq_s_bind j1 j2 s (2 * m1.val + 1) hj1 hj2 (by (clear * - hk lt'; omega)) hs _ _ fun t ht => ?_
     by_cases c : t < four
     · have c' : (2 * m1.val + 1) * (2 * m1.val + 1) * s.val < 4 * P * P := by
         have : t.val < four.val := c; rw [ht, ← F] at this; exact this
       rw [ite_eq_left c]
-      refine WP.spec_bind (UScalar.add_spec (by rw [lit_val, U64_max_val]; omega)) fun m2 hm2 => ?_
+      refine WP.spec_bind (UScalar.add_spec (by rw [lit_val, U64_max_val]; (clear * - hk lt'; omega))) fun m2 hm2 => ?_
       rw [lit_val] at hm2
-      refine WP.spec_bind (up_loop_spec k s m2 four (4 * P * P) F.symm hk hs (by omega) (by omega)
-        (by rw [hm2, show 2 * (m1.val + 1) - 1 = 2 * m1.val + 1 by omega]; exact c'))
+      refine WP.spec_bind (up_loop_spec k s m2 four (4 * P * P) F.symm hk hs (by (clear * - lt' hm2; omega)) (by (clear * - hj hm2; omega))
+        (by rw [hm2, show 2 * (m1.val + 1) - 1 = 2 * m1.val + 1 by (clear * - hj hm2; omega)]; exact c'))
         fun m3 ⟨m3k, m31, m3lo, m3up⟩ => ?_
       exact fin m3 m3k (walk m3.val hs0 hpk m3k hnt' m3up (Or.inr m3lo.le))
     · have c' : 4 * P * P ≤ (2 * m1.val + 1) * (2 * m1.val + 1) * s.val := by
-        have : ¬ t.val < four.val := c; rw [ht, ← F] at this; omega
+        have : ¬ t.val < four.val := c; rw [ht, ← F] at this; (clear * - this; omega)
       rw [ite_eq_right c]
       by_cases z : m1 > 0#u64
       · have z' : 0 < m1.val := z
         rw [ite_eq_left z]
-        refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; omega)) fun j3 ⟨hj3, _⟩ => ?_
-        refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; omega)) fun j4 ⟨hj4, _⟩ => ?_
+        refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; (clear * - z'; omega))) fun j3 ⟨hj3, _⟩ => ?_
+        refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; (clear * - z'; omega))) fun j4 ⟨hj4, _⟩ => ?_
         rw [lit_val, hj] at hj3 hj4
-        refine sq_s_bind j3 j4 s (2 * m1.val - 1) hj3 hj4 (by omega) hs _ _ fun t2 ht2 => ?_
+        refine sq_s_bind j3 j4 s (2 * m1.val - 1) hj3 hj4 (by (clear * - hk lt' z' hj3; omega)) hs _ _ fun t2 ht2 => ?_
         by_cases c2 : t2 > four
         · have c2' : 4 * P * P < (2 * m1.val - 1) * (2 * m1.val - 1) * s.val := by
             have : four.val < t2.val := c2; rw [ht2, ← F] at this; exact this
           rw [ite_eq_left c2]
-          refine WP.spec_bind (UScalar.sub_spec (by rw [lit_val]; omega)) fun m2 ⟨hm2, _⟩ => ?_
+          refine WP.spec_bind (UScalar.sub_spec (by rw [lit_val]; (clear * - z'; omega))) fun m2 ⟨hm2, _⟩ => ?_
           rw [lit_val] at hm2
           refine WP.spec_bind (down_loop_spec _ k s m2 four (4 * P * P) (fun _ => rfl) F.symm hk hs
-            (by omega) (by rw [hm2, show 2 * (m1.val - 1) + 1 = 2 * m1.val - 1 by omega]; exact c2'))
+            (by (clear * - lt' z' hm2; omega)) (by rw [hm2, show 2 * (m1.val - 1) + 1 = 2 * m1.val - 1 by (clear * - z' hj3 hm2; omega)]; exact c2'))
             fun m3 ⟨m3k, m3up, m3lo⟩ => ?_
           exact fin m3 m3k (walk m3.val hs0 hpk m3k hnt' (Or.inr m3up.le) m3lo)
         · have c2' : (2 * m1.val - 1) * (2 * m1.val - 1) * s.val ≤ 4 * P * P := by
-            have : ¬ four.val < t2.val := c2; rw [ht2, ← F] at this; omega
+            have : ¬ four.val < t2.val := c2; rw [ht2, ← F] at this; (clear * - this; omega)
           rw [ite_eq_right c2]
           exact fin m1 hm1 (walk m1.val hs0 hpk hm1 hnt' (Or.inr c') (Or.inr c2'))
-      · have z' : m1.val = 0 := by have : ¬ 0 < m1.val := z; omega
+      · have z' : m1.val = 0 := by have : ¬ 0 < m1.val := z; (clear * - this; omega)
         rw [ite_eq_right z]
         exact fin m1 hm1 (walk m1.val hs0 hpk hm1 hnt' (Or.inr c') (Or.inl z'))
-  · have e : m1.val = k.val := by have : ¬ m1.val < k.val := lt; omega
+  · have e : m1.val = k.val := by have : ¬ m1.val < k.val := lt; (clear * - hm1 this; omega)
     rw [ite_eq_right lt]
     by_cases z : m1 > 0#u64
     · have z' : 0 < m1.val := z
       rw [ite_eq_left z]
-      refine WP.spec_bind (UScalar.mul_spec (by rw [lit_val, U64_max_val]; omega)) fun j hj => ?_
+      refine WP.spec_bind (UScalar.mul_spec (by rw [lit_val, U64_max_val]; (clear * - hk e z'; omega))) fun j hj => ?_
       rw [lit_val] at hj
-      refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; omega)) fun j3 ⟨hj3, _⟩ => ?_
-      refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; omega)) fun j4 ⟨hj4, _⟩ => ?_
+      refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; (clear * - hk e z'; omega))) fun j3 ⟨hj3, _⟩ => ?_
+      refine WP.spec_bind (UScalar.sub_spec (by rw [hj, lit_val]; (clear * - hk e z'; omega))) fun j4 ⟨hj4, _⟩ => ?_
       rw [lit_val, hj] at hj3 hj4
-      refine sq_s_bind j3 j4 s (2 * m1.val - 1) hj3 hj4 (by omega) hs _ _ fun t2 ht2 => ?_
+      refine sq_s_bind j3 j4 s (2 * m1.val - 1) hj3 hj4 (by (clear * - hk e z' hj3; omega)) hs _ _ fun t2 ht2 => ?_
       by_cases c2 : t2 > four
       · have c2' : 4 * P * P < (2 * m1.val - 1) * (2 * m1.val - 1) * s.val := by
           have : four.val < t2.val := c2; rw [ht2, ← F] at this; exact this
         rw [ite_eq_left c2]
-        refine WP.spec_bind (UScalar.sub_spec (by rw [lit_val]; omega)) fun m2 ⟨hm2, _⟩ => ?_
+        refine WP.spec_bind (UScalar.sub_spec (by rw [lit_val]; (clear * - hk e z'; omega))) fun m2 ⟨hm2, _⟩ => ?_
         rw [lit_val] at hm2
         refine WP.spec_bind (down_loop_spec _ k s m2 four (4 * P * P) (fun _ => rfl) F.symm hk hs
-          (by omega) (by rw [hm2, show 2 * (m1.val - 1) + 1 = 2 * m1.val - 1 by omega]; exact c2'))
+          (by (clear * - hk e z' hm2; omega)) (by rw [hm2, show 2 * (m1.val - 1) + 1 = 2 * m1.val - 1 by (clear * - hk e z' hj3; omega)]; exact c2'))
           fun m3 ⟨m3k, m3up, m3lo⟩ => ?_
         exact fin m3 m3k (walk m3.val hs0 hpk m3k hnt' (Or.inr m3up.le) m3lo)
       · have c2' : (2 * m1.val - 1) * (2 * m1.val - 1) * s.val ≤ 4 * P * P := by
-          have : ¬ four.val < t2.val := c2; rw [ht2, ← F] at this; omega
+          have : ¬ four.val < t2.val := c2; rw [ht2, ← F] at this; (clear * - this; omega)
         rw [ite_eq_right c2]
         exact fin m1 hm1 (walk m1.val hs0 hpk hm1 hnt' (Or.inl e) (Or.inr c2'))
-    · have z' : m1.val = 0 := by have : ¬ 0 < m1.val := z; omega
+    · have z' : m1.val = 0 := by have : ¬ 0 < m1.val := z; (clear * - hk e this; omega)
       rw [ite_eq_right z]
       exact fin m1 hm1 (walk m1.val hs0 hpk hm1 hnt' (Or.inl e) (Or.inl z'))
 
@@ -401,7 +404,7 @@ theorem scale_narrow_spec (v : Std.Array Std.I64 3#usize) (k s : Std.U64) (hk : 
   have hlz : (core.num.U64.leading_zeros s).val = 64 - L - 1 := by
     rw [hL]; exact leading_zeros_val s (Nat.ne_zero_of_lt hs0) (Nat.le_of_ble_eq_true rfl)
   rw [lift, bind_ok]
-  set zv := 2 * ((63 - L - 1) / 2) with hzv
+  set! zv := 2 * ((63 - L - 1) / 2) with hzv
   refine WP.spec_bind (Pₘ := fun z : Std.U32 => z.val = zv) ?_ fun z hz => ?_
   · by_cases h0 : core.num.U64.leading_zeros s = 0#u32
     · have : (core.num.U64.leading_zeros s).val = 0 := congrArg UScalar.val h0

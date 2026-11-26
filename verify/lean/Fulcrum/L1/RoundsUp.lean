@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Math.Round
 public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.Math.Round
 
 /-!
 # L1: `kernel::magnitude_rounds_up`

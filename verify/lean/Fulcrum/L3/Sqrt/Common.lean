@@ -1,9 +1,11 @@
 module
 
-public import Fulcrum.L3.Sqrt.Table
-public import Fulcrum.Math.Newton
-public import Fulcrum.Math.Sqrt
-public import Fulcrum.Lemmas.Loop
+public import Fulcrum.Kernel.Funs
+import Fulcrum.L3.Sqrt.Table
+import Fulcrum.Lemmas.Loop
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Newton
+import Fulcrum.Math.Sqrt
 
 /-!
 # L3: the steps shared by every `isqrt`

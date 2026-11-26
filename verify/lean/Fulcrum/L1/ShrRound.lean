@@ -1,7 +1,10 @@
 module
 
-public import Fulcrum.Math.Round
-public import Fulcrum.Lemmas.Scalar
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Spec
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Round
 
 /-!
 # L1: the rounding rule of `kernel::shr_round`
@@ -27,7 +30,7 @@ theorem shr_bounds (n : ℤ) (s m : ℕ) (hs : s ≠ 0) (lo : -2 ^ (m + 1) ≤ n
   have pm : (0 : ℤ) ≤ 2 ^ m := (pow_pos zero_lt_two m).le
   rw [pow_succ] at lo hi
   rw [shr_eq_div, Int.le_ediv_iff_mul_le pos, Int.ediv_lt_iff_lt_mul pos]
-  exact ⟨(mul_le_mul_of_nonpos_left two (neg_nonpos.mpr pm)).trans (by linarith),
+  exact ⟨(mul_le_mul_of_nonpos_left two (neg_nonpos.mpr pm)).trans (by linarith only [lo]),
     hi.trans_le (mul_le_mul_of_nonneg_left two pm)⟩
 
 /-- The last step of `shr_round` and `kN::shr`: the floor `i = n >> s` plus the
@@ -46,7 +49,7 @@ theorem add_bit_spec {W} (n : ℤ) (s m : ℕ) (hW : W.numBits = m + 1 + 1) (hs 
   have one_le : (1 : ℤ) ≤ 2 ^ m := one_le_pow₀ one_le_two
   have ⟨fl, fu⟩ := in_bounds_of_pow hW
     ((neg_le_neg p).trans (le_add_of_le_of_nonneg (hi1 ▸ l) b0))
-    (by rw [hi1, pow_succ]; linarith)
+    (by rw [hi1, pow_succ]; linarith only [u, b1, one_le])
   refine WP.spec_mono (IScalar.add_spec (bit ▸ fl) (bit ▸ fu)) fun r hr => ?_
   rw [hr, bit, hi1, hi2, ← shrRound_eq, shrRound, ite_eq_right hs]
 

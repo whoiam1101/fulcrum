@@ -1,7 +1,9 @@
 module
 
-public import Fulcrum.L1.ShrRound
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.Range
+import Fulcrum.L1.ShrRound
+import Fulcrum.Lemmas.Int
 
 /-!
 # L3: `kernel::rescale`

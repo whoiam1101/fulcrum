@@ -1,7 +1,9 @@
 module
 
-public import Fulcrum.Wide.Div3by2
-public import Fulcrum.Math.DivU256
+public import Fulcrum.Kernel.Funs
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.DivU256
+import Fulcrum.Wide.Div3by2
 
 /-!
 # `wide::div_rem_u256`

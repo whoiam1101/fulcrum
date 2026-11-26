@@ -1,7 +1,8 @@
 module
 
-public import Mathlib.Data.Nat.Sqrt
-public import Mathlib.Tactic.Ring
+public import Mathlib.Algebra.Group.Nat.Defs
+import Mathlib.Algebra.Order.Ring.Nat
+import Mathlib.Tactic.Ring.RingNF
 
 /-!
 # Natural-number facts used by several modules

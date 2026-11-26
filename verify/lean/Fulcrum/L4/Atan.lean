@@ -1,8 +1,19 @@
 module
 
-public import Fulcrum.L4.Radians
-public import Fulcrum.Math.Atan
-public import Fulcrum.L3.Sqrt.K64
+public import Fulcrum.Kernel.Funs
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Arctan
+import Fulcrum.L1.ShrRound
+import Fulcrum.L3.Sqrt.K64
+import Fulcrum.L4.Radians
+import Fulcrum.L4.SinQuarter
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Atan
+import Fulcrum.Math.Quarter
+import Fulcrum.Math.Range
+import Fulcrum.Tables.Atan
+import Fulcrum.Tables.Trig
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Analysis.Real.Pi.Bounds
 
 /-!
 # L4: `trig::atan_unit`, `atan_ratio`, `round_angle`, `atan2`, `atan`, `cathetus`, `asin`, `acos` (INTERNALS §3.13)
@@ -48,7 +59,7 @@ theorem atan_table_spec (i : Std.Usize) (hi : i.val ≤ 256) :
       ((div_le_div_of_nonneg_right Real.pi_lt_d2.le zero_le_two).trans (by norm_num))) (by positivity)).trans_eq
       (mul_comm _ _)
   have u : (x.val : ℝ) < 2 ^ 63 := by
-    linarith [(abs_le.mp e).2]
+    linarith only [(abs_le.mp e).2, a]
   exact_mod_cast u
 
 /-- L4 on the code: `trig::atan_unit` of `n ≤ d`, `0 < d ≤ 2^64`, never fails and
@@ -158,8 +169,8 @@ theorem arctan_le_quarter (a b : ℝ) (ha : 0 ≤ a) (hab : a ≤ b) :
     Real.arctan (a / b) * 2 ^ 62 ≤ 2 ^ 62 * (4 / 5) := by
   have q : a / b ≤ 1 := div_le_one_of_le₀ hab (ha.trans hab)
   have : Real.arctan (a / b) ≤ 4 / 5 :=
-    (Real.arctan_mono q).trans (by rw [Real.arctan_one]; linarith [Real.pi_lt_d2])
-  nlinarith
+    (Real.arctan_mono q).trans (by rw [Real.arctan_one]; linarith only [Real.pi_lt_d2])
+  nlinarith only [this]
 
 /-- L4 on the code: `trig::atan_ratio` of `n, d ≤ 2^64`, not both `0`, never fails
 and is within `3.4` units of `arg (d + n i) · 2^62 = atan (n/d) · 2^62`. -/
@@ -181,7 +192,7 @@ theorem atan_ratio_spec (n d : Std.U128) (hn : n.val ≤ 2 ^ 64) (hd : d.val ≤
     have P := frac_pi_2_entry
     have le : a.val ≤ fulcrum.tables.trig.FRAC_PI_2.val := by
       have : (a.val : ℝ) ≤ fulcrum.tables.trig.FRAC_PI_2.val := by
-        linarith [(abs_le.mp ha).2, (abs_le.mp P).1, Real.pi_gt_three]
+        linarith only [(abs_le.mp ha).2, (abs_le.mp P).1, Real.pi_gt_three, q]
       exact_mod_cast this
     refine WP.spec_mono (UScalar.sub_spec (x := fulcrum.tables.trig.FRAC_PI_2) (y := a) le) fun r ⟨hr, _⟩ => ?_
     rw [hr, Nat.cast_sub le, arg_compl _ _ (Nat.cast_nonneg _) (by exact_mod_cast (show 0 < n.val by omega))]
@@ -209,17 +220,17 @@ theorem round_angle_spec (a : Std.U64) (xn ng : Bool) (f : Std.U32) (hf : f.val 
       |(r.val : ℝ) - roundTarget xn ng A * 2 ^ f.val| ≤ 1 / 2 + (E + 1 / 2) / 2 ^ (62 - f.val) ⦄ := by
   unfold fulcrum.trig.round_angle
   set θ : ℝ := if xn then Real.pi - A else A with hθ
-  have θ0 : 0 ≤ θ := by rw [hθ]; split <;> linarith [Real.pi_gt_three]
-  have θπ : θ ≤ Real.pi := by rw [hθ]; split <;> linarith [Real.pi_gt_three]
+  have θ0 : 0 ≤ θ := by rw [hθ]; split <;> linarith only [Real.pi_gt_three, hA0, hA]
+  have θπ : θ ≤ Real.pi := by rw [hθ]; split <;> linarith only [Real.pi_gt_three, hA0, hA]
   refine WP.spec_bind (Pₘ := fun a1 : Std.U64 => |(a1.val : ℝ) - θ * 2 ^ 62| ≤ E + 1 / 2) ?_ fun a1 h1 => ?_
   · cases xn
     · simp only [Bool.false_eq_true, ↓reduceIte, WP.spec_ok, hθ]
-      exact ha.trans (by linarith)
+      exact ha.trans (by linarith only [])
     · simp only [↓reduceIte, hθ]
       have P := pi_entry
       have le : a.val ≤ fulcrum.tables.trig.PI.val := by
         have : (a.val : ℝ) ≤ fulcrum.tables.trig.PI.val := by
-          linarith [(abs_le.mp ha).2, (abs_le.mp P).1, Real.pi_gt_three]
+          linarith only [(abs_le.mp ha).2, (abs_le.mp P).1, Real.pi_gt_three, hA, hE]
         exact_mod_cast this
       refine WP.spec_mono (UScalar.sub_spec (x := fulcrum.tables.trig.PI) (y := a) le) fun r ⟨hr, _⟩ => ?_
       rw [hr, Nat.cast_sub le]
@@ -242,13 +253,13 @@ theorem round_angle_spec (a : Std.U64) (xn ng : Bool) (f : Std.U32) (hf : f.val 
   rw [← hi5] at near
   have err : 1 / 2 + (E + 1 / 2) / 2 ^ (62 - f.val) ≤ (101 : ℝ) := by
     have : (E + 1 / 2) / 2 ^ (62 - f.val) ≤ E + 1 / 2 :=
-      div_le_self (by linarith [abs_nonneg ((a.val : ℝ) - A * 2 ^ 62)]) (one_le_pow₀ one_le_two)
-    linarith
+      div_le_self (by linarith only [abs_nonneg ((a.val : ℝ) - A * 2 ^ 62), ha]) (one_le_pow₀ one_le_two)
+    linarith only [hE, this]
   have i5b : |(i5.val : ℝ)| ≤ 2 ^ 34 := by
     have sf : |θ * 2 ^ f.val| ≤ 2 ^ 34 - 101 := by
       rw [abs_of_nonneg (by positivity)]
       have : (2 : ℝ) ^ f.val ≤ 2 ^ 32 := pow_le_pow_right₀ one_le_two hf
-      nlinarith [Real.pi_lt_d2]
+      nlinarith only [Real.pi_lt_d2, θ0, θπ, this]
     calc |(i5.val : ℝ)| ≤ |(i5.val : ℝ) - θ * 2 ^ f.val| + |θ * 2 ^ f.val| :=
           sub_le_iff_le_add.mp (abs_sub_abs_le_abs_sub _ _)
       _ ≤ 101 + (2 ^ 34 - 101) := add_le_add (near.trans err) sf
@@ -339,7 +350,7 @@ theorem atan_spec (raw : Std.I64) (f : Std.U32) (hf : f.val ≤ 32) :
   have iv : i.val = 2 ^ f.val := by
     have pf : (2 : ℤ) ^ f.val ≤ 2 ^ 32 := pow_le_pow_right₀ (by norm_num) hf
     rw [hi, Int.shiftLeft_eq, show (1#i64 : Std.I64).val = 1 from rfl, one_mul, IScalarTy.I64_numBits_eq]
-    exact Int.bmod_eq_of_le (by push_cast; linarith [(by positivity : (0 : ℤ) ≤ 2 ^ f.val)]) (by push_cast; linarith)
+    exact Int.bmod_eq_of_le (by push_cast; linarith only [(by positivity : (0 : ℤ) ≤ 2 ^ f.val)]) (by push_cast; linarith only [pf])
   refine WP.spec_mono (atan2_spec raw i f hf) fun r hr => ?_
   rw [iv, arg_of_pos _ _ (by positivity)] at hr
   push_cast at hr

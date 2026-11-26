@@ -1,6 +1,11 @@
 module
 
-public import Mathlib.Algebra.Order.Floor.Ring
+public import Mathlib.Algebra.Group.Int.Defs
+public import Mathlib.Algebra.Group.Nat.Defs
+import Mathlib.Algebra.Order.Group.Int
+import Mathlib.Algebra.Order.Group.Unbundled.Int
+import Mathlib.Algebra.Ring.Int.Defs
+import Mathlib.Data.Nat.Cast.Order.Basic
 
 /-!
 # Integer facts used by several modules

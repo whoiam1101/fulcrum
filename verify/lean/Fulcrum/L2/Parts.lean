@@ -1,7 +1,9 @@
 module
 
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.Range
-public import Fulcrum.Lemmas.Scalar
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
 
 /-!
 # L2: `kernel::to_int` and `from_parts`

@@ -1,7 +1,7 @@
 module
 
 public import Fulcrum.Spec
-public import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Int
 
 /-!
 # Rounding by a shift

@@ -1,8 +1,18 @@
 module
 
-public import Fulcrum.L4.Exp
+public import Fulcrum.Kernel.Funs
 public import Fulcrum.Math.Pow
-public import Fulcrum.Wide.Mul
+import Fulcrum.L4.Exp
+import Fulcrum.L4.Log
+import Fulcrum.Lemmas.Int
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.ExpReduce
+import Fulcrum.Math.Log
+import Fulcrum.Math.Range
+import Fulcrum.Tables.Exp
+import Fulcrum.Tables.Log2Wide
+import Fulcrum.Wide.Mul
+import Mathlib.Algebra.Order.Ring.Star
 
 /-!
 # L4: `exp::mul_hi`, `log2_wide`, `exp2_wide`, `pow_magnitude`, `pow` (INTERNALS §3.16)
@@ -68,10 +78,10 @@ theorem log2_wide_table_spec (i : Std.Usize) (hi : i.val < 256) :
   have lb : Real.logb 2 (1 + (i.val : ℝ) / 256) < 1 := by
     rw [Real.logb_lt_iff_lt_rpow (by norm_num) (by positivity), Real.rpow_one]
     have : (i.val : ℝ) < 256 := by exact_mod_cast hi
-    linarith
+    linarith only [this]
   have u : (x.val : ℝ) < 2 ^ 126 + 1 := by
     have := (abs_le.mp e).2
-    nlinarith
+    nlinarith only [lb, this]
   exact Nat.lt_succ_iff.mp (by exact_mod_cast u)
 
 /-- `exp::W_FRAC` is `120`. -/
@@ -111,7 +121,7 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   have n64 : UScalarTy.U64.numBits = 64 := rfl
   unfold fulcrum.exp.log2_wide
   have a0 : a.val ≠ 0 := by omega
-  set L := Nat.log 2 a.val with hL
+  set! L := Nat.log 2 a.val with hL
   have hlo : 2 ^ L ≤ a.val := Nat.pow_log_le_self 2 a0
   have hhi : a.val < 2 ^ (L + 1) := Nat.lt_pow_succ_log_self Nat.one_lt_two _
   have L63 : L ≤ 63 := by
@@ -122,37 +132,37 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   refine WP.spec_bind (UScalar.sub_spec (x := 63#u32) (y := core.num.U64.leading_zeros a)
     (by rw [hlz, lit_val]; omega)) fun e ⟨he, _⟩ => ?_
   rw [hlz, lit_val] at he
-  have ev : e.val = L := by omega
+  have ev : e.val = L := by (clear * - L63 hlz he; omega)
   refine WP.spec_bind (Pₘ := fun u : Std.U64 => u.val * 2 ^ L = a.val * 2 ^ 62) ?_ fun u hu => ?_
   · by_cases big : e > fulcrum.tables.exp.FRAC
-    · have b : 62 < L := by have : fulcrum.tables.exp.FRAC.val < e.val := big; rw [exp_frac_val] at this; omega
+    · have b : 62 < L := by have : fulcrum.tables.exp.FRAC.val < e.val := big; rw [exp_frac_val] at this; (clear * - L63 he ev this; omega)
       rw [ite_eq_left big]
       refine WP.spec_bind (UScalar.sub_spec (x := e) (y := fulcrum.tables.exp.FRAC)
-        (by rw [exp_frac_val]; omega)) fun i1 ⟨h1, _⟩ => ?_
+        (by rw [exp_frac_val]; (clear * - L63 he ev b; omega))) fun i1 ⟨h1, _⟩ => ?_
       rw [exp_frac_val, ev] at h1
-      refine WP.spec_mono (UScalar.ShiftRight_spec a i1 (by rw [h1, n64]; omega)) fun u ⟨hu, _⟩ => ?_
-      have L63' : L = 63 := by omega
+      refine WP.spec_mono (UScalar.ShiftRight_spec a i1 (by rw [h1, n64]; (clear * - L63 he ev b; omega))) fun u ⟨hu, _⟩ => ?_
+      have L63' : L = 63 := by (clear * - L63 he ev b; omega)
       have av : a.val = 2 ^ 63 := le_antisymm ha (by rw [← L63']; exact hlo)
       rw [hu, Nat.shiftRight_eq_div_pow, h1, L63', av]
       norm_num
     · have b : L ≤ 62 := by
-        have : ¬ fulcrum.tables.exp.FRAC.val < e.val := big; rw [exp_frac_val] at this; omega
+        have : ¬ fulcrum.tables.exp.FRAC.val < e.val := big; rw [exp_frac_val] at this; (clear * - L63 he ev this; omega)
       rw [ite_eq_right big]
       refine WP.spec_bind (UScalar.sub_spec (x := fulcrum.tables.exp.FRAC) (y := e)
         (by rw [exp_frac_val, ev]; exact b)) fun i1 ⟨h1, _⟩ => ?_
       rw [exp_frac_val, ev] at h1
       have Ul : a.val * 2 ^ (62 - L) < 2 ^ 63 := by
         calc a.val * 2 ^ (62 - L) < 2 ^ (L + 1) * 2 ^ (62 - L) := Nat.mul_lt_mul_of_pos_right hhi (by positivity)
-          _ = 2 ^ 63 := by rw [← pow_add]; congr 1; omega
-      refine WP.spec_mono (UScalar.ShiftLeft_spec a i1 _ (by rw [h1, n64]; omega) rfl) fun u ⟨hu, _⟩ => ?_
+          _ = 2 ^ 63 := by rw [← pow_add]; congr 1; (clear * - L63 he ev b; omega)
+      refine WP.spec_mono (UScalar.ShiftLeft_spec a i1 _ (by rw [h1, n64]; (clear * - L63 he ev b; omega)) rfl) fun u ⟨hu, _⟩ => ?_
       rw [hu, h1, Nat.shiftLeft_eq, UScalar.size_def, n64, Nat.mod_eq_of_lt (Ul.trans (by norm_num)), mul_assoc,
-        ← pow_add, show 62 - L + L = 62 by omega]
+        ← pow_add, show 62 - L + L = 62 by (clear * - L63 he ev b; omega)]
   have Ug : 2 ^ 62 ≤ u.val := by
     have : 2 ^ 62 * 2 ^ L ≤ u.val * 2 ^ L := by rw [hu, mul_comm (2 ^ 62)]; exact Nat.mul_le_mul_right _ hlo
     exact Nat.le_of_mul_le_mul_right this (by positivity)
   have Ul : u.val < 2 ^ 63 := by
     have : u.val * 2 ^ L < 2 ^ 63 * 2 ^ L := by
-      rw [hu, show 2 ^ 63 * 2 ^ L = 2 ^ (L + 1) * 2 ^ 62 by rw [← pow_add, ← pow_add]; congr 1; omega]
+      rw [hu, show 2 ^ 63 * 2 ^ L = 2 ^ (L + 1) * 2 ^ 62 by rw [← pow_add, ← pow_add]; congr 1; (clear * -; omega)]
       exact Nat.mul_lt_mul_of_pos_right hhi (by positivity)
     exact Nat.lt_of_mul_lt_mul_right this
   refine WP.spec_bind (UScalar.sub_spec (x := fulcrum.tables.exp.FRAC) (y := fulcrum.tables.exp.STEPS)
@@ -165,24 +175,24 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
     (by rw [exp_steps_val, n64]; norm_num) rfl) fun i2 ⟨h2, _⟩ => ?_
   rw [exp_steps_val, lit_val, Nat.shiftLeft_eq, one_mul, UScalar.size_def, n64] at h2
   norm_num at h2
-  have q1 : 256 ≤ i1.val := by rw [h1]; exact (Nat.le_div_iff_mul_le (by positivity)).mpr (by omega)
-  have q2 : i1.val < 512 := by rw [h1, Nat.div_lt_iff_lt_mul (by positivity)]; omega
-  refine WP.spec_bind (UScalar.sub_spec (x := i1) (y := i2) (by omega)) fun k ⟨hk, _⟩ => ?_
+  have q1 : 256 ≤ i1.val := by rw [h1]; exact (Nat.le_div_iff_mul_le (by positivity)).mpr (by (clear * - Ug; omega))
+  have q2 : i1.val < 512 := by rw [h1, Nat.div_lt_iff_lt_mul (by positivity)]; (clear * - Ul; omega)
+  refine WP.spec_bind (UScalar.sub_spec (x := i1) (y := i2) (by (clear * - h1 h2 q1 q2; omega))) fun k ⟨hk, _⟩ => ?_
   have k256 : k.val < 256 := by omega
   refine WP.spec_bind (UScalar.ShiftLeft_spec k i _ (by rw [hi, n64]; norm_num) rfl) fun i3 ⟨h3, _⟩ => ?_
-  rw [hi, Nat.shiftLeft_eq, UScalar.size_def, n64, Nat.mod_eq_of_lt (by omega)] at h3
+  rw [hi, Nat.shiftLeft_eq, UScalar.size_def, n64, Nat.mod_eq_of_lt (by (clear * - k256; omega))] at h3
   refine WP.spec_bind exp_one_spec fun i4 h4 => ?_
-  refine WP.spec_bind (UScalar.add_spec (x := i4) (y := i3) (by rw [h4, h3, U64_max_val]; omega)) fun c hc => ?_
+  refine WP.spec_bind (UScalar.add_spec (x := i4) (y := i3) (by rw [h4, h3, U64_max_val]; (clear * - k256; omega))) fun c hc => ?_
   have cv : c.val = 2 ^ 62 + k.val * 2 ^ 54 := by rw [hc, h4, h3]
   have Cle : c.val ≤ u.val := by
     rw [cv, hk, h1, h2]
     have := Nat.div_mul_le_self u.val (2 ^ 54)
-    omega
+    (clear * - h1 q1 q2; omega)
   have rl : u.val - c.val < 2 ^ 54 := by
     rw [cv, hk, h1, h2]
     have := Nat.lt_div_mul_add (a := u.val) (b := 2 ^ 54) (by positivity)
-    omega
-  refine WP.spec_bind (UScalar.add_spec (x := u) (y := c) (by rw [U64_max_val]; omega)) fun i6 h6 => ?_
+    (clear * - h1 q1 q2; omega)
+  refine WP.spec_bind (UScalar.add_spec (x := u) (y := c) (by rw [U64_max_val]; (clear * - Ug Ul h3 h4 hc Cle; omega))) fun i6 h6 => ?_
   rw [lift, bind_ok]
   refine WP.spec_bind (UScalar.sub_spec (x := u) (y := c) Cle) fun i7 ⟨h7, _⟩ => ?_
   rw [lift, bind_ok]
@@ -190,8 +200,8 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   have rv : (UScalar.cast .U128 i7).val = u.val - c.val := by rw [cast_u128_val, h7]
   generalize UScalar.cast .U128 i6 = d at dv ⊢
   generalize UScalar.cast .U128 i7 = r at rv ⊢
-  have dpos : 0 < d.val := by omega
-  have dl : d.val < 2 ^ 64 := by omega
+  have dpos : 0 < d.val := by (clear * - h1 q1 q2 h3 h4 hc h6 dv; omega)
+  have dl : d.val < 2 ^ 64 := by (clear * - Ug Ul h3 h4 hc Cle h6 dv; omega)
   refine WP.spec_bind (shl_i32_spec r 64#i32 64 rfl (by rw [n128]; norm_num) (by
     rw [n128, rv]
     calc (u.val - c.val) * 2 ^ 64 < 2 ^ 54 * 2 ^ 64 := Nat.mul_lt_mul_of_pos_right rl (by positivity)
@@ -221,7 +231,7 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   rw [lift, bind_ok]
   have sv : (i11 ||| low).val = (u.val - c.val) * 2 ^ 128 / (u.val + c.val) := by
     rw [UScalar.val_or, h11, mul_comm, ← Nat.two_pow_add_eq_or_of_lt lowl, mul_comm, hlow, h10, hi9, hhigh, h8, rv, dv,
-      div_two_words _ _ (by omega), mul_assoc, ← pow_add]
+      div_two_words _ _ (by (clear * - h3 h4 hc h6 dv dpos dl; omega)), mul_assoc, ← pow_add]
   generalize i11 ||| low = s at sv ⊢
   have sl : s.val ≤ 2 ^ 119 := by
     rw [sv]
@@ -235,23 +245,23 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
     rw [hz]; exact Nat.div_le_of_le_mul ((Nat.mul_le_mul sl sl).trans (by norm_num))
   refine WP.spec_bind (u128_div_spec _ 13#u128 13 (lit_val _ (by decide)) (by norm_num)) fun g hg => ?_
   rw [u128_max_val] at hg
-  refine horner_wide_spec z g 11#u128 (by rw [lit_val _ (by decide)]; omega) zl _ _ fun g1 hg1 => ?_
-  refine horner_wide_spec z g1 9#u128 (by rw [lit_val _ (by decide)]; omega) zl _ _ fun g2 hg2 => ?_
-  refine horner_wide_spec z g2 7#u128 (by rw [lit_val _ (by decide)]; omega) zl _ _ fun g3 hg3 => ?_
-  refine horner_wide_spec z g3 5#u128 (by rw [lit_val _ (by decide)]; omega) zl _ _ fun g4 hg4 => ?_
+  refine horner_wide_spec z g 11#u128 (by rw [lit_val _ (by decide)]; (clear * -; omega)) zl _ _ fun g1 hg1 => ?_
+  refine horner_wide_spec z g1 9#u128 (by rw [lit_val _ (by decide)]; (clear * -; omega)) zl _ _ fun g2 hg2 => ?_
+  refine horner_wide_spec z g2 7#u128 (by rw [lit_val _ (by decide)]; (clear * -; omega)) zl _ _ fun g3 hg3 => ?_
+  refine horner_wide_spec z g3 5#u128 (by rw [lit_val _ (by decide)]; (clear * -; omega)) zl _ _ fun g4 hg4 => ?_
   refine horner_wide_spec z g4 3#u128 (by rw [lit_val _ (by decide)]) zl _ _ fun g5 hg5 => ?_
   refine WP.spec_bind (mul_hi_spec z g5) fun i22 h22 => ?_
   refine WP.spec_bind (mul_hi_spec s i22) fun i23 h23 => ?_
   have i23l : i23.val ≤ 2 ^ 119 := by rw [h23]; exact (mul128_le_left _ _ i22.bv.isLt.le).trans sl
-  refine WP.spec_bind (UScalar.add_spec (x := s) (y := i23) (by rw [U128_max_val]; omega)) fun at' hat => ?_
+  refine WP.spec_bind (UScalar.add_spec (x := s) (y := i23) (by rw [U128_max_val]; (clear * - sv sl h23 i23l; omega))) fun at' hat => ?_
   rw [lift, bind_ok]
-  have ck := usize_cast_val k (by omega)
+  have ck := usize_cast_val k (by (clear * - k256; omega))
   refine WP.spec_bind (log2_wide_table_spec _ (by rw [ck]; exact k256)) fun T ⟨hT, TU⟩ => ?_
   rw [ck] at hT
   refine WP.spec_bind (mul_hi_spec at' fulcrum.tables.exp.TWO_LOG2_E_WIDE) fun i26 h26 => ?_
   have i26l : i26.val ≤ 2 ^ 120 := by
     rw [h26]
-    exact Nat.div_le_of_le_mul ((Nat.mul_le_mul (show at'.val ≤ 2 ^ 120 by omega)
+    exact Nat.div_le_of_le_mul ((Nat.mul_le_mul (show at'.val ≤ 2 ^ 120 by (clear * - sv sl h23 i23l hat; omega))
       fulcrum.tables.exp.TWO_LOG2_E_WIDE.bv.isLt.le).trans (by rw [mul_comm]))
   refine WP.spec_bind (UScalar.add_spec (x := T) (y := i26) (by rw [U128_max_val]; omega)) fun l hl => ?_
   have lv : l.val = log2WideN T.val s.val fulcrum.tables.exp.TWO_LOG2_E_WIDE.val := by
@@ -259,22 +269,22 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
     simp only [lit_val]
     rfl
   have ll : l.val ≤ 2 ^ 126 + 2 ^ 120 := by omega
-  set σ : ℝ := ((u.val : ℝ) - c.val) / ((u.val : ℝ) + c.val) with hσ
+  set! σ : ℝ := ((u.val : ℝ) - c.val) / ((u.val : ℝ) + c.val) with hσ
   have Cp : (0 : ℝ) < c.val := by rw [cv]; positivity
   have CU : (c.val : ℝ) ≤ u.val := by exact_mod_cast Cle
-  have σ0 : 0 ≤ σ := div_nonneg (by linarith) (by positivity)
+  have σ0 : 0 ≤ σ := div_nonneg (by linarith only [CU]) (by positivity)
   have σM : σ ≤ 1 / 512 := by
     rw [hσ, div_le_iff₀ (by positivity)]
-    have : ((u.val - c.val : ℕ) : ℝ) < 2 ^ 54 := by exact_mod_cast rl
-    rw [Nat.cast_sub Cle] at this
-    have : (2 : ℝ) ^ 62 ≤ u.val := by exact_mod_cast Ug
-    have : (2 : ℝ) ^ 62 ≤ c.val := by exact_mod_cast (show 2 ^ 62 ≤ c.val by omega)
-    linarith
-  have ⟨fl, fu⟩ := floor_div_near ((u.val - c.val) * 2 ^ 128) (u.val + c.val) (by omega)
+    have t1 : ((u.val - c.val : ℕ) : ℝ) < 2 ^ 54 := by exact_mod_cast rl
+    rw [Nat.cast_sub Cle] at t1
+    have t2 : (2 : ℝ) ^ 62 ≤ u.val := by exact_mod_cast Ug
+    have t3 : (2 : ℝ) ^ 62 ≤ c.val := by exact_mod_cast (show 2 ^ 62 ≤ c.val by (clear * - k256 h3 h4 hc ck; omega))
+    linarith only [t1, t2, t3]
+  have ⟨fl, fu⟩ := floor_div_near ((u.val - c.val) * 2 ^ 128) (u.val + c.val) (by (clear * - h3 h4 hc h6 dv dpos dl; omega))
   rw [← sv] at fl fu
   rw [Nat.cast_mul, Nat.cast_sub Cle, Nat.cast_add, Nat.cast_pow, Nat.cast_ofNat] at fl fu
   have hsσ : (s.val : ℝ) ≤ σ * 2 ^ 128 := by rw [hσ, div_mul_eq_mul_div]; exact fl
-  have hsσ' : σ * 2 ^ 128 < s.val + 1 := by rw [hσ, div_mul_eq_mul_div]; linarith
+  have hsσ' : σ * 2 ^ 128 < s.val + 1 := by rw [hσ, div_mul_eq_mul_div]; linarith only [fu]
   have cR : (1 : ℝ) + (k.val : ℝ) / 256 = c.val / 2 ^ 62 := by rw [cv]; push_cast; field_simp; ring
   rw [cR] at hT
   have near := log2_wide_series_near T.val s.val fulcrum.tables.exp.TWO_LOG2_E_WIDE.val _ σ hT
@@ -283,7 +293,7 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   set S := Real.logb 2 ((u.val : ℝ) / 2 ^ 62) with hS
   have uR : (u.val : ℝ) / 2 ^ 62 = (a.val : ℝ) / 2 ^ L := by
     have : (u.val : ℝ) * 2 ^ L = a.val * 2 ^ 62 := by exact_mod_cast hu
-    field_simp; linarith
+    field_simp; linarith only [this]
   have ap : (0 : ℝ) < a.val := by exact_mod_cast ha0
   have S0 : 0 ≤ S := by
     rw [hS]; exact Real.logb_nonneg one_lt_two (by
@@ -291,36 +301,36 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   have S1 : S < 1 := by
     rw [hS, Real.logb_lt_iff_lt_rpow (by norm_num) (by positivity), Real.rpow_one, div_lt_iff₀ (by positivity)]
     have : (u.val : ℝ) < 2 ^ 63 := by exact_mod_cast Ul
-    linarith
+    linarith only [this]
   rw [lift, bind_ok, lift, bind_ok]
   have ec : (UScalar.hcast .I128 e).val = (L : ℤ) := by
     rw [UScalar.hcast_val_eq, IScalarTy.I128_numBits_eq, ev]
-    exact Int.bmod_eq_of_le (by push_cast; omega) (by push_cast; omega)
+    exact Int.bmod_eq_of_le (by push_cast; (clear * - L63 he ev; omega)) (by push_cast; (clear * - L63 he ev; omega))
   have fc : (UScalar.hcast .I128 f).val = (f.val : ℤ) := by
     rw [UScalar.hcast_val_eq, IScalarTy.I128_numBits_eq]
-    exact Int.bmod_eq_of_le (by push_cast; omega) (by push_cast; omega)
+    exact Int.bmod_eq_of_le (by push_cast; (clear * - hf1 hf; omega)) (by push_cast; (clear * - hf1 hf; omega))
   have mn2 : IScalar.min .I128 = -2 ^ 127 := min_eq_neg_pow IScalarTy.I128_numBits_eq
   have mx2 : IScalar.max .I128 = 2 ^ 127 - 1 := max_eq_pow_sub_one IScalarTy.I128_numBits_eq
   refine WP.spec_bind (IScalar.sub_spec (x := UScalar.hcast .I128 e) (y := UScalar.hcast .I128 f)
-    (by rw [ec, fc, mn2]; omega) (by rw [ec, fc, mx2]; omega)) fun i29 h29 => ?_
+    (by rw [ec, fc, mn2]; (clear * - hf1 hf L63 he ev ec fc; omega)) (by rw [ec, fc, mx2]; (clear * - hf1 hf L63 he ev ec fc; omega))) fun i29 h29 => ?_
   rw [ec, fc] at h29
   refine WP.spec_bind (IScalar.ShiftLeft_spec i29 fulcrum.exp.W_FRAC
     (by rw [w_frac_val, IScalarTy.I128_numBits_eq]; norm_num)) fun i30 ⟨h30, _⟩ => ?_
   have i30v : i30.val = ((L : ℤ) - f.val) * 2 ^ 120 := by
     rw [h30, Int.shiftLeft_eq, h29, w_frac_val, IScalarTy.I128_numBits_eq]
     have lb : -(32 : ℤ) * 2 ^ 120 ≤ ((L : ℤ) - f.val) * 2 ^ 120 := by
-      have : -(32 : ℤ) ≤ (L : ℤ) - f.val := by omega
+      have : -(32 : ℤ) ≤ (L : ℤ) - f.val := by (clear * - hf1 hf L63 he ev ec fc h29; omega)
       exact mul_le_mul_of_nonneg_right this (by positivity)
     have ub : ((L : ℤ) - f.val) * 2 ^ 120 ≤ 63 * 2 ^ 120 := by
-      have : (L : ℤ) - f.val ≤ 63 := by omega
+      have : (L : ℤ) - f.val ≤ 63 := by (clear * - hf1 hf L63 he ev ec fc h29; omega)
       exact mul_le_mul_of_nonneg_right this (by positivity)
-    exact Int.bmod_eq_of_le (by push_cast; omega) (by push_cast; omega)
+    exact Int.bmod_eq_of_le (by push_cast; (clear * - he ev ec fc h29 lb ub; omega)) (by push_cast; (clear * - he ev ec fc h29 lb ub; omega))
   refine WP.spec_bind (UScalar.sub_spec (x := fulcrum.tables.exp.WIDE_FRAC) (y := fulcrum.exp.W_FRAC)
     (by rw [wide_frac_val, w_frac_val]; norm_num)) fun i31 ⟨h31, _⟩ => ?_
   rw [wide_frac_val, w_frac_val] at h31
   refine WP.spec_bind (UScalar.ShiftRight_spec l i31 (by rw [h31, n128]; norm_num)) fun i32 ⟨h32, _⟩ => ?_
   rw [h31, Nat.shiftRight_eq_div_pow, show (126 - 120 : ℕ) = 6 from rfl] at h32
-  have i32l : i32.val < 2 ^ 121 := by rw [h32, Nat.div_lt_iff_lt_mul (by positivity)]; omega
+  have i32l : i32.val < 2 ^ 121 := by rw [h32, Nat.div_lt_iff_lt_mul (by positivity)]; (clear * - lv ll; omega)
   rw [lift, bind_ok]
   have pc : (UScalar.hcast .I128 i32).val = (i32.val : ℤ) := by
     rw [UScalar.hcast_val_eq, IScalarTy.I128_numBits_eq]
@@ -329,9 +339,9 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   have i30b : -(32 : ℤ) * 2 ^ 120 ≤ i30.val ∧ i30.val ≤ 63 * 2 ^ 120 := by
     rw [i30v]
     constructor
-    · have : -(32 : ℤ) ≤ (L : ℤ) - f.val := by omega
+    · have : -(32 : ℤ) ≤ (L : ℤ) - f.val := by (clear * - hf1 hf L63 he ev ec fc h29; omega)
       exact mul_le_mul_of_nonneg_right this (by positivity)
-    · have : (L : ℤ) - f.val ≤ 63 := by omega
+    · have : (L : ℤ) - f.val ≤ 63 := by (clear * - hf1 hf L63 he ev ec fc h29; omega)
       exact mul_le_mul_of_nonneg_right this (by positivity)
   refine WP.spec_mono (IScalar.add_spec (x := i30) (y := UScalar.hcast .I128 i32)
     (by rw [pc, mn2]; omega) (by rw [pc, mx2]; omega)) fun r hr => ?_
@@ -348,15 +358,15 @@ theorem log2_wide_spec (a : Std.U64) (f : Std.U32) (ha0 : 0 < a.val) (ha : a.val
   · rw [tgt, key]
     exact dn.trans (by norm_num)
   · have ib : (i32.val : ℝ) ≤ 2 ^ 120 + 2 := by
-      have := (abs_le.mp dn).2
-      have : S * 2 ^ 126 ≤ 1 * 2 ^ 126 := mul_le_mul_of_nonneg_right S1.le (by positivity)
-      linarith
+      have t1 := (abs_le.mp dn).2
+      have t2 : S * 2 ^ 126 ≤ 1 * 2 ^ 126 := mul_le_mul_of_nonneg_right S1.le (by positivity)
+      linarith only [t1, t2]
     have ib' : i32.val ≤ 2 ^ 120 + 2 := by exact_mod_cast ib
     have lo : -(32 : ℤ) * 2 ^ 120 ≤ ((L : ℤ) - f.val) * 2 ^ 120 := by
-      have : -(32 : ℤ) ≤ (L : ℤ) - f.val := by omega
+      have : -(32 : ℤ) ≤ (L : ℤ) - f.val := by (clear * - hf1 hf L63 he ev ec fc h29; omega)
       exact mul_le_mul_of_nonneg_right this (by positivity)
     have hi' : ((L : ℤ) - f.val) * 2 ^ 120 ≤ 63 * 2 ^ 120 := by
-      have : (L : ℤ) - f.val ≤ 63 := by omega
+      have : (L : ℤ) - f.val ≤ 63 := by (clear * - hf1 hf L63 he ev ec fc h29; omega)
       exact mul_le_mul_of_nonneg_right this (by positivity)
     omega
 
@@ -398,10 +408,10 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
   by_cases ho : n >= UScalar.hcast .I64 f
   · have : (UScalar.hcast .I64 f).val ≤ n.val := ho
     rw [ite_eq_left ho]
-    exact WP.spec_mono (overflow_spec f hf) fun r hr => Or.inl ⟨by rw [← nv]; omega, hr⟩
+    exact WP.spec_mono (overflow_spec f hf) fun r hr => Or.inl ⟨by rw [← nv]; (clear * - fc this; omega), hr⟩
   have nlt : n.val < f.val := by
     have : ¬ (UScalar.hcast .I64 f).val ≤ n.val := ho
-    omega
+    (clear * - fc this; omega)
   rw [ite_eq_right ho, lift, bind_ok]
   refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u128 fulcrum.exp.W_FRAC _
     (by rw [w_frac_val, n128]; norm_num) rfl) fun i3 ⟨h3, _⟩ => ?_
@@ -436,10 +446,10 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
   norm_num at hr
   refine WP.spec_bind (UScalar.ShiftRight_spec t rest (by rw [hr, n128]; norm_num)) fun i5 ⟨h5, _⟩ => ?_
   rw [Nat.shiftRight_eq_div_pow, hr] at h5
-  have kl : i5.val < 256 := by rw [h5, Nat.div_lt_iff_lt_mul (by positivity)]; omega
+  have kl : i5.val < 256 := by rw [h5, Nat.div_lt_iff_lt_mul (by positivity)]; (clear * - tl; omega)
   rw [lift, bind_ok]
   have kv : (UScalar.cast .U64 i5).val = i5.val := by
-    rw [cast_u64_val, Nat.mod_eq_of_lt (by omega)]
+    rw [cast_u64_val, Nat.mod_eq_of_lt (by (clear * - h5 kl; omega))]
   generalize UScalar.cast .U64 i5 = k at kv ⊢
   refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u128 rest _ (by rw [hr, n128]; norm_num) rfl)
     fun i6 ⟨h6, _⟩ => ?_
@@ -460,7 +470,7 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
   norm_num at h8
   refine WP.spec_bind (UScalar.ShiftRight_spec r i8 (by rw [h8, n128]; norm_num)) fun i9 ⟨h9, _⟩ => ?_
   rw [Nat.shiftRight_eq_div_pow, h8] at h9
-  have i9l : i9.val < 2 ^ 64 := by rw [h9, Nat.div_lt_iff_lt_mul (by positivity)]; omega
+  have i9l : i9.val < 2 ^ 64 := by rw [h9, Nat.div_lt_iff_lt_mul (by positivity)]; (clear * - rl; omega)
   refine WP.spec_bind (UScalar.sub_spec (x := fulcrum.tables.exp.LN_2_FRAC) (y := 64#u32)
     (by rw [ln_2_frac_val, lit_val]; norm_num)) fun i10 ⟨h10, _⟩ => ?_
   rw [ln_2_frac_val, lit_val] at h10
@@ -483,11 +493,11 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
   refine WP.spec_bind (exp_unit_spec k _ (by rw [kv]; exact kl) (yv ▸ ylim)) fun m ⟨hm, mtop⟩ => ?_
   rw [yv, kv] at hm
   have mlt : m.val < 2 ^ 127 := by omega
-  refine WP.spec_mono (round_mantissa_spec m n f mlt (by omega) (by omega) hf) fun res hres => Or.inr ⟨by rw [← nv]; exact nlt, ?_⟩
+  refine WP.spec_mono (round_mantissa_spec m n f mlt (by (clear * - hi nlo nhi nv; omega)) (by (clear * - hf1 hf fc nlt; omega)) hf) fun res hres => Or.inr ⟨by rw [← nv]; exact nlt, ?_⟩
   rw [hres]
   set X : ℝ := (2 : ℝ) ^ ((w.val : ℝ) / 2 ^ 120) * 2 ^ f.val with hX
   set sh : ℕ := (126 - f.val - n.val).toNat with hsd
-  have sv : (sh : ℤ) = 126 - f.val - n.val := Int.toNat_of_nonneg (by omega)
+  have sv : (sh : ℤ) = 126 - f.val - n.val := Int.toNat_of_nonneg (by (clear * - hf1 hf fc nlt; omega))
   have split : (w.val : ℝ) = 2 ^ 120 * (n.val : ℝ) + t.val := by
     rw [tR, nv]; exact_mod_cast (Int.mul_ediv_add_emod w.val (2 ^ (120 : ℕ))).symm
   have sc := exp2_wide_scale w.val n.val f.val sh t.val split sv
@@ -497,7 +507,7 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
       rw [h5, rv]; exact_mod_cast (Nat.div_add_mod' t.val (2 ^ 112)).symm
     rw [d]; field_simp; ring
   set A : ℝ := (i13.val : ℝ) / 2 ^ 72 with hA
-  set B : ℝ := Real.log 2 * (r.val / 2 ^ 120) with hB
+  set! B : ℝ := Real.log 2 * (r.val / 2 ^ 120) with hB
   have tgt : (2 : ℝ) ^ ((t.val : ℝ) / 2 ^ 120) = (2 : ℝ) ^ ((i5.val : ℝ) / 256) * Real.exp B := by
     rw [tk, Real.rpow_add two_pos, Real.rpow_def_of_pos two_pos ((r.val : ℝ) / 2 ^ 120)]
   have top : (2 : ℝ) ^ ((i5.val : ℝ) / 256) * Real.exp B ≤ 2 := by
@@ -518,7 +528,7 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
     have rM : (r.val : ℝ) / 2 ^ 48 ≤ 2 ^ 64 := by
       rw [div_le_iff₀ (by positivity)]
       have : (r.val : ℝ) < 2 ^ 112 := by exact_mod_cast rl
-      linarith
+      linarith only [this]
     have core : |(i9.val : ℝ) * i11.val / 2 ^ 64 - r.val / 2 ^ 48 * Real.log 2| ≤ 16942 / 10000 := by
       rw [show (i9.val : ℝ) * i11.val / 2 ^ 64 - r.val / 2 ^ 48 * Real.log 2 =
         (((i9.val : ℝ) - r.val / 2 ^ 48) * i11.val + r.val / 2 ^ 48 * ((i11.val : ℝ) - Real.log 2 * 2 ^ 64)) / 2 ^ 64 by
@@ -526,19 +536,19 @@ theorem exp2_wide_spec (w : Std.I128) (f : Std.U32) (hf1 : 1 ≤ f.val) (hf : f.
       refine (abs_add_le _ _).trans ?_
       rw [abs_mul, abs_mul, abs_of_nonneg (Nat.cast_nonneg (α := ℝ) i11.val), abs_of_nonneg r0]
       have t1 : |(i9.val : ℝ) - r.val / 2 ^ 48| * (i11.val : ℝ) ≤ 1 * (6932 / 10000 * 2 ^ 64) :=
-        mul_le_mul (abs_le.mpr ⟨by linarith, by linarith⟩) lamM (Nat.cast_nonneg _) zero_le_one
+        mul_le_mul (abs_le.mpr ⟨by linarith only [rb], by linarith only [ra]⟩) lamM (Nat.cast_nonneg _) zero_le_one
       have t2 : (r.val : ℝ) / 2 ^ 48 * |(i11.val : ℝ) - Real.log 2 * 2 ^ 64| ≤ 2 ^ 64 * (1001 / 1000) :=
         mul_le_mul rM elam (abs_nonneg _) (by positivity)
-      linarith
+      linarith only [t1, t2]
     rw [hA, hB, show (i13.val : ℝ) / 2 ^ 72 - Real.log 2 * (r.val / 2 ^ 120) =
       ((i13.val : ℝ) - r.val / 2 ^ 48 * Real.log 2) / 2 ^ 72 by ring, abs_div,
       abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 72)]
     refine div_le_div_of_nonneg_right ?_ (by positivity)
     have ⟨c1, c2⟩ := abs_le.mp core
-    exact abs_le.mpr ⟨by linarith, by linarith⟩
+    exact abs_le.mpr ⟨by linarith only [yb, c1], by linarith only [ya, c2]⟩
   have es := exp_shift_near A B _ (1 / 2 ^ 60) dAB (by norm_num) (by norm_num)
   have T0 : (0 : ℝ) ≤ (2 : ℝ) ^ ((i5.val : ℝ) / 256) := by positivity
-  refine (mantissa_round_near m.val n.val f.val 0 X (22 / 10 * 2 ^ 56) mlt hf (by omega) (by positivity) (by positivity)
+  refine (mantissa_round_near m.val n.val f.val 0 X (22 / 10 * 2 ^ 56) mlt hf (by (clear * - fc nlt sv; omega)) (by positivity) (by positivity)
     ?_ ?_).trans_eq (by ring)
   · rw [sc, tgt]
     exact (mul_le_mul_of_nonneg_right top (by positivity)).trans (by norm_num)
@@ -571,7 +581,7 @@ theorem natAbs_mul_div_near (y l : ℤ) (fy : ℕ) :
     rw [abs_mul, Nat.cast_mul, Nat.cast_natAbs, Nat.cast_natAbs, Int.cast_abs, Int.cast_abs]
   rw [e] at a b
   push_cast at a b
-  constructor <;> linarith
+  constructor <;> linarith only [a, b]
 
 /-- `2^(w / 2^120)` against `2^P` for `w` within `1.05 Y + 1` of `P · 2^120`, `0 ≤ Y ≤ 2^63`:
 a value within `E` of `2^(w / 2^120) · 2^f` is within `E + 2^P · 2^f · (Y + 1) / 2^120` of
@@ -583,13 +593,13 @@ theorem pow_tail_near (w P Y E r : ℝ) (f : ℕ) (hY0 : 0 ≤ Y) (hY : Y ≤ 2 
   have l1 := log_two_le'
   have d : |Real.log 2 * (w / 2 ^ 120) - Real.log 2 * P| ≤ Real.log 2 * ((105 / 100 * Y + 1) / 2 ^ 120) := by
     rw [show Real.log 2 * (w / 2 ^ 120) - Real.log 2 * P = Real.log 2 * ((w - P * 2 ^ 120) / 2 ^ 120) by ring,
-      abs_mul, abs_of_pos (by linarith), abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 120)]
-    exact mul_le_mul_of_nonneg_left (div_le_div_of_nonneg_right hw (by positivity)) (by linarith)
+      abs_mul, abs_of_pos (by linarith only [l0]), abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 120)]
+    exact mul_le_mul_of_nonneg_left (div_le_div_of_nonneg_right hw (by positivity)) (by linarith only [l0])
   have dc : Real.log 2 * ((105 / 100 * Y + 1) / 2 ^ 120) ≤ 1 / 2 ^ 50 := by
     have : (105 / 100 * Y + 1) / 2 ^ 120 ≤ (105 / 100 * 2 ^ 63 + 1) / 2 ^ 120 :=
-      div_le_div_of_nonneg_right (by linarith) (by positivity)
+      div_le_div_of_nonneg_right (by linarith only [hY]) (by positivity)
     calc Real.log 2 * ((105 / 100 * Y + 1) / 2 ^ 120) ≤ 1 * ((105 / 100 * 2 ^ 63 + 1) / 2 ^ 120) :=
-          mul_le_mul (by linarith) this (by positivity) zero_le_one
+          mul_le_mul (by linarith only [l1]) this (by positivity) zero_le_one
       _ ≤ 1 / 2 ^ 50 := by norm_num
   have es := exp_shift_near _ _ _ (1 / 2 ^ 50) d dc (by norm_num)
   rw [← Real.rpow_def_of_pos two_pos, ← Real.rpow_def_of_pos two_pos] at es
@@ -598,8 +608,8 @@ theorem pow_tail_near (w P Y E r : ℝ) (f : ℕ) (hY0 : 0 ≤ Y) (hY : Y ≤ 2 
     rw [show (1 + 1 / 2 ^ 50) * (Real.log 2 * ((105 / 100 * Y + 1) / 2 ^ 120)) =
       (1 + 1 / 2 ^ 50) * Real.log 2 * (105 / 100 * Y + 1) / 2 ^ 120 by ring]
     refine div_le_div_of_nonneg_right ?_ (by positivity)
-    have : (1 + 1 / 2 ^ 50) * Real.log 2 ≤ 7 / 10 := by nlinarith
-    nlinarith
+    have : (1 + 1 / 2 ^ 50) * Real.log 2 ≤ 7 / 10 := by nlinarith only [l1]
+    nlinarith only [hY0, l1]
   calc |r - (2 : ℝ) ^ P * 2 ^ f| ≤ |r - (2 : ℝ) ^ (w / 2 ^ 120) * 2 ^ f| +
         |((2 : ℝ) ^ (w / 2 ^ 120) - (2 : ℝ) ^ P) * 2 ^ f| := by
         rw [show r - (2 : ℝ) ^ P * 2 ^ f = (r - (2 : ℝ) ^ (w / 2 ^ 120) * 2 ^ f) +
@@ -653,14 +663,14 @@ theorem powOk_ge (f a : ℕ) (y : ℤ) (fy : ℕ) (r : ℤ) (hf : f ≤ 32) (hy 
     have Yb : |(y : ℝ)| / 2 ^ fy + 1 ≤ 2 ^ 120 := by
       have : |(y : ℝ)| ≤ 2 ^ 63 := by rw [← Int.cast_abs, Int.abs_eq_natAbs]; exact_mod_cast hy
       have : |(y : ℝ)| / 2 ^ fy ≤ 2 ^ 63 := (div_le_self (abs_nonneg _) (one_le_pow₀ one_le_two)).trans this
-      linarith
+      linarith only [this]
     have t : X * (|(y : ℝ)| / 2 ^ fy + 1) / 2 ^ 120 ≤ X := by
       rw [div_le_iff₀ (by positivity)]; exact mul_le_mul_of_nonneg_left Yb X0
     have p : (22 / 10 : ℝ) * 2 ^ (2 * f) / 2 ^ 71 ≤ 1 / 4 := by
       have : (2 : ℝ) ^ (2 * f) ≤ 2 ^ 64 := pow_le_pow_right₀ one_le_two (by omega)
-      rw [div_le_iff₀ (by positivity)]; nlinarith
+      rw [div_le_iff₀ (by positivity)]; nlinarith only [this]
     have := (abs_le.mp h).1
-    have : (-1 : ℝ) < r := by linarith
+    have : (-1 : ℝ) < r := by linarith only [t, p, this]
     have : (-1 : ℤ) < r := by exact_mod_cast this
     omega
 
@@ -685,16 +695,16 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
   generalize UScalar.cast .U128 yi = ym at ymv ⊢
   have yab : y.val.natAbs ≤ 2 ^ 63 := natAbs_le_pow y 63 IScalarTy.I64_numBits_eq
   refine WP.spec_bind (shr_i32_spec lm 64#i32 64 rfl (by rw [n128]; norm_num)) fun i1 h1 => ?_
-  have i1l : i1.val < 2 ^ 62 := by rw [h1, hlm, Nat.div_lt_iff_lt_mul (by positivity)]; omega
+  have i1l : i1.val < 2 ^ 62 := by rw [h1, hlm, Nat.div_lt_iff_lt_mul (by positivity)]; (clear * - lab; omega)
   refine WP.spec_bind (UScalar.mul_spec (x := ym) (y := i1) (by
     rw [U128_max_val, ymv]
     calc y.val.natAbs * i1.val ≤ 2 ^ 63 * 2 ^ 62 := Nat.mul_le_mul yab i1l.le
       _ ≤ 2 ^ 128 - 1 := by norm_num)) fun high hhigh => ?_
-  refine WP.spec_bind (UScalar.add_spec (x := 62#u32) (y := fy) (by rw [lit_val, U32_max_val]; omega)) fun i2 h2 => ?_
+  refine WP.spec_bind (UScalar.add_spec (x := 62#u32) (y := fy) (by rw [lit_val, U32_max_val]; (clear * - fy32; omega))) fun i2 h2 => ?_
   rw [lit_val] at h2
-  refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u128 i2 _ (by rw [h2, n128]; omega) rfl) fun i3 ⟨h3, _⟩ => ?_
+  refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u128 i2 _ (by rw [h2, n128]; (clear * - fy32 h2; omega)) rfl) fun i3 ⟨h3, _⟩ => ?_
   rw [h2, lit_val, Nat.shiftLeft_eq, one_mul, UScalar.size_def, n128,
-    Nat.mod_eq_of_lt (Nat.pow_lt_pow_right one_lt_two (by omega))] at h3
+    Nat.mod_eq_of_lt (Nat.pow_lt_pow_right one_lt_two (by (clear * - fy32 h2; omega)))] at h3
   set Lr : ℝ := Real.logb 2 ((a.val : ℝ) / 2 ^ f.val) with hLr
   set p : ℝ := (y.val : ℝ) / 2 ^ fy.val with hp
   set Y : ℝ := |(y.val : ℝ)| / 2 ^ fy.val with hY
@@ -721,9 +731,9 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
     rw [z1, z2] at h
     rcases lt_or_ge l.val 0 with c | c
     · have : 0 ≤ y.val := by by_contra q; exact h ⟨fun _ => lt_of_not_ge q, fun _ => c⟩
-      nlinarith
+      nlinarith only [c, this]
     · have : y.val < 0 := by by_contra q; exact h ⟨fun e => absurd e (not_lt.mpr c), fun e => absurd e q⟩
-      nlinarith
+      nlinarith only [c, this]
   have sgn' : ¬ ((l < 0#i128) != (y < 0#i64)) = true → 0 ≤ y.val * l.val := by
     intro h
     simp only [bne_iff_ne, ne_eq, decide_eq_decide, IScalar.lt_equiv, not_not] at h
@@ -732,13 +742,13 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
     rw [z1, z2] at h
     rcases lt_or_ge l.val 0 with c | c
     · have : y.val < 0 := h.mp c
-      nlinarith
+      nlinarith only [c, this]
     · have : 0 ≤ y.val := by by_contra q; exact (not_lt.mpr c) (h.mpr (lt_of_not_ge q))
-      nlinarith
+      nlinarith only [c, this]
   have bnd0 : 0 ≤ 22 / 10 * (2 : ℝ) ^ (2 * f.val) / 2 ^ 71 +
       (2 : ℝ) ^ (p * Lr) * 2 ^ f.val * (Y + 1) / 2 ^ 120 := by positivity
   by_cases big : high >= i3
-  · have hb : 2 ^ (62 + fy.val) ≤ high.val := by have : i3.val ≤ high.val := big; omega
+  · have hb : 2 ^ (62 + fy.val) ≤ high.val := by have : i3.val ≤ high.val := big; (clear * - hhigh h3 this; omega)
     rw [ite_eq_left big]
     have prod : (2 : ℝ) ^ 126 ≤ |(y.val : ℝ) * l.val| / 2 ^ fy.val := by
       rw [le_div_iff₀ (by positivity)]
@@ -748,10 +758,10 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
       have e : ((y.val.natAbs * l.val.natAbs : ℕ) : ℝ) = |(y.val : ℝ) * l.val| := by
         rw [abs_mul, Nat.cast_mul, Nat.cast_natAbs, Nat.cast_natAbs, Int.cast_abs, Int.cast_abs]
       calc (2 : ℝ) ^ 126 * 2 ^ fy.val = ((2 ^ (62 + fy.val) * 2 ^ 64 : ℕ) : ℝ) := by
-            rw [Nat.cast_mul, Nat.cast_pow, Nat.cast_pow, Nat.cast_ofNat, ← pow_add, ← pow_add]; congr 1; omega
+            rw [Nat.cast_mul, Nat.cast_pow, Nat.cast_pow, Nat.cast_ofNat, ← pow_add, ← pow_add]; congr 1; (clear * -; omega)
         _ ≤ ((y.val.natAbs * l.val.natAbs : ℕ) : ℝ) := by exact_mod_cast n2
         _ = _ := e
-    have YM' : 105 / 100 * Y ≤ 2 ^ 64 := by linarith
+    have YM' : 105 / 100 * Y ≤ 2 ^ 64 := by linarith only [YM]
     by_cases hn : ((l < 0#i128) != (y < 0#i64)) = true
     · rw [ite_eq_left hn, WP.spec_ok]
       right
@@ -759,11 +769,11 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
       have neg : (y.val : ℝ) * l.val / 2 ^ fy.val ≤ -2 ^ 126 := by
         have : (y.val : ℝ) * l.val ≤ 0 := by exact_mod_cast s0
         rw [abs_of_nonpos this] at prod
-        rw [neg_div] at prod; linarith
+        rw [neg_div] at prod; linarith only [prod]
       have Pl : p * Lr ≤ -63 := by
         have := (abs_le.mp wnear).1
-        have : p * Lr * 2 ^ 120 ≤ -63 * 2 ^ 120 := by linarith
-        exact le_of_mul_le_mul_right (by linarith) (by positivity : (0 : ℝ) < 2 ^ 120)
+        have : p * Lr * 2 ^ 120 ≤ -63 * 2 ^ 120 := by linarith only [YM, neg, this]
+        exact le_of_mul_le_mul_right this (by positivity : (0 : ℝ) < 2 ^ 120)
       have Xs : (2 : ℝ) ^ (p * Lr) * 2 ^ f.val ≤ 1 / 2 := by
         have h1' : (2 : ℝ) ^ (p * Lr) ≤ 2 ^ (-63 : ℝ) := Real.rpow_le_rpow_of_exponent_le one_le_two Pl
         have h2' : (2 : ℝ) ^ f.val ≤ 2 ^ 32 := pow_le_pow_right₀ one_le_two hf
@@ -774,7 +784,7 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
           _ ≤ 1 / 2 := by norm_num
       rw [show ((0#i128 : Std.I128).val : ℝ) = 0 from by norm_num [show (0#i128 : Std.I128).val = 0 from rfl],
         zero_sub, abs_neg, abs_of_nonneg (by positivity)]
-      linarith
+      linarith only [bnd0, Xs]
     · rw [ite_eq_right hn]
       refine WP.spec_mono (overflow_spec f hf) fun r hr => Or.inl ⟨hr, ?_⟩
       have s0 := sgn' hn
@@ -783,20 +793,20 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
         rwa [abs_of_nonneg this] at prod
       have Pl : (f.val : ℝ) - 1 ≤ p * Lr := by
         have := (abs_le.mp wnear).2
-        have : 63 * 2 ^ 120 ≤ p * Lr * 2 ^ 120 := by linarith
-        have : (63 : ℝ) ≤ p * Lr := le_of_mul_le_mul_right (by linarith) (by positivity : (0 : ℝ) < 2 ^ 120)
-        have : (f.val : ℝ) ≤ 32 := by exact_mod_cast hf
-        linarith
+        have : 63 * 2 ^ 120 ≤ p * Lr * 2 ^ 120 := by linarith only [YM, pos, this]
+        have t1 : (63 : ℝ) ≤ p * Lr := le_of_mul_le_mul_right this (by positivity : (0 : ℝ) < 2 ^ 120)
+        have t2 : (f.val : ℝ) ≤ 32 := by exact_mod_cast hf
+        linarith only [t1, t2]
       exact pow_mark_le _ _ hf1 Pl
-  have hb : high.val < 2 ^ (62 + fy.val) := by have : ¬ i3.val ≤ high.val := big; omega
+  have hb : high.val < 2 ^ (62 + fy.val) := by have : ¬ i3.val ≤ high.val := big; (clear * - hhigh h3 this; omega)
   rw [ite_eq_right big]
-  refine WP.spec_bind (UScalar.sub_spec (x := 64#u32) (y := fy) (by rw [lit_val]; omega)) fun i4 ⟨h4, _⟩ => ?_
+  refine WP.spec_bind (UScalar.sub_spec (x := 64#u32) (y := fy) (by rw [lit_val]; (clear * - fy32 h2; omega))) fun i4 ⟨h4, _⟩ => ?_
   rw [lit_val] at h4
   have i5b : high.val * 2 ^ (64 - fy.val) < 2 ^ 126 := by
     calc high.val * 2 ^ (64 - fy.val) < 2 ^ (62 + fy.val) * 2 ^ (64 - fy.val) :=
           Nat.mul_lt_mul_of_pos_right hb (by positivity)
-      _ = 2 ^ 126 := by rw [← pow_add]; congr 1; omega
-  refine WP.spec_bind (UScalar.ShiftLeft_spec high i4 _ (by rw [h4, n128]; omega) rfl) fun i5 ⟨h5, _⟩ => ?_
+      _ = 2 ^ 126 := by rw [← pow_add]; congr 1; (clear * - fy32 h2; omega)
+  refine WP.spec_bind (UScalar.ShiftLeft_spec high i4 _ (by rw [h4, n128]; (clear * - fy32 h2; omega)) rfl) fun i5 ⟨h5, _⟩ => ?_
   rw [h4, Nat.shiftLeft_eq, UScalar.size_def, n128, Nat.mod_eq_of_lt (i5b.trans (by norm_num))] at h5
   rw [lift, bind_ok, lift, bind_ok]
   have i7v : (UScalar.cast .U128 (UScalar.cast .U64 lm)).val = l.val.natAbs % 2 ^ 64 := by
@@ -806,9 +816,9 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
     calc y.val.natAbs * (l.val.natAbs % 2 ^ 64) ≤ 2 ^ 63 * (2 ^ 64 - 1) :=
           Nat.mul_le_mul yab (Nat.le_pred_of_lt (Nat.mod_lt _ (by positivity)))
       _ < 2 ^ 127 := by norm_num
-  refine WP.spec_bind (UScalar.mul_spec (x := ym) (y := i7) (by rw [U128_max_val, ymv, i7v]; omega)) fun i8 h8 => ?_
+  refine WP.spec_bind (UScalar.mul_spec (x := ym) (y := i7) (by rw [U128_max_val, ymv, i7v]; (clear * - i8b; omega))) fun i8 h8 => ?_
   rw [ymv, i7v] at h8
-  refine WP.spec_bind (UScalar.ShiftRight_spec i8 fy (by rw [n128]; omega)) fun i9 ⟨h9, _⟩ => ?_
+  refine WP.spec_bind (UScalar.ShiftRight_spec i8 fy (by rw [n128]; (clear * - fy32 h2; omega))) fun i9 ⟨h9, _⟩ => ?_
   rw [Nat.shiftRight_eq_div_pow, h8] at h9
   have i9b : i9.val < 2 ^ 126 := by
     rw [h9]
@@ -821,17 +831,17 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
     · rw [Nat.div_lt_iff_lt_mul (by positivity)]
       calc y.val.natAbs * (l.val.natAbs % 2 ^ 64) < 2 ^ 127 := i8b
         _ = 2 ^ 126 * 2 ^ 1 := by norm_num
-        _ ≤ 2 ^ 126 * 2 ^ fy.val := Nat.mul_le_mul_left _ (Nat.pow_le_pow_right two_pos (by omega))
-  refine WP.spec_bind (UScalar.add_spec (x := i5) (y := i9) (by rw [U128_max_val, h5]; omega)) fun i10 h10 => ?_
+        _ ≤ 2 ^ 126 * 2 ^ fy.val := Nat.mul_le_mul_left _ (Nat.pow_le_pow_right two_pos (by (clear * - hf1 hf h2 h0; omega)))
+  refine WP.spec_bind (UScalar.add_spec (x := i5) (y := i9) (by rw [U128_max_val, h5]; (clear * - i5b h5 h9 i9b; omega))) fun i10 h10 => ?_
   have i10v : i10.val = y.val.natAbs * l.val.natAbs / 2 ^ fy.val := by
     rw [h10, h5, h9, hhigh, ymv, h1, hlm]
     have e : y.val.natAbs * l.val.natAbs =
         y.val.natAbs * (l.val.natAbs / 2 ^ 64) * 2 ^ (64 - fy.val) * 2 ^ fy.val + y.val.natAbs * (l.val.natAbs % 2 ^ 64) := by
-      rw [mul_assoc _ (2 ^ (64 - fy.val)), ← pow_add, show 64 - fy.val + fy.val = 64 by omega]
+      rw [mul_assoc _ (2 ^ (64 - fy.val)), ← pow_add, show 64 - fy.val + fy.val = 64 by (clear * - fy32 h2; omega)]
       conv_lhs => rw [← Nat.div_add_mod l.val.natAbs (2 ^ 64)]
       ring
     rw [e, add_comm _ (y.val.natAbs * (l.val.natAbs % 2 ^ 64)), Nat.add_mul_div_right _ _ (by positivity), add_comm]
-  have i10l : i10.val < 2 ^ 127 := by rw [h10, h5]; omega
+  have i10l : i10.val < 2 ^ 127 := by rw [h10, h5]; (clear * - i5b h5 h9 i9b h10 i10v; omega)
   rw [lift, bind_ok]
   have mc : (UScalar.hcast .I128 i10).val = (i10.val : ℤ) := by
     rw [UScalar.hcast_val_eq, IScalarTy.I128_numBits_eq]
@@ -853,12 +863,12 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
         rw [abs_of_nonpos s0] at trunc
         rw [Int.cast_neg, Int.cast_natCast, show -((y.val.natAbs * l.val.natAbs / 2 ^ fy.val : ℕ) : ℝ) - (y.val : ℝ) * l.val / 2 ^ fy.val =
           -(y.val * l.val) / 2 ^ fy.val - ((y.val.natAbs * l.val.natAbs / 2 ^ fy.val : ℕ) : ℝ) by ring]
-        exact abs_lt.mpr ⟨by linarith [trunc.1], by linarith [trunc.2]⟩
+        exact abs_lt.mpr ⟨by linarith only [trunc.1], by linarith only [trunc.2]⟩
     · rw [ite_eq_right hn, WP.spec_ok, mc]
       have s0 : 0 ≤ (y.val : ℝ) * l.val := by exact_mod_cast sgn' hn
       rw [abs_of_nonneg s0] at trunc
       rw [Int.cast_natCast]
-      exact abs_lt.mpr ⟨by linarith [trunc.2], by linarith [trunc.1]⟩
+      exact abs_lt.mpr ⟨by linarith only [trunc.2], by linarith only [trunc.1]⟩
   have wn : |(m1.val : ℝ) - p * Lr * 2 ^ 120| ≤ 105 / 100 * Y + 1 := by
     calc |(m1.val : ℝ) - p * Lr * 2 ^ 120| ≤ |(m1.val : ℝ) - (y.val : ℝ) * l.val / 2 ^ fy.val| +
           |(y.val : ℝ) * l.val / 2 ^ fy.val - p * Lr * 2 ^ 120| := abs_sub_le _ _ _
@@ -870,7 +880,7 @@ theorem pow_magnitude_spec (a : Std.U64) (f : Std.U32) (y : Std.I64) (fy : Std.U
     refine ⟨hrv, pow_mark_le _ _ hf1 ?_⟩
     have : (f.val : ℤ) * 2 ^ 120 ≤ m1.val := by
       have := Int.mul_le_of_le_ediv (by positivity) ho
-      linarith
+      linarith only [this]
     have q1 : (f.val : ℝ) * 2 ^ 120 ≤ m1.val := by exact_mod_cast this
     have q2 := (abs_le.mp wn).2
     have : ((f.val : ℝ) - 1) * 2 ^ 120 ≤ p * Lr * 2 ^ 120 := by

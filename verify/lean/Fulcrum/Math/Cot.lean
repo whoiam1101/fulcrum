@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Math.Series
-public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
+public import Mathlib.Analysis.Complex.Trigonometric
+import Fulcrum.Math.Series
+import Mathlib.Analysis.SpecialFunctions.Trigonometric.Bounds
 
 /-!
 # The cotangent near zero
@@ -26,8 +27,8 @@ theorem cot_near (θ : ℝ) (h0 : 0 < θ) (h1 : θ ≤ 1 / 512) :
     |Real.cos θ / Real.sin θ - (1 / θ - θ / 3 - θ ^ 3 / 45)| ≤ θ ^ 5 / 390 := by
   have t2 : θ ^ 2 ≤ 1 / 512 ^ 2 := by
     rw [show (1 : ℝ) / 512 ^ 2 = (1 / 512) ^ 2 by norm_num]; exact pow_le_pow_left₀ h0.le h1 2
-  have hs := sin_sub_sum_le θ 3 (by norm_num; nlinarith)
-  have hc := cos_sub_sum_le θ 4 (by norm_num; nlinarith)
+  have hs := sin_sub_sum_le θ 3 (by norm_num; nlinarith only [h0, h1, t2])
+  have hc := cos_sub_sum_le θ 4 (by norm_num; nlinarith only [h0, h1, t2])
   simp only [sum_range_succ, sum_range_zero, Nat.factorial, Nat.succ_eq_add_one] at hs hc
   norm_num at hs hc
   rw [abs_of_pos h0] at hs hc
@@ -37,15 +38,15 @@ theorem cot_near (θ : ℝ) (h0 : 0 < θ) (h1 : θ ≤ 1 / 512) :
   have hs' : |s - (θ - θ ^ 3 / 6 + θ ^ 5 / 120)| ≤ θ ^ 7 / 5039 := by
     rw [show θ - θ ^ 3 / 6 + θ ^ 5 / 120 = θ + -θ ^ 3 / 6 + θ ^ 5 / 120 by ring]
     refine hs.trans ?_
-    rw [div_div, div_le_div_iff₀ (by nlinarith) (by norm_num)]
+    rw [div_div, div_le_div_iff₀ (by nlinarith only [h0, h1, t2]) (by norm_num)]
     have : (0 : ℝ) ≤ θ ^ 7 := by positivity
-    nlinarith
+    nlinarith only [h0, h1, t2, this]
   have hc' : |c - (1 - θ ^ 2 / 2 + θ ^ 4 / 24 - θ ^ 6 / 720)| ≤ θ ^ 8 / 40319 := by
     rw [show 1 - θ ^ 2 / 2 + θ ^ 4 / 24 - θ ^ 6 / 720 = 1 + -θ ^ 2 / 2 + θ ^ 4 / 24 + -θ ^ 6 / 720 by ring]
     refine hc.trans ?_
-    rw [div_div, div_le_div_iff₀ (by nlinarith) (by norm_num)]
+    rw [div_div, div_le_div_iff₀ (by nlinarith only [h0, h1, t2]) (by norm_num)]
     have : (0 : ℝ) ≤ θ ^ 8 := by positivity
-    nlinarith
+    nlinarith only [h0, h1, t2, this]
   set P := 1 / θ - θ / 3 - θ ^ 3 / 45 with hP
   have P0 : 0 ≤ P := by
     rw [hP, one_div]

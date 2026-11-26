@@ -1,8 +1,9 @@
 module
 
-public import Fulcrum.Lemmas.Nat
-public import Mathlib.Algebra.Order.Ring.Int
-public import Mathlib.Tactic.Ring
+public import Mathlib.Data.Nat.Notation
+import Mathlib.Algebra.Order.Group.Nat
+import Mathlib.Algebra.Order.Ring.Int
+import Mathlib.Tactic.Ring.RingNF
 
 /-!
 # One Newton step for `⌊√n⌋`

@@ -1,7 +1,8 @@
 module
 
-public import Fulcrum.Math.Fixed
-public import Fulcrum.Math.Series
+public import Mathlib.Analysis.Complex.Exponential
+import Fulcrum.Math.Fixed
+import Fulcrum.Math.Series
 
 /-!
 # `e^y - 1` of the remainder (INTERNALS §3.16)
@@ -54,7 +55,7 @@ theorem horner_step (c y g : ℕ) (C G e : ℝ) (hc : |(c : ℝ) - C| ≤ 1) (hg
   refine (abs_add_le _ _).trans ?_
   have : 2 ^ 64 * e / 2 ^ 72 = e / 2 ^ 8 := by field_simp
   rw [this] at d
-  linarith
+  linarith only [hc, d]
 
 /-- A Horner step is at most `c + g` when `y ≤ 2^72`. -/
 theorem horner_step_le (c y g : ℕ) (hy : y ≤ 2 ^ 72) : c + y * g / 2 ^ 72 ≤ c + g :=
@@ -70,17 +71,17 @@ theorem expm1_series_near (y : ℕ) (hy : y ≤ 2 ^ 64) :
   have u0 : 0 ≤ u := by positivity
   have yu : (y : ℝ) = u * 2 ^ 72 := by rw [hu]; field_simp
   have u1 : u ≤ 1 / 2 ^ 8 := by
-    rw [hu, div_le_div_iff₀ (by positivity) (by positivity)]; linarith
-  set G0 : ℝ := 2 ^ 64 / 720 + y * (2 ^ 64 / 5040) / 2 ^ 72
-  set G1 : ℝ := 2 ^ 64 / 120 + y * G0 / 2 ^ 72
-  set G2 : ℝ := 2 ^ 64 / 24 + y * G1 / 2 ^ 72
-  set G3 : ℝ := 2 ^ 64 / 6 + y * G2 / 2 ^ 72
-  set H : ℝ := 2 ^ 64 / 2 + y * G3 / 2 ^ 72 with hH
-  set g0 : ℕ := 2 ^ 64 / 720 + y * (2 ^ 64 / 5040) / 2 ^ 72 with hg0
-  set g1 : ℕ := 2 ^ 64 / 120 + y * g0 / 2 ^ 72 with hg1
-  set g2 : ℕ := 2 ^ 64 / 24 + y * g1 / 2 ^ 72 with hg2
-  set g3 : ℕ := 2 ^ 64 / 6 + y * g2 / 2 ^ 72 with hg3
-  set h : ℕ := 2 ^ 64 / 2 + y * g3 / 2 ^ 72 with hh
+    rw [hu, div_le_div_iff₀ (by positivity) (by positivity)]; linarith only [yM]
+  set! G0 : ℝ := 2 ^ 64 / 720 + y * (2 ^ 64 / 5040) / 2 ^ 72
+  set! G1 : ℝ := 2 ^ 64 / 120 + y * G0 / 2 ^ 72
+  set! G2 : ℝ := 2 ^ 64 / 24 + y * G1 / 2 ^ 72
+  set! G3 : ℝ := 2 ^ 64 / 6 + y * G2 / 2 ^ 72
+  set! H : ℝ := 2 ^ 64 / 2 + y * G3 / 2 ^ 72 with hH
+  set! g0 : ℕ := 2 ^ 64 / 720 + y * (2 ^ 64 / 5040) / 2 ^ 72 with hg0
+  set! g1 : ℕ := 2 ^ 64 / 120 + y * g0 / 2 ^ 72 with hg1
+  set! g2 : ℕ := 2 ^ 64 / 24 + y * g1 / 2 ^ 72 with hg2
+  set! g3 : ℕ := 2 ^ 64 / 6 + y * g2 / 2 ^ 72 with hg3
+  set! h : ℕ := 2 ^ 64 / 2 + y * g3 / 2 ^ 72 with hh
   have e0 : |(g0 : ℝ) - G0| ≤ 2 + 1 / 2 ^ 8 := horner_step _ y _ _ _ 1
     (pow64_div_near 720 720 (by norm_num) (by norm_num)) (pow64_div_near 5040 5040 (by norm_num) (by norm_num)) hy
   have e1 : |(g1 : ℝ) - G1| ≤ _ := horner_step _ y _ _ _ _ (pow64_div_near 120 120 (by norm_num) (by norm_num)) e0 hy
@@ -98,9 +99,9 @@ theorem expm1_series_near (y : ℕ) (hy : y ≤ 2 ^ 64) :
     have u4 : u ^ 4 ≤ u := pow_le_of_le_one u0 (u1.trans (by norm_num)) (by norm_num)
     have u5 : u ^ 5 ≤ u := pow_le_of_le_one u0 (u1.trans (by norm_num)) (by norm_num)
     have : (0 : ℝ) < 2 ^ 64 := by positivity
-    nlinarith
-  have hM : (h : ℝ) ≤ 2 ^ 64 * (1 / 2 + 1 / 2 ^ 8) + 201 / 100 := by linarith [(abs_le.mp eH).2]
-  set Z : ℝ := (y : ℝ) * y / 2 ^ 72 with hZ
+    nlinarith only [yM, hu, u2, u3, u4, u5]
+  have hM : (h : ℝ) ≤ 2 ^ 64 * (1 / 2 + 1 / 2 ^ 8) + 201 / 100 := by linarith only [(abs_le.mp eH).2, HM]
+  set! Z : ℝ := (y : ℝ) * y / 2 ^ 72 with hZ
   have Z0 : 0 ≤ Z := by positivity
   have ZM : Z ≤ 2 ^ 56 := by
     rw [hZ, div_le_iff₀ (by positivity)]
@@ -119,7 +120,7 @@ theorem expm1_series_near (y : ℕ) (hy : y ≤ 2 ^ 64) :
       · rw [abs_mul, abs_of_nonneg Z0]; exact mul_le_mul ZM eH (abs_nonneg _) (by positivity))
   simp only [Nat.cast_pow, Nat.cast_ofNat] at ep
   have tail : |(Real.exp u - 1) * 2 ^ 72 - (y + Z * H / 2 ^ 64)| ≤ 2 / 100 := by
-    have t := exp_sub_sum_le u 8 (by rw [abs_of_nonneg u0]; linarith)
+    have t := exp_sub_sum_le u 8 (by rw [abs_of_nonneg u0]; linarith only [yM, hu])
     norm_num [sum_range_succ, Nat.factorial, abs_of_nonneg u0] at t
     have poly : (y : ℝ) + Z * H / 2 ^ 64 =
         2 ^ 72 * (u + u ^ 2 / 2 + u ^ 3 / 6 + u ^ 4 / 24 + u ^ 5 / 120 + u ^ 6 / 720 + u ^ 7 / 5040) := by
@@ -129,7 +130,7 @@ theorem expm1_series_near (y : ℕ) (hy : y ≤ 2 ^ 64) :
         2 ^ 72 * (Real.exp u - (1 + u + u ^ 2 / 2 + u ^ 3 / 6 + u ^ 4 / 24 + u ^ 5 / 120 + u ^ 6 / 720 +
           u ^ 7 / 5040)) by ring, abs_mul, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 72)]
     have u8 : u ^ 8 ≤ (1 / 2 ^ 8) ^ 8 := pow_le_pow_left₀ u0 u1 8
-    have d : (1 : ℝ) / 2 ≤ 1 - u / 9 := by linarith
+    have d : (1 : ℝ) / 2 ≤ 1 - u / 9 := by linarith only [yM, hu]
     have hh : |Real.exp u - (1 + u + u ^ 2 / 2 + u ^ 3 / 6 + u ^ 4 / 24 + u ^ 5 / 120 + u ^ 6 / 720 +
         u ^ 7 / 5040)| ≤ u ^ 8 / 40320 / (1 - u / 9) := by
       convert t using 2
@@ -148,7 +149,7 @@ theorem expm1_series_near (y : ℕ) (hy : y ≤ 2 ^ 64) :
     refine (abs_sub _ _).trans ?_
     have : (1 * (2 ^ 64 * (1 / 2 + 1 / 2 ^ 8) + 201 / 100) + 2 ^ 56 * (201 / 100) : ℝ) / 2 ^ 64 + 1 + 2 / 100 ≤
         16 / 10 := by norm_num
-    linarith
+    linarith only [ep, tail]
   · have : ((z * h / 2 ^ 64 : ℕ) : ℝ) ≤ 2 ^ 56 := by
       have := (abs_le.mp ep).2
       have : Z * H / 2 ^ 64 ≤ 2 ^ 56 * (2 ^ 64 * (1 / 2 + 1 / 2 ^ 8)) / 2 ^ 64 :=
@@ -158,7 +159,7 @@ theorem expm1_series_near (y : ℕ) (hy : y ≤ 2 ^ 64) :
       have : (2 ^ 56 * (2 ^ 64 * (1 / 2 + 1 / 2 ^ 8)) / 2 ^ 64 : ℝ) ≤ 2 ^ 56 - 2 := by norm_num
       linarith
     have : z * h / 2 ^ 64 ≤ 2 ^ 56 := by exact_mod_cast this
-    omega
+    (clear * - this; omega)
 
 /-- `expm1N` is monotone. -/
 theorem expm1N_mono (y y' : ℕ) (h : y ≤ y') : expm1N y ≤ expm1N y' := by
@@ -188,15 +189,15 @@ theorem exp_unit_near (t e : ℕ) (T E : ℝ) (ht : |(t : ℝ) - T| ≤ 1 / 2) (
     rw [show (t : ℝ) + t * e / 2 ^ 72 - T * (1 + E) = ((t : ℝ) - T) * (1 + E) + t * (((e : ℝ) - E * 2 ^ 72) / 2 ^ 72) by
       field_simp; ring]
     refine (abs_add_le _ _).trans (add_le_add ?_ ?_)
-    · rw [abs_mul, abs_of_nonneg (by linarith : (0 : ℝ) ≤ 1 + E)]
-      exact (mul_le_mul ht (by linarith : 1 + E ≤ 2) (by linarith) (by norm_num)).trans (by norm_num)
+    · rw [abs_mul, abs_of_nonneg (by linarith only [E0] : (0 : ℝ) ≤ 1 + E)]
+      exact (mul_le_mul ht (by linarith only [E1] : 1 + E ≤ 2) (by linarith only [E0]) (by norm_num)).trans (by norm_num)
     · rw [abs_mul, Nat.abs_cast, abs_div, abs_of_pos (by positivity : (0 : ℝ) < 2 ^ 72), mul_div_assoc']
       exact div_le_div_of_nonneg_right (mul_le_mul tM he (abs_nonneg _) (by positivity)) (by positivity)
   refine ⟨?_, ?_⟩
   · push_cast
     have ⟨c1, c2⟩ := abs_le.mp core
     have : (1 + 2 ^ 127 * (16 / 10) / 2 ^ 72 : ℝ) + 2 ≤ 81 / 100 * 2 ^ 56 := by norm_num
-    exact abs_le.mpr ⟨by linarith, by linarith⟩
+    exact abs_le.mpr ⟨by linarith only [split, a2, b2, c1], by linarith only [split, a1, b1, c2]⟩
   · have : t / 2 ^ 64 * e / 2 ^ 8 + t % 2 ^ 64 * e / 2 ^ 72 ≤ t * e / 2 ^ 72 := by
       have h1 : t / 2 ^ 64 * e / 2 ^ 8 = t / 2 ^ 64 * 2 ^ 64 * e / 2 ^ 72 := by
         rw [show t / 2 ^ 64 * 2 ^ 64 * e = t / 2 ^ 64 * e * 2 ^ 64 by ring,

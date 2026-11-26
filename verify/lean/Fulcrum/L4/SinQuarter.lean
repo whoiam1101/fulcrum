@@ -1,8 +1,14 @@
 module
 
-public import Fulcrum.Math.Quarter
-public import Fulcrum.Tables.Trig
-public import Fulcrum.Lemmas.Scalar
+public import Fulcrum.Kernel.Funs
+public import Fulcrum.Math.Fixed
+public import Mathlib.Analysis.SpecialFunctions.Trigonometric.Basic
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.Quarter
+import Fulcrum.Tables.SinQuarter
+import Fulcrum.Tables.Trig
+import Mathlib.Algebra.Order.Ring.Star
+import Mathlib.Data.Nat.Cast.Field
 
 /-!
 # L4: `trig::sin_quarter` (INTERNALS §3.11)
@@ -95,19 +101,6 @@ theorem trig_mul_le_spec (a b : Std.U64) (A B : ℕ) (ha : a.val ≤ A) (hb : b.
     (h : A * B < 2 ^ 126) : fulcrum.trig.mul a b ⦃ r => r.val = mul62 a.val b.val ⦄ :=
   trig_mul_spec a b ((Nat.mul_le_mul ha hb).trans_lt h)
 
-/-- A division of a `u64` by a non-zero literal. -/
-theorem u64_div_spec (x y : Std.U64) (d : ℕ) (hy : y.val = d) (hd : 0 < d) :
-    (x / y) ⦃ r => r.val = x.val / d ⦄ := by
-  obtain ⟨z, hz, hv⟩ := UScalar.div_spec x (y := y) (by omega)
-  rw [hz, WP.spec_ok, hv, hy]
-
-/-- `k / 256 = p / 2^bits` for `k = p · 2^(8 - bits)` and `bits ≤ 8`. -/
-theorem angle_scale_up (p bits : ℕ) (hb : bits ≤ 8) :
-    ((p * 2 ^ (8 - bits) : ℕ) : ℝ) / 256 = p / 2 ^ bits := by
-  have e : (256 : ℝ) = 2 ^ (8 - bits) * 2 ^ bits := by
-    rw [← pow_add, Nat.sub_add_cancel hb]; norm_num
-  rw [e]; push_cast; field_simp
-
 /-- L4 on the code: `trig::sin_quarter` of `p ≤ 2^bits`, `bits ≤ 62`, never fails
 and is within `6.1` units of `sin (p / 2^bits · π/2) · 2^62`. -/
 theorem sin_quarter_spec (p : Std.U64) (bits : Std.U32) (hb : bits.val ≤ 62)
@@ -145,7 +138,7 @@ theorem sin_quarter_spec (p : Std.U64) (bits : Std.U32) (hb : bits.val ≤ 62)
     rw [hk]; exact (Nat.div_le_iff_le_mul_add_pred (Nat.two_pow_pos _)).mpr (by rw [← pw]; omega)
   refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u64 rest _ (by rw [hr, UScalarTy.U64_numBits_eq]; omega) rfl)
     fun i ⟨hi, _⟩ => ?_
-  have pr : 2 ^ (bits.val - 8) < 2 ^ 64 := Nat.pow_lt_pow_right one_lt_two (by omega)
+  have pr : 2 ^ (bits.val - 8) < 2 ^ 64 := Nat.pow_lt_pow_right one_lt_two (by (clear * - hb h8'; omega))
   rw [hr, lit_val, Nat.shiftLeft_eq, one_mul, UScalar.size_def, UScalarTy.U64_numBits_eq,
     Nat.mod_eq_of_lt pr] at hi
   refine WP.spec_bind (UScalar.sub_spec (x := i) (y := 1#u64) (by rw [hi, lit_val]; exact Nat.one_le_two_pow))
@@ -156,7 +149,7 @@ theorem sin_quarter_spec (p : Std.U64) (bits : Std.U32) (hb : bits.val ≤ 62)
     rw [UScalar.val_and, hi1, Nat.and_two_pow_sub_one_eq_mod]
   generalize p &&& i1 = b at bv ⊢
   rw [lift, bind_ok]
-  have ck := usize_cast_val k (by omega)
+  have ck := usize_cast_val k (by (clear * - hk k256; omega))
   refine WP.spec_bind (sin_table_spec _ (by rw [ck]; exact k256)) fun sv ⟨hs, sU⟩ => ?_
   rw [ck, hk] at hs
   have pk : p.val = 2 ^ (bits.val - 8) * (p.val / 2 ^ (bits.val - 8)) + p.val % 2 ^ (bits.val - 8) :=
@@ -175,24 +168,24 @@ theorem sin_quarter_spec (p : Std.U64) (bits : Std.U32) (hb : bits.val ≤ 62)
     have bl : b.val < 2 ^ (bits.val - 8) := bv ▸ Nat.mod_lt _ (Nat.two_pow_pos _)
     calc b.val * 2 ^ (62 - bits.val) ≤ 2 ^ (bits.val - 8) * 2 ^ (62 - bits.val) :=
           Nat.mul_le_mul_right _ bl.le
-      _ = 2 ^ 54 := by rw [← pow_add]; congr 1; omega
+      _ = 2 ^ 54 := by rw [← pow_add]; congr 1; (clear * - hb h8' hi pr bv; omega)
   refine WP.spec_bind (UScalar.ShiftLeft_spec 1#u64 fulcrum.tables.trig.STEPS _
-    (by rw [trig_steps_val, UScalarTy.U64_numBits_eq]; omega) rfl) fun i3 ⟨hi3, _⟩ => ?_
+    (by rw [trig_steps_val, UScalarTy.U64_numBits_eq]; (clear * -; omega)) rfl) fun i3 ⟨hi3, _⟩ => ?_
   rw [trig_steps_val, lit_val, Nat.shiftLeft_eq, one_mul, UScalar.size_def, UScalarTy.U64_numBits_eq,
-    Nat.mod_eq_of_lt (Nat.pow_lt_pow_right one_lt_two (by omega))] at hi3
+    Nat.mod_eq_of_lt (Nat.pow_lt_pow_right one_lt_two (by (clear * -; omega)))] at hi3
   refine WP.spec_bind (UScalar.sub_spec (x := i3) (y := k) (by rw [hi3]; exact k256)) fun i4 ⟨hi4, _⟩ => ?_
   rw [hi3] at hi4
   rw [lift, bind_ok]
-  have c4 := usize_cast_val i4 (by omega)
-  refine WP.spec_bind (sin_table_spec _ (by rw [c4, hi4]; omega)) fun cv ⟨hc, cU⟩ => ?_
+  have c4 := usize_cast_val i4 (by (clear * - hk k256 ck hi4; omega))
+  refine WP.spec_bind (sin_table_spec _ (by rw [c4, hi4]; (clear * - hk k256 ck hi4 c4; omega))) fun cv ⟨hc, cU⟩ => ?_
   rw [c4, hi4] at hc
   refine WP.spec_bind (UScalar.sub_spec (x := fulcrum.tables.trig.FRAC) (y := bits)
     (by rw [trig_frac_val]; exact hb)) fun i6 ⟨hi6, _⟩ => ?_
   rw [trig_frac_val] at hi6
-  refine WP.spec_bind (UScalar.ShiftLeft_spec b i6 _ (by rw [hi6, UScalarTy.U64_numBits_eq]; omega) rfl)
+  refine WP.spec_bind (UScalar.ShiftLeft_spec b i6 _ (by rw [hi6, UScalarTy.U64_numBits_eq]; (clear * - hb h8'; omega)) rfl)
     fun i7 ⟨hi7, _⟩ => ?_
   rw [hi6, Nat.shiftLeft_eq, UScalar.size_def, UScalarTy.U64_numBits_eq,
-    Nat.mod_eq_of_lt (b54.trans_lt (Nat.pow_lt_pow_right one_lt_two (by omega)))] at hi7
+    Nat.mod_eq_of_lt (b54.trans_lt (Nat.pow_lt_pow_right one_lt_two (by (clear * -; omega))))] at hi7
   have P63 : fulcrum.tables.trig.FRAC_PI_2.val ≤ 2 ^ 63 := by
     rw [frac_pi_2_val]; exact Nat.le_of_ble_eq_true rfl
   refine WP.spec_bind (trig_mul_le_spec i7 _ _ _ (hi7 ▸ b54) P63 (Nat.le_of_ble_eq_true rfl))
@@ -201,9 +194,9 @@ theorem sin_quarter_spec (p : Std.U64) (bits : Std.U32) (hb : bits.val ≤ 62)
     hθ ▸ (mul62_mono _ _ _ _ (hi7 ▸ b54) P63).trans (Nat.le_of_ble_eq_true rfl)
   refine WP.spec_bind (trig_mul_le_spec θ θ _ _ θ55 θ55 (Nat.le_of_ble_eq_true rfl)) fun z hz => ?_
   have z48 : z.val ≤ 2 ^ 48 := hz ▸ (mul62_mono _ _ _ _ θ55 θ55).trans (Nat.le_of_ble_eq_true rfl)
-  have zU : z.val ≤ 2 ^ 62 := z48.trans (Nat.pow_le_pow_right two_pos (by omega))
-  refine WP.spec_bind (u64_div_spec z 6#u64 6 rfl (by omega)) fun i8 hi8 => ?_
-  refine WP.spec_bind (u64_div_spec z 20#u64 20 rfl (by omega)) fun i9 hi9 => ?_
+  have zU : z.val ≤ 2 ^ 62 := z48.trans (Nat.pow_le_pow_right two_pos (by (clear * -; omega)))
+  refine WP.spec_bind (u64_div_spec z 6#u64 6 rfl (by (clear * -; omega))) fun i8 hi8 => ?_
+  refine WP.spec_bind (u64_div_spec z 20#u64 20 rfl (by (clear * -; omega))) fun i9 hi9 => ?_
   refine WP.spec_bind trig_one_spec fun one hone => ?_
   have dz : ∀ d, z.val / d ≤ 2 ^ 48 := fun d => (Nat.div_le_self _ _).trans z48
   refine WP.spec_bind (UScalar.sub_spec (x := one) (y := i9) (by rw [hone, hi9]; exact div_le_U _ _ zU))
@@ -219,9 +212,9 @@ theorem sin_quarter_spec (p : Std.U64) (bits : Std.U32) (hb : bits.val ≤ 62)
   refine WP.spec_bind (trig_mul_le_spec θ i13 _ _ θ55 (hi13 ▸ Nat.sub_le _ _)
     (Nat.le_of_ble_eq_true rfl)) fun sb hsb => ?_
   have sb55 : sb.val ≤ 2 ^ 55 := hsb ▸ (mul62_le_left _ _ (hi13 ▸ Nat.sub_le _ _)).trans θ55
-  refine WP.spec_bind (u64_div_spec z 2#u64 2 rfl (by omega)) fun i14 hi14 => ?_
-  refine WP.spec_bind (u64_div_spec z 12#u64 12 rfl (by omega)) fun i15 hi15 => ?_
-  refine WP.spec_bind (u64_div_spec z 30#u64 30 rfl (by omega)) fun i16 hi16 => ?_
+  refine WP.spec_bind (u64_div_spec z 2#u64 2 rfl (by (clear * -; omega))) fun i14 hi14 => ?_
+  refine WP.spec_bind (u64_div_spec z 12#u64 12 rfl (by (clear * -; omega))) fun i15 hi15 => ?_
+  refine WP.spec_bind (u64_div_spec z 30#u64 30 rfl (by (clear * -; omega))) fun i16 hi16 => ?_
   refine WP.spec_bind (UScalar.sub_spec (x := one) (y := i16) (by rw [hone, hi16]; exact div_le_U _ _ zU))
     fun i17 ⟨hi17, _⟩ => ?_
   rw [hone, hi16] at hi17

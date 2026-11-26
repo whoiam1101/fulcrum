@@ -1,9 +1,12 @@
 module
 
 public import Fulcrum.L5.Scale
-public import Fulcrum.Math.ScaleTo
-public import Fulcrum.Wide.Mul
-public import Fulcrum.Wide.DivU256
+import Fulcrum.L3.Sqrt.K64
+import Fulcrum.L5.Length
+import Fulcrum.Lemmas.Scalar
+import Fulcrum.Math.ScaleTo
+import Fulcrum.Wide.DivU256
+import Fulcrum.Wide.Mul
 
 /-!
 # L5: `kernel::k64::scale_to`, `kernel::k64::scale_vec`
