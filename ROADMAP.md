@@ -249,10 +249,10 @@ Every public item of `API.md` is reviewed against the engine (`rat`): names, sig
 
 The `lean` job of CI is the longest check on every push. The proofs stay the same theorems; only how they are built and checked changes.
 
-- CI: what does not change between pushes is cached, and independent checks run in parallel.
-- A margin under the heartbeat limit, so that an update of Mathlib or Aeneas does not break a proof that only just fits.
-- The slowest proofs, found by the profiler, are made lighter: heavy tactics over a long context give way to direct terms and small lemmas, each change measured.
-- The modules are split so that the longest chain of imports gets shorter.
+- [ ] CI: what does not change between pushes is cached, and independent checks run in parallel.
+- [x] A margin under the heartbeat limit, so that an update of Mathlib or Aeneas does not break a proof that only just fits: `verify/lean/lakefile.toml` builds with `maxHeartbeats = 100000`, half the default; the largest proof takes 70 305 (`angle_between3_spec`, it took 197 760 of 200 000).
+- [x] The slowest proofs, found by the profiler, are made lighter: heavy tactics over a long context give way to direct terms and small lemmas, each change measured. `linarith` and `nlinarith` in the long proofs take `only [...]`, `omega` there runs after `clear * -` of what it does not use, `set!` where `set` rewrites nothing, the math of `exp_spec` moves to `Math/ExpReduce.lean` and that of `angle_between3_spec` to lemmas of its own, the series of the tables have the fewest terms that pass (one fewer fails at some entry, by exact rational arithmetic) (`sin` 12, `atan` 29 and 19, `exp2` 32, `log2` 20, `log2_wide` 40): 4.01 million heartbeats in all become 1.95.
+- [x] The modules are split so that the longest chain of imports gets shorter: every table in a file of its own (`Tables/SinQuarter`, `Atan`, `Exp2`, `Log2`, `Log2Wide`), the helpers that `L4/Log` and `L4/Exp` took from `L4/Angle` and `L4/SinQuarter` and `L5/Scale` from `L4/Vec` in `Lemmas/Scalar` and `Math/Fixed`, so the L4 proofs of `exp` and `pow` no longer wait for those of the trigonometry; every file has the imports that `#min_imports` finds, `public` only where a statement needs it, but for two it cannot see (`import all` in `L4/Vec`, `Fulcrum.Spec` for `positivity` in `Math/DivWide` and `Math/DivU256`). On 4 cores the build takes 95 s instead of 162 (CPU 343 s instead of 526); `leanchecker` stays at 268 s, mostly the start of each of its runs.
 
 **Done when:** the `lean` job is at least twice as fast as on `v1.0.0`, and every proof keeps a margin under the heartbeat limit.
 
