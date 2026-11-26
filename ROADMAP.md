@@ -13,6 +13,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 7 | Optimizations, vectorized loops | `v0.7.0` | ✅ done |
 | 8 | Lean proofs of the kernel and of the error bounds | `v1.0.0` | ✅ done |
 | 9 | API review and freeze | `v1.1.0` | |
+| 10 | Faster Lean build | `v1.2.0` | |
 | — | `FixedFloat128`, `FixedFloat256`, only on demand | after `1.0` | deferred |
 
 Widths stop at `FixedFloat64` until 1.0. Q32.32 holds ±2.1·10⁹ with a step of 2.3·10⁻¹⁰, which covers game worlds, and the accumulators are already exact. Every extra width would repeat the work of every later stage (tables, error bounds, proofs) for a type nobody uses yet, so the wide types wait at the end of the plan until a concrete need appears ([Wide types](#wide-types-on-demand)).
@@ -234,6 +235,17 @@ Lean 4 is the last step. It covers `src/kernel.rs`, the one place that owns widt
 Every public item of `API.md` is reviewed against the engine (`rat`): names, signatures, what is public. After `v1.1.0` the API changes only in a major version.
 
 **Done when:** the review is done and nothing in the API is expected to change.
+
+## 10. Faster Lean build `v1.2.0`
+
+The `lean` job of CI is the longest check on every push. The proofs stay the same theorems; only how they are built and checked changes.
+
+- CI: what does not change between pushes is cached, and independent checks run in parallel.
+- A margin under the heartbeat limit, so that an update of Mathlib or Aeneas does not break a proof that only just fits.
+- The slowest proofs, found by the profiler, are made lighter: heavy tactics over a long context give way to direct terms and small lemmas, each change measured.
+- The modules are split so that the longest chain of imports gets shorter.
+
+**Done when:** the `lean` job is at least twice as fast as on `v1.0.0`, and every proof keeps a margin under the heartbeat limit.
 
 ## Wide types (on demand)
 
