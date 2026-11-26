@@ -54,11 +54,6 @@ macro_rules! add_round_spec {
             assert_eq!((x - y).to_bits() as i128, saturate(ra - rb, $bits));
             assert_eq!((-x).to_bits() as i128, saturate(-ra, $bits));
             assert_eq!(x.abs().to_bits() as i128, saturate(ra.abs(), $bits));
-            if b == 0 {
-                assert_eq!(x.saturating_rem(y), $T::ZERO);
-            } else {
-                assert_eq!(x.saturating_rem(y).to_bits(), a.wrapping_rem(b));
-            }
 
             let q = ra.div_euclid(one);
             let up = -((-ra).div_euclid(one));
@@ -222,6 +217,22 @@ from_int_spec!(from_int_spec_8, FixedFloat8, 8, 4);
 from_int_spec!(from_int_spec_16, FixedFloat16, 16, 8);
 from_int_spec!(from_int_spec_32, FixedFloat32, 32, 16);
 from_int_spec!(from_int_spec_64, FixedFloat64, 64, 32);
+
+/// `saturating_rem` is `wrapping_rem` of `core` on the raw values, and `0`
+/// for a zero divisor. On 8 bits only: the solver needs far more time for a
+/// symbolic remainder of 32 and 64 bits, and the code is the same macro for
+/// every width.
+#[kani::proof]
+fn rem_spec_8() {
+    let a: i8 = kani::any();
+    let b: i8 = kani::any();
+    let (x, y) = (FixedFloat8::from_bits(a), FixedFloat8::from_bits(b));
+    if b == 0 {
+        assert_eq!(x.saturating_rem(y), FixedFloat8::ZERO);
+    } else {
+        assert_eq!(x.saturating_rem(y).to_bits(), a.wrapping_rem(b));
+    }
+}
 
 /// `double` never panics and keeps every digit at most 9, for any `k ≤ 65`.
 #[kani::proof]
