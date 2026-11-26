@@ -12,7 +12,7 @@ Each stage ends with an annotated tag. Stage *n* is tagged `v0.n.0`; fixes, spee
 | 6 | `exp2`, `log2`, `exp`, `ln`, `pow` | `v0.6.0` | ✅ done |
 | 7 | Optimizations, vectorized loops | `v0.7.0` | ✅ done |
 | 8 | Lean proofs of the kernel and of the error bounds | `v1.0.0` | ✅ done |
-| 9 | API review and freeze | `v1.1.0` | |
+| 9 | API review and freeze | `v1.1.0` | ✅ done |
 | 10 | Faster Lean build | `v1.2.0` | |
 | — | `FixedFloat128`, `FixedFloat256`, only on demand | after `1.0` | deferred |
 
@@ -230,9 +230,14 @@ Lean 4 is the last step. It covers `src/kernel.rs`, the one place that owns widt
 
 **Done when:** L1–L5 are proven, and what they prove is no longer brute-forced. The API review and freeze move to `v1.1.0`.
 
-## 9. API review and freeze `v1.1.0`
+## 9. API review and freeze ✅ `v1.1.0`
 
 Every public item of `API.md` is reviewed against the engine (`rat`): names, signatures, what is public. After `v1.1.0` the API changes only in a major version.
+
+- ✅ The contract of `rat` (`docs/ARCHITECTURE.md` §1.1 of the engine) is covered: the same bits on x86-64 and ARM64, saturation without panics, `sqrt`, `sin`, `cos`, `atan2` without floats, `Vec2` and `Vec3` with `length`, `normalize` and `dot`, bytes and `serde` for snapshots, replays and checksums, `no_std`.
+- ✅ Names and signatures stay: every public item of the rustdoc of `v1.0.0` was checked against `API.md`, no documented item is renamed or removed, which would take a major version (`cargo semver-checks` in CI, which passes `v1.0.0` → `v1.1.0` as a minor change; it skips `#[doc(hidden)]` items, which are not part of the API). What the engine does not use yet (`serde` and bytes of the angle types, `Send + Sync` on `FixedFloat`, vectors from arrays and between widths) is not added: a minor version adds it when the code of `rat` needs it (ARCHITECTURE §10).
+- ✅ What is public: the hidden kernels of the generic vectors and of `saturating_from`, `wrapping_from` (`__dot`, `__det`, `__hypot3`, `__scale_to`, `__cmp_length`, `__rotate`, `__angle2`, `__angle3`, `__raw_i128`) move from `FixedFloat` to a private supertrait, and each takes a private token, so no code outside the crate can call them; a `compile_fail` doctest checks it. `__lit` stays hidden and public for the literal macros.
+- ✅ `API.md` and `API.ru.md` describe `v1.1.0`: `shr_round` as the `const` form of `>>`, the bits of an angle for snapshots, the `const` methods of the vectors, the sealed traits that a minor version may extend, and the freeze in place of "the API may change before 1.0".
 
 **Done when:** the review is done and nothing in the API is expected to change.
 

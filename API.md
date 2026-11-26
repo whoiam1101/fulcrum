@@ -1,14 +1,14 @@
-# fulcrum 0.7: API guide
+# fulcrum 1.1: API guide
 
 **English** · [Русский](API.ru.md)
 
-How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v0.7.1`.
+How to use the library: the types, how to create values, what operations do at the edges, how to serialize, and how to write generic code. Describes `v1.1.0`.
 
 ## 1. Setup
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.0.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.1.0" }
 ```
 
 The crate is `no_std`, has no required dependencies, MSRV 1.60, and no `unsafe` outside the optional `bytemuck` feature. Features (all off by default):
@@ -121,7 +121,7 @@ Same as the primitive integers. Everything below is a `const fn`.
 
 `x << n` is the exact `x · 2ⁿ`, saturating; any `n` is accepted. `x >> n` is `x / 2ⁿ` with the same rounding as `/`, so `x >> 1 == x / 2` for every `x`. It is **not** an arithmetic shift of the raw value: `DELTA >> 1 == DELTA`, `-DELTA >> 1 == 0`. For a raw bit shift, use `to_bits()`.
 
-`wrapping_shl(n)` with `n ≥ BITS` gives `0`; unlike the primitives, `n` is not masked.
+`x.shr_round(n)` is `x >> n` as a `const fn`. `wrapping_shl(n)` with `n ≥ BITS` gives `0`; unlike the primitives, `n` is not masked.
 
 ### Other methods
 
@@ -358,6 +358,8 @@ assert!(s > c);
 
 There is no `Ord`: angles on a circle have no order. The trait `FixedAngle` (every method and constant above, the raw type `Bits` and the paired fixed-point type `Fixed`) and the associated type `FixedFloat::Angle` let generic code go from a fixed-point type to its angle type.
 
+An angle has no bytes, `serde` or `bytemuck` of its own: snapshots, replays and checksums store `to_bits()`, the unsigned raw integer, with its `to_le_bytes`, and `from_bits` reads it back exactly.
+
 ### Vectors: `Vec2`, `Vec3`
 
 `Vec2<T>` and `Vec3<T>` over any fixed-point type, with public fields `x`, `y` (`z`), `#[repr(C)]`: two or three components in a row, no padding. Aliases name each width: `Vec2f8` … `Vec2f64`, `Vec3f8` … `Vec3f64`. The rules are those of the scalars: operators saturate per component (and panic under `strict-overflow`), and every method that combines components rounds once, from exact intermediates.
@@ -562,7 +564,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 }
 ```
 
-Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). The trait grows with the stages: `sin_cos` and `atan2` joined in stage 4, `hypot` and `lerp` in stage 5 for the generic vectors, `log2`, `exp2`, `ln`, `exp`, `pow` and `powi` in stage 6.
+Everything else (`saturating_*`, `overflowing_*`, `to_int_*`, bytes, accumulators, other constants) exists only as inherent methods of the concrete types (`const` where §15 says so). `sin_cos` and `atan2` joined the trait in stage 4, `hypot` and `lerp` in stage 5 for the generic vectors, `log2`, `exp2`, `ln`, `exp`, `pow` and `powi` in stage 6. Both traits are sealed, so a minor version may add a method or a constant to them without breaking any code that uses them.
 
 ## 12. `strict-overflow`
 
@@ -574,7 +576,7 @@ For tests only:
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.0.0", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.1.0", features = ["strict-overflow"] }
 ```
 
 Cargo unifies features, so under `cargo test` of your crate the feature is enabled for the normal dependency too.
@@ -598,8 +600,8 @@ Use it for debugging, tests, rendering and loading input data. Once a value has 
 - **Same bits everywhere.** The result of every operation depends only on the input bits: not on the platform, compiler, optimization level or number of threads. Checked by a golden hash on x86-64, ARM64 and i686 in debug and release. A determinism bug is treated as a security issue ([SECURITY.md](SECURITY.md)).
 - **No panics** without `strict-overflow`: not on overflow, not on division by zero, not on any input string.
 - **Accuracy.** `+ - %`, comparisons, left shift and widening are exact. `* / >>`, `div_int`, `mul_add`, `mul_div`, `lerp`, `sqrt`, `rsqrt`, `hypot`, narrowing, parsing, literals and accumulators are correctly rounded (error ≤ ½ ulp, ties toward `+∞`). Constants are correctly rounded. `sin_turns`, `cos_turns`, `sin`, `cos`, `tan`, `atan`, `atan2`, `asin`, `acos`, `log2`, `exp2`, `ln`, `exp`, `pow` and `powi` are within 1 ulp.
-- **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`. Operators are not: `core::ops` traits are not `const` in stable Rust.
-- **Stability.** The API may change before 1.0. The result bits of existing operations do not: speedups must produce the same bits.
+- **`const fn`** almost everywhere: every method of the types except `saturating_from`, `wrapping_from` and the `f64` conversions; on accumulators only `new`, `merge`, `finish` and `checked_finish` are `const`, on vectors only `new` and the bytes. Operators are not: `core::ops` traits are not `const` in stable Rust.
+- **Stability.** The API is frozen since `v1.1.0`: a minor version only adds, a name, a signature or a documented behaviour changes only in a major version; CI checks each release against the previous tag with `cargo semver-checks`. The result bits of existing operations never change: speedups must produce the same bits.
 
 ## 16. Common mistakes
 
