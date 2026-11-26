@@ -1,10 +1,16 @@
-# fulcrum
+<h1 align="center">
+<img src="assets/logo.svg" alt="fulcrum">
+</h1>
+
+<div align="center">
 
 [![ci](https://github.com/whoiam1101/fulcrum/actions/workflows/ci.yml/badge.svg)](https://github.com/whoiam1101/fulcrum/actions/workflows/ci.yml)
 [![codeql](https://github.com/whoiam1101/fulcrum/actions/workflows/codeql.yml/badge.svg)](https://github.com/whoiam1101/fulcrum/actions/workflows/codeql.yml)
 [![license](https://img.shields.io/badge/license-Apache--2.0-blue.svg)](LICENSE)
 [![msrv](https://img.shields.io/badge/MSRV-1.60-orange.svg)](Cargo.toml)
 [![formally verified in Lean 4](https://img.shields.io/badge/formally%20verified-Lean%204-6f42c1.svg)](verify/)
+
+</div>
 
 Deterministic fixed-point math for Rust: bit-identical results on every platform, no floating point inside. Operators saturate and never panic; sums are exact and independent of order and thread count. `no_std`, no required dependencies, MSRV 1.60. Made for lockstep networking, replays and simulations that must agree across machines.
 
