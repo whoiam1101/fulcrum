@@ -132,6 +132,40 @@ pub use vec::{Vec2, Vec2f16, Vec2f32, Vec2f64, Vec2f8, Vec3, Vec3f16, Vec3f32, V
 
 mod sealed {
     pub trait Sealed {}
+
+    /// An argument of every method of [`Fixed`]: code outside the crate cannot
+    /// name it, so it cannot call those methods even through a bound
+    /// `T: FixedFloat`.
+    ///
+    /// ```compile_fail,E0061
+    /// fn raw<T: fulcrum::FixedFloat>(x: T) -> i128 {
+    ///     x.__raw_i128()
+    /// }
+    /// ```
+    pub struct Token;
+
+    /// The exact kernels behind the generic vectors and the conversions
+    /// between widths: a supertrait of [`crate::FixedFloat`] that code outside
+    /// the crate can neither name nor call, since every method takes a
+    /// [`Token`].
+    pub trait Fixed: Sized {
+        fn __raw_i128(self, _: Token) -> i128;
+        fn __dot(a: &[Self], b: &[Self], _: Token) -> Self;
+        fn __det(a: Self, b: Self, c: Self, d: Self, _: Token) -> Self;
+        fn __hypot3(a: Self, b: Self, c: Self, _: Token) -> Self;
+        fn __scale_to(v: [Self; 3], len: Self, _: Token) -> [Self; 3];
+        fn __cmp_length(v: [Self; 3], len: Self, _: Token) -> core::cmp::Ordering;
+        fn __rotate(
+            x: Self,
+            y: Self,
+            angle: <Self as crate::FixedFloat>::Angle,
+            _: Token,
+        ) -> (Self, Self)
+        where
+            Self: crate::FixedFloat;
+        fn __angle2(a: [Self; 2], b: [Self; 2], _: Token) -> Self;
+        fn __angle3(a: [Self; 3], b: [Self; 3], _: Token) -> Self;
+    }
 }
 
 /// Interface shared by all fixed-point types, for generic code.
@@ -158,6 +192,7 @@ pub trait FixedFloat:
     + core::ops::DivAssign
     + core::ops::RemAssign
     + sealed::Sealed
+    + sealed::Fixed
 {
     /// The angle type of the same width.
     type Angle: FixedAngle<Fixed = Self>;
@@ -196,8 +231,6 @@ pub trait FixedFloat:
     fn from_bits(bits: Self::Bits) -> Self;
     /// The raw representation.
     fn to_bits(self) -> Self::Bits;
-    #[doc(hidden)]
-    fn __raw_i128(self) -> i128;
     /// Converts an integer, saturating.
     fn saturating_from_int(n: i128) -> Self;
     /// Converts an integer, or `None` when out of range.
@@ -266,22 +299,6 @@ pub trait FixedFloat:
     /// `self^n` within 1 ulp, saturated.
     #[must_use]
     fn powi(self, n: i32) -> Self;
-    #[doc(hidden)]
-    fn __dot(a: &[Self], b: &[Self]) -> Self;
-    #[doc(hidden)]
-    fn __det(a: Self, b: Self, c: Self, d: Self) -> Self;
-    #[doc(hidden)]
-    fn __hypot3(a: Self, b: Self, c: Self) -> Self;
-    #[doc(hidden)]
-    fn __scale_to(v: [Self; 3], len: Self) -> [Self; 3];
-    #[doc(hidden)]
-    fn __cmp_length(v: [Self; 3], len: Self) -> core::cmp::Ordering;
-    #[doc(hidden)]
-    fn __rotate(x: Self, y: Self, angle: Self::Angle) -> (Self, Self);
-    #[doc(hidden)]
-    fn __angle2(a: [Self; 2], b: [Self; 2]) -> Self;
-    #[doc(hidden)]
-    fn __angle3(a: [Self; 3], b: [Self; 3]) -> Self;
 }
 
 /// Interface shared by the angle types [`Angle8`] … [`Angle64`], for generic

@@ -104,7 +104,7 @@ macro_rules! impl_vec {
             /// once to nearest (ties toward `+∞`) and saturated.
             #[inline]
             pub fn dot(self, other: Self) -> T {
-                T::__dot(&[$(self.$c),+], &[$(other.$c),+])
+                T::__dot(&[$(self.$c),+], &[$(other.$c),+], crate::sealed::Token)
             }
 
             /// The squared length, `self · self`, rounded once and saturated.
@@ -144,7 +144,7 @@ macro_rules! impl_vec {
                 if self == Self::ZERO {
                     None
                 } else {
-                    Some(Self::from_xyz(T::__scale_to(self.to_xyz(), T::ONE)))
+                    Some(Self::from_xyz(T::__scale_to(self.to_xyz(), T::ONE, crate::sealed::Token)))
                 }
             }
 
@@ -164,8 +164,8 @@ macro_rules! impl_vec {
             #[must_use]
             pub fn clamp_length_max(self, max: T) -> Self {
                 let max = core::cmp::max(max, T::ZERO);
-                if T::__cmp_length(self.to_xyz(), max) == core::cmp::Ordering::Greater {
-                    Self::from_xyz(T::__scale_to(self.to_xyz(), max))
+                if T::__cmp_length(self.to_xyz(), max, crate::sealed::Token) == core::cmp::Ordering::Greater {
+                    Self::from_xyz(T::__scale_to(self.to_xyz(), max, crate::sealed::Token))
                 } else {
                     self
                 }
@@ -181,8 +181,8 @@ macro_rules! impl_vec {
             #[must_use]
             pub fn clamp_length(self, min: T, max: T) -> Self {
                 let min = core::cmp::max(min, T::ZERO);
-                if T::__cmp_length(self.to_xyz(), min) == core::cmp::Ordering::Less {
-                    Self::from_xyz(T::__scale_to(self.to_xyz(), min))
+                if T::__cmp_length(self.to_xyz(), min, crate::sealed::Token) == core::cmp::Ordering::Less {
+                    Self::from_xyz(T::__scale_to(self.to_xyz(), min, crate::sealed::Token))
                 } else {
                     self.clamp_length_max(max)
                 }
@@ -310,7 +310,7 @@ impl<T: FixedFloat> Vec2<T> {
     #[inline]
     #[must_use]
     pub fn rotate(self, angle: T::Angle) -> Self {
-        let (x, y) = T::__rotate(self.x, self.y, angle);
+        let (x, y) = T::__rotate(self.x, self.y, angle, crate::sealed::Token);
         Self { x, y }
     }
 
@@ -319,7 +319,7 @@ impl<T: FixedFloat> Vec2<T> {
     /// within 1 ulp. `0` when either vector is zero.
     #[inline]
     pub fn angle_to(self, other: Self) -> T {
-        T::__angle2([self.x, self.y], [other.x, other.y])
+        T::__angle2([self.x, self.y], [other.x, other.y], crate::sealed::Token)
     }
 
     /// The unit vector along `x`.
@@ -344,7 +344,7 @@ impl<T: FixedFloat> Vec2<T> {
     /// the `z` of the cross product: rounded once and saturated.
     #[inline]
     pub fn perp_dot(self, other: Self) -> T {
-        T::__det(self.x, self.y, other.x, other.y)
+        T::__det(self.x, self.y, other.x, other.y, crate::sealed::Token)
     }
 
     /// `self` turned a quarter turn counterclockwise, `(-y, x)`; `-MIN`
@@ -381,7 +381,7 @@ impl<T: FixedFloat> Vec3<T> {
     /// exact products, within 1 ulp. `0` when either vector is zero.
     #[inline]
     pub fn angle_to(self, other: Self) -> T {
-        T::__angle3(self.to_xyz(), other.to_xyz())
+        T::__angle3(self.to_xyz(), other.to_xyz(), crate::sealed::Token)
     }
 
     /// The unit vector along `x`.
@@ -407,7 +407,7 @@ impl<T: FixedFloat> Vec3<T> {
     /// squares and saturated.
     #[inline]
     pub fn length(self) -> T {
-        T::__hypot3(self.x, self.y, self.z)
+        T::__hypot3(self.x, self.y, self.z, crate::sealed::Token)
     }
 
     /// The cross product, each component rounded once from its exact value
@@ -416,9 +416,9 @@ impl<T: FixedFloat> Vec3<T> {
     #[must_use]
     pub fn cross(self, other: Self) -> Self {
         Self {
-            x: T::__det(self.y, self.z, other.y, other.z),
-            y: T::__det(self.z, self.x, other.z, other.x),
-            z: T::__det(self.x, self.y, other.x, other.y),
+            x: T::__det(self.y, self.z, other.y, other.z, crate::sealed::Token),
+            y: T::__det(self.z, self.x, other.z, other.x, crate::sealed::Token),
+            z: T::__det(self.x, self.y, other.x, other.y, crate::sealed::Token),
         }
     }
 }

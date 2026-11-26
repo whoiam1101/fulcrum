@@ -929,6 +929,75 @@ macro_rules! define_fixed {
 
         impl crate::sealed::Sealed for $Name {}
 
+        impl crate::sealed::Fixed for $Name {
+            #[inline]
+            fn __raw_i128(self, _: crate::sealed::Token) -> i128 {
+                i128::from(self.raw)
+            }
+            #[inline]
+            fn __det(a: Self, b: Self, c: Self, d: Self, _: crate::sealed::Token) -> Self {
+                Self::saturate(crate::kernel::$k::det(a.raw, b.raw, c.raw, d.raw))
+            }
+            #[inline]
+            fn __dot(a: &[Self], b: &[Self], _: crate::sealed::Token) -> Self {
+                Self::dot_slices(a, b)
+            }
+            #[inline]
+            fn __hypot3(a: Self, b: Self, c: Self, _: crate::sealed::Token) -> Self {
+                Self::saturate(crate::kernel::$k::hypot3(a.raw, b.raw, c.raw))
+            }
+            #[inline]
+            fn __scale_to(v: [Self; 3], len: Self, _: crate::sealed::Token) -> [Self; 3] {
+                let r = crate::kernel::$k::scale_vec(v[0].raw, v[1].raw, v[2].raw, len.raw);
+                [Self { raw: r[0] }, Self { raw: r[1] }, Self { raw: r[2] }]
+            }
+            #[inline]
+            fn __cmp_length(v: [Self; 3], len: Self, _: crate::sealed::Token) -> core::cmp::Ordering {
+                match crate::kernel::$k::cmp_length(v[0].raw, v[1].raw, v[2].raw, len.raw) {
+                    -1 => core::cmp::Ordering::Less,
+                    0 => core::cmp::Ordering::Equal,
+                    _ => core::cmp::Ordering::Greater,
+                }
+            }
+            #[inline]
+            fn __rotate(x: Self, y: Self, angle: crate::$Angle, _: crate::sealed::Token) -> (Self, Self) {
+                let (rx, ry) = crate::trig::rotate(
+                    i64::from(x.raw),
+                    i64::from(y.raw),
+                    u64::from(angle.to_bits()),
+                    <$Bits>::BITS,
+                );
+                (
+                    Self::saturating_from_scaled_bits(rx, $F),
+                    Self::saturating_from_scaled_bits(ry, $F),
+                )
+            }
+            #[inline]
+            fn __angle2(a: [Self; 2], b: [Self; 2], _: crate::sealed::Token) -> Self {
+                Self::saturating_from_scaled_bits(
+                    i128::from(crate::trig::angle_between2(
+                        i64::from(a[0].raw),
+                        i64::from(a[1].raw),
+                        i64::from(b[0].raw),
+                        i64::from(b[1].raw),
+                        $F,
+                    )),
+                    $F,
+                )
+            }
+            #[inline]
+            fn __angle3(a: [Self; 3], b: [Self; 3], _: crate::sealed::Token) -> Self {
+                Self::saturating_from_scaled_bits(
+                    i128::from(crate::trig::angle_between3(
+                        [i64::from(a[0].raw), i64::from(a[1].raw), i64::from(a[2].raw)],
+                        [i64::from(b[0].raw), i64::from(b[1].raw), i64::from(b[2].raw)],
+                        $F,
+                    )),
+                    $F,
+                )
+            }
+        }
+
         impl crate::FixedFloat for $Name {
             type Angle = crate::$Angle;
             type Bits = $Bits;
@@ -954,10 +1023,6 @@ macro_rules! define_fixed {
             #[inline]
             fn to_bits(self) -> $Bits {
                 self.raw
-            }
-            #[inline]
-            fn __raw_i128(self) -> i128 {
-                i128::from(self.raw)
             }
             #[inline]
             fn saturating_from_int(n: i128) -> Self {
@@ -1058,68 +1123,6 @@ macro_rules! define_fixed {
             #[inline]
             fn powi(self, n: i32) -> Self {
                 Self::powi(self, n)
-            }
-            #[inline]
-            fn __det(a: Self, b: Self, c: Self, d: Self) -> Self {
-                Self::saturate(crate::kernel::$k::det(a.raw, b.raw, c.raw, d.raw))
-            }
-            #[inline]
-            fn __dot(a: &[Self], b: &[Self]) -> Self {
-                Self::dot_slices(a, b)
-            }
-            #[inline]
-            fn __hypot3(a: Self, b: Self, c: Self) -> Self {
-                Self::saturate(crate::kernel::$k::hypot3(a.raw, b.raw, c.raw))
-            }
-            #[inline]
-            fn __scale_to(v: [Self; 3], len: Self) -> [Self; 3] {
-                let r = crate::kernel::$k::scale_vec(v[0].raw, v[1].raw, v[2].raw, len.raw);
-                [Self { raw: r[0] }, Self { raw: r[1] }, Self { raw: r[2] }]
-            }
-            #[inline]
-            fn __cmp_length(v: [Self; 3], len: Self) -> core::cmp::Ordering {
-                match crate::kernel::$k::cmp_length(v[0].raw, v[1].raw, v[2].raw, len.raw) {
-                    -1 => core::cmp::Ordering::Less,
-                    0 => core::cmp::Ordering::Equal,
-                    _ => core::cmp::Ordering::Greater,
-                }
-            }
-            #[inline]
-            fn __rotate(x: Self, y: Self, angle: crate::$Angle) -> (Self, Self) {
-                let (rx, ry) = crate::trig::rotate(
-                    i64::from(x.raw),
-                    i64::from(y.raw),
-                    u64::from(angle.to_bits()),
-                    <$Bits>::BITS,
-                );
-                (
-                    Self::saturating_from_scaled_bits(rx, $F),
-                    Self::saturating_from_scaled_bits(ry, $F),
-                )
-            }
-            #[inline]
-            fn __angle2(a: [Self; 2], b: [Self; 2]) -> Self {
-                Self::saturating_from_scaled_bits(
-                    i128::from(crate::trig::angle_between2(
-                        i64::from(a[0].raw),
-                        i64::from(a[1].raw),
-                        i64::from(b[0].raw),
-                        i64::from(b[1].raw),
-                        $F,
-                    )),
-                    $F,
-                )
-            }
-            #[inline]
-            fn __angle3(a: [Self; 3], b: [Self; 3]) -> Self {
-                Self::saturating_from_scaled_bits(
-                    i128::from(crate::trig::angle_between3(
-                        [i64::from(a[0].raw), i64::from(a[1].raw), i64::from(a[2].raw)],
-                        [i64::from(b[0].raw), i64::from(b[1].raw), i64::from(b[2].raw)],
-                        $F,
-                    )),
-                    $F,
-                )
             }
         }
 

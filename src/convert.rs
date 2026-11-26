@@ -79,7 +79,7 @@ macro_rules! impl_convert {
             /// the result is out of range. Widening is exact.
             #[inline]
             pub fn saturating_from<T: crate::FixedFloat>(x: T) -> Self {
-                Self::saturating_from_scaled_bits(x.__raw_i128(), T::FRAC_BITS)
+                Self::saturating_from_scaled_bits(x.__raw_i128(crate::sealed::Token), T::FRAC_BITS)
             }
 
             /// Converts any fixed-point value to this type, rounding dropped
@@ -87,7 +87,7 @@ macro_rules! impl_convert {
             /// result modulo `2^BITS` when it is out of range. Widening is exact.
             #[inline]
             pub fn wrapping_from<T: crate::FixedFloat>(x: T) -> Self {
-                Self::wrapping_from_scaled_bits(x.__raw_i128(), T::FRAC_BITS)
+                Self::wrapping_from_scaled_bits(x.__raw_i128(crate::sealed::Token), T::FRAC_BITS)
             }
 
             #[inline]
