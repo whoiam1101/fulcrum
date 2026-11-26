@@ -9,11 +9,14 @@
 Deterministic fixed-point math for Rust: bit-identical results on every platform, no floating point inside. Operators saturate and never panic; sums are exact and independent of order and thread count. `no_std`, no required dependencies, MSRV 1.60. Made for lockstep networking, replays and simulations that must agree across machines.
 
 > [!IMPORTANT]
-> **Formally verified in Lean 4.** The arithmetic kernel `src/kernel.rs`, which owns every width and every rounding of the crate, is proven correct on the code itself, not on a model: Charon and Aeneas translate the Rust to Lean, and the proofs show that rounding, narrowing, saturation, `*`, `/`, `div_int`, `mul_add`, `mul_div`, `lerp`, rescaling between scales and the integer square root of `FixedFloat8` … `FixedFloat64` never panic and return exactly the specified result — rounded to nearest, ties toward +∞ — for every input of their contract (a non-zero divisor, the root on its domain). The proofs use no axiom beyond those of Lean and Mathlib, no `sorry` and no `native_decide`; CI re-extracts the kernel, rebuilds the proofs and replays them through the Lean kernel on every push. See [`verify/`](verify/).
+> **Formally verified in Lean 4.** Charon and Aeneas translate the Rust of `src/kernel.rs`, `src/trig.rs` and `src/exp.rs` to Lean, and the proofs run on that translation of the code.
+> The kernel owns every width and every rounding of the crate. Its rounding, narrowing, saturation, `*`, `/`, `mul_add`, `mul_div`, `lerp`, square roots and vector lengths never panic and return the specified result, rounded to nearest with ties toward +∞, for every input of their contract.
+> Trigonometry, logarithms, exponentials and powers never panic on their domains and stay within their stated error bounds.
+> The proofs add no axiom to those of Lean and Mathlib and use no `sorry` or `native_decide`. On every push CI extracts the code again, rebuilds the proofs and replays them through the Lean kernel. See [`verify/`](verify/).
 
 Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32); vectors `Vec2<T>`, `Vec3<T>` over any of them.
 
-> **Status:** stages 1–7 of the [roadmap](ROADMAP.md) are done: arithmetic, `mul_add`, `mul_div`, `lerp`, exact accumulators, correctly rounded `sqrt`, `rsqrt`, `hypot`; trigonometry within 1 ulp (`sin_turns`, `cos_turns` and, in radians, `sin`, `cos`, `sin_cos`, `tan`, `atan`, `atan2`, `asin`, `acos`) and the wrapping angle types `Angle8` … `Angle64`; the vectors `Vec2` and `Vec3` (`dot`, `cross`, lengths rounded once, correctly rounded `normalize`, `rotate`, `angle_to`); `log2`, `exp2`, `ln`, `exp` within ½ ulp plus a small margin, and `pow`, `powi` within 1 ulp; plain loops over slices of 8–32 bits that vectorize on SSE2, AVX2 and NEON, checked in CI; optional `serde`, `bytemuck` and `num-traits` support. The API may change before 1.0. Not on crates.io; use a git dependency pinned to a tag.
+> **Status:** `v1.1.0`, the API is frozen: it changes only in a major version. The crate has integer arithmetic with exact accumulators, `mul_add`, `mul_div`, `lerp`, correctly rounded `sqrt`, `rsqrt`, `hypot`, trigonometry and the angle types `Angle8` … `Angle64`, the vectors `Vec2` and `Vec3`, and `log2`, `exp2`, `ln`, `exp`, `pow`, `powi`, all within 1 ulp. Loops over slices of 8–32 bits vectorize on SSE2, AVX2 and NEON, and CI checks that they do. Support for `serde`, `bytemuck` and `num-traits` sits behind optional features. The crate is not on crates.io: depend on it through git, pinned to a tag.
 
 ```toml
 [dependencies]
@@ -45,13 +48,13 @@ assert_eq!(left.merge(right).finish(), xs.iter().sum::<FixedFloat64>());
 ## Documentation
 
 - [API guide](API.md) ([на русском](API.ru.md)): types, operations, rounding, overflow, accumulators, features.
-- [Internals](docs/INTERNALS.md) (на русском): the math behind the kernel, rounding, division, parsing, formatting and accumulators, with proofs.
-- [Roadmap](ROADMAP.md): stages up to 1.0, what each delivers and how it is verified.
+- [Internals](docs/INTERNALS.md) (на русском): the math behind each function and its error bound, with proofs.
+- [Roadmap](ROADMAP.md): the stages, what each delivers and how it is verified.
 - [Security](SECURITY.md): a determinism bug is treated as a vulnerability.
 
 Local checks are recipes of the [`justfile`](justfile): `just` lists them, `just check` runs the fast ones, `just all` the gate before a push (lint, tests, oracle, MSRV, feature combinations, `cargo deny`). CI calls the same recipes where it can; the OS and target matrices, fuzzing, Kani and Lean stay in `.github/workflows`. Before contributing, install the hooks: `pre-commit install` (gitleaks, typos, actionlint, zizmor and the fast recipes on commit; tests, the MSRV build and `cargo deny` before push).
 
-Verified by Lean 4 proofs of the kernel, exhaustive tests of `FixedFloat8` and `FixedFloat16`, an exact rational oracle, fuzzing, Kani proofs and a golden hash on x86-64, ARM64 and 32-bit x86. CI runs on Linux, macOS and Windows and builds for `thumbv7em` without `std`.
+Besides the Lean proofs, CI checks every value of `FixedFloat8` and `FixedFloat16` exhaustively, compares with an exact rational oracle, fuzzes, runs Kani and compares a golden hash on x86-64, ARM64 and 32-bit x86. It tests on Linux, macOS and Windows and builds for `thumbv7em` without `std`.
 
 ## Benchmarks
 
@@ -315,7 +318,7 @@ Results that differ bit for bit from `linux/x86_64`, of 20000 operands per funct
 - A difference is reported only when the 95% confidence intervals of the two medians do not overlap and the medians differ by at least 5%; everything else is *on par*. Absolute numbers depend on the runner's CPU, ratios measured in the same run are what to compare.
 - `fixed` is measured with `saturating_*`, the closest to fulcrum semantics. fulcrum additionally rounds `*` and `/` to nearest, while `fixed` truncates: fulcrum does more work per operation and returns a more accurate result.
 - `i32`/`i64`/`i128` are plain integer arithmetic on the same loops, without rounding or saturation: a reference point for the cost of the integer operations themselves.
-- `f32`/`f64` are the speed ceiling: hardware floats are fast, but their results may differ between platforms and compilers. The gap shows the price of bit-identical results.
+- `f32`/`f64` are the speed ceiling: hardware floats are fast, but their results may differ between platforms and compilers. The gap between them and fulcrum is what bit-identical results cost.
 - Reproduce locally: `cd bench && cargo bench --bench ops && cargo run --release --bin report`.
 
 ## Citation

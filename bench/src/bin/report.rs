@@ -907,7 +907,7 @@ impl Report {
              fulcrum additionally rounds `*` and `/` to nearest, while `fixed` truncates: fulcrum does more work per operation and returns a more accurate result.\n\
              - `i32`/`i64`/`i128` are plain integer arithmetic on the same loops, without rounding or saturation: a reference point for the cost of the integer operations themselves.\n\
              - `f32`/`f64` are the speed ceiling: hardware floats are fast, but their results may differ between platforms and compilers. \
-             The gap shows the price of bit-identical results.\n\
+             The gap between them and fulcrum is what bit-identical results cost.\n\
              - Reproduce locally: `cd bench && cargo bench --bench ops && cargo run --release --bin report`.\n",
         );
         s

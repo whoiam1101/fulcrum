@@ -2,9 +2,13 @@
 
 Formal verification (docs/ARCHITECTURE.md §6.1):
 
-| Folder | Layer | Tool |
+| Folder | Tool | What it proves |
 |---|---|---|
-| `../src/proofs/` | 1 | Kani proof harnesses, run with `cargo kani` from the repository root |
-| `lean/` | 2–3 | Lean 4 spec and proofs through Aeneas extraction (stage 8 of `ROADMAP.md`): `src/kernel.rs` equals the specification, and the error bounds of `src/trig.rs` and of its tables |
+| `../src/proofs/` | Kani, `cargo kani` from the repository root | no panics and equality with the specification for the code outside the extracted modules |
+| `lean/` | Lean 4 on the code extracted by Charon and Aeneas | layers L1–L5 of stage 8 of `ROADMAP.md`: `src/kernel.rs` equals the specification, `src/trig.rs` and `src/exp.rs` stay within their error bounds |
 
-`lean/` builds with `just lean`. `lean/Fulcrum/Kernel/Types.lean` and `Funs.lean` are `src/kernel.rs` extracted by Charon and Aeneas (`just aeneas-src`, `just aeneas`, `just extract`; CI checks that they match the code); `FunsExternal.lean` defines by hand the functions of `core` that Aeneas does not know. The root `Fulcrum.lean` ends with `#check_axioms`: the build fails if any declaration of a `Fulcrum` module is an axiom or depends on anything beyond `propext`, `Classical.choice` and `Quot.sound`, so no `sorry`, `native_decide` or `bv_decide`. `just lean` then runs `leanchecker` on every module of `lean/Fulcrum/` separately (given several at once, it crashes).
+`just lean` builds `lean/` and then runs `leanchecker` on each module of `lean/Fulcrum/` in turn, since it crashes when given several at once.
+
+`lean/Fulcrum/Kernel/Types.lean` and `Funs.lean` hold `src/kernel.rs`, `src/trig.rs`, `src/exp.rs` and their tables, extracted with `just aeneas-src aeneas extract`. CI extracts them again and fails if they differ from the code. `FunsExternal.lean` defines by hand the functions of `core` that Aeneas does not know.
+
+The root `Fulcrum.lean` ends with `#check_axioms`. The build fails if a declaration of a `Fulcrum` module is an axiom or depends on anything beyond `propext`, `Classical.choice` and `Quot.sound`, which rules out `sorry`, `native_decide` and `bv_decide`.
