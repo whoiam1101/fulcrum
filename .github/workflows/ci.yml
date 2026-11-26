@@ -68,7 +68,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        test: [trig, radians, inverse, angle, roots, exp, pow, exhaustive, round_trip, vec_geometry]
+        test: [trig, radians, inverse, angle, exp, pow, round_trip, vec_geometry]
     runs-on: ubuntu-latest
     env:
       CARGO_PROFILE_RELEASE_OVERFLOW_CHECKS: "true"

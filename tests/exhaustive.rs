@@ -3,9 +3,9 @@
 //!
 //! `FixedFloat8`: every pair for every binary operation, every value for unary
 //! operations, formatting and parsing. `FixedFloat16`: every value for unary
-//! operations; every pair for binary operations runs only with `--ignored`
-//! (2^32 pairs, nightly CI). `parse(display(x)) = x` of every `FixedFloat32`
-//! is in `round_trip.rs`.
+//! operations. Every pair of 16 bits is not run: the kernel behind the binary
+//! operations is proven by Lean (`verify/lean/Fulcrum/L3/`).
+//! `parse(display(x)) = x` of every `FixedFloat32` is in `round_trip.rs`.
 
 #![cfg(not(feature = "strict-overflow"))]
 
@@ -89,15 +89,4 @@ fn fixed8_parse_rounding_below_ulp() {
             }
         }
     }
-}
-
-#[test]
-#[ignore = "2^32 pairs: run with --ignored --release"]
-fn fixed16_all_pairs() {
-    parallel(i64::from(i16::MIN), i64::from(i16::MAX) + 1, |a| {
-        let a = a as i16;
-        for b in i16::MIN..=i16::MAX {
-            check_pair!(FixedFloat16, 16, 8, a, b);
-        }
-    });
 }

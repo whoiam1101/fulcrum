@@ -1,14 +1,13 @@
 //! Square roots: `sqrt`, `rsqrt`, `hypot` and their `checked_*` variants
-//! against `spec::sqrt_ratio` and `spec::is_sqrt_ratio` of
-//! `tests/common/reference.rs` over `i128`, a binary search and the
-//! definition of rounding to nearest, independent of the Newton iteration of
-//! the kernel. All three are correctly rounded.
+//! against `spec::sqrt_ratio` of `tests/common/reference.rs` over `i128`, a
+//! binary search and the definition of rounding to nearest, independent of
+//! the Newton iteration of the kernel. All three are correctly rounded.
 //!
-//! `FixedFloat8`: every value and every pair. `FixedFloat16`: every value;
-//! every pair of `hypot` only with `--ignored`. `FixedFloat32`: every value of
-//! `sqrt` and `rsqrt` only with `--ignored`. Wider types: edge-biased random
-//! values; `hypot` of `FixedFloat64` squares beyond `i128` and is checked by
-//! the rational oracle (`oracle/tests/ops.rs`).
+//! `FixedFloat8`: every value and every pair. `FixedFloat16`: every value.
+//! Wider types: edge-biased random values; `hypot` of `FixedFloat64`
+//! squares beyond `i128` and is checked by the rational oracle
+//! (`oracle/tests/ops.rs`). The kernel behind all three is proven by Lean on
+//! every width (`verify/lean/Fulcrum/L5/Length.lean`).
 
 #![cfg(not(feature = "strict-overflow"))]
 
@@ -118,50 +117,6 @@ macro_rules! random_values {
 #[test]
 fn random_values_on_wider_types() {
     for_each_width!(random_values!());
-}
-
-#[test]
-#[ignore = "2^32 pairs: run with --ignored --release"]
-fn fixed16_hypot_all_pairs() {
-    parallel(i64::from(i16::MIN), i64::from(i16::MAX) + 1, |a| {
-        let x = FixedFloat16::from_bits(a as i16);
-        let ra = i128::from(a);
-        for b in i16::MIN..=i16::MAX {
-            let rb = i128::from(b);
-            let n = ra * ra + rb * rb;
-            let h = x.checked_hypot(FixedFloat16::from_bits(b));
-            match h {
-                Some(h) => assert!(
-                    spec::is_sqrt_ratio(i128::from(h.to_bits()), n, 1),
-                    "hypot {a} {b}"
-                ),
-                None => assert!(
-                    4 * n >= (2 * i128::from(i16::MAX) + 1).pow(2),
-                    "checked_hypot {a} {b} is None"
-                ),
-            }
-        }
-    });
-}
-
-#[test]
-#[ignore = "2^32 values: run with --ignored --release"]
-fn fixed32_sqrt_rsqrt_all_values() {
-    parallel(i64::from(i32::MIN), i64::from(i32::MAX) + 1, |a| {
-        let x = FixedFloat32::from_bits(a as i32);
-        let ra = i128::from(a);
-        if ra < 0 {
-            assert_eq!(x.sqrt(), FixedFloat32::ZERO, "sqrt {a}");
-            assert_eq!(x.rsqrt(), FixedFloat32::MAX, "rsqrt {a}");
-        } else {
-            let s = i128::from(x.sqrt().to_bits());
-            assert!(spec::is_sqrt_ratio(s, ra << 16, 1), "sqrt {a}");
-            if ra > 0 {
-                let r = i128::from(x.rsqrt().to_bits());
-                assert!(spec::is_sqrt_ratio(r, 1 << 48, ra), "rsqrt {a}");
-            }
-        }
-    });
 }
 
 macro_rules! known_values {
