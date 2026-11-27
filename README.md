@@ -22,11 +22,11 @@ Deterministic fixed-point math for Rust: bit-identical results on every platform
 
 Types: `FixedFloat8` (Q4.4), `FixedFloat16` (Q8.8), `FixedFloat32` (Q16.16), `FixedFloat64` (Q32.32); vectors `Vec2<T>`, `Vec3<T>` over any of them.
 
-> **Status:** `v1.1.0`, the API is frozen: it changes only in a major version. The crate has integer arithmetic with exact accumulators, `mul_add`, `mul_div`, `lerp`, correctly rounded `sqrt`, `rsqrt`, `hypot`, trigonometry and the angle types `Angle8` … `Angle64`, the vectors `Vec2` and `Vec3`, and `log2`, `exp2`, `ln`, `exp`, `pow`, `powi`, all within 1 ulp. Loops over slices of 8–32 bits vectorize on SSE2, AVX2 and NEON, and CI checks that they do. Support for `serde`, `bytemuck` and `num-traits` sits behind optional features. The crate is not on crates.io: depend on it through git, pinned to a tag.
+> **Status:** `v1.2.0`, the API is frozen: it changes only in a major version. The crate has integer arithmetic with exact accumulators, `mul_add`, `mul_div`, `lerp`, correctly rounded `sqrt`, `rsqrt`, `hypot`, trigonometry and the angle types `Angle8` … `Angle64`, the vectors `Vec2` and `Vec3`, and `log2`, `exp2`, `ln`, `exp`, `pow`, `powi`, all within 1 ulp. Loops over slices of 8–32 bits vectorize on SSE2, AVX2 and NEON, and CI checks that they do. Support for `serde`, `bytemuck` and `num-traits` sits behind optional features. The crate is not on crates.io: depend on it through git, pinned to a tag.
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.1.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.2.0" }
 ```
 
 ## Example

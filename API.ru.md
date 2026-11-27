@@ -2,13 +2,13 @@
 
 [English](API.md) · **Русский**
 
-Как пользоваться библиотекой: какие есть типы, как создавать значения, что делают операции на границах, как сериализовать и как писать обобщённый код. Описывает `v1.1.0`.
+Как пользоваться библиотекой: какие есть типы, как создавать значения, что делают операции на границах, как сериализовать и как писать обобщённый код. Описывает `v1.2.0`.
 
 ## 1. Подключение
 
 ```toml
 [dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.1.0" }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.2.0" }
 ```
 
 Крейт `no_std`, без обязательных зависимостей, MSRV 1.60, без `unsafe` вне необязательной фичи `bytemuck`. Фичи (все выключены по умолчанию):
@@ -578,7 +578,7 @@ fn total<T: FixedFloat>(xs: &[T]) -> T {
 
 ```toml
 [dev-dependencies]
-fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.1.0", features = ["strict-overflow"] }
+fulcrum = { git = "https://github.com/whoiam1101/fulcrum", tag = "v1.2.0", features = ["strict-overflow"] }
 ```
 
 Учтите: Cargo объединяет фичи, поэтому в `cargo test` вашего крейта фича включится и для обычной зависимости.
