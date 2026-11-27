@@ -36,7 +36,7 @@ jobs:
           persist-credentials: false
       - run: rustup toolchain install stable --profile minimal && rustup default stable
         shell: bash
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: just test test-release test-strict
@@ -57,7 +57,7 @@ jobs:
       - run: rustup toolchain install "$TOOLCHAIN" --profile minimal && rustup default "$TOOLCHAIN"
         env:
           TOOLCHAIN: ${{ matrix.toolchain }}
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: just test test-release test-strict
@@ -86,7 +86,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: just oracle
@@ -140,7 +140,7 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install nightly --profile minimal
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: cargo-fuzz
       - run: cargo +nightly fuzz run --target x86_64-unknown-linux-gnu "$TARGET" -- -max_total_time=600
@@ -158,7 +158,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: rustup toolchain install "$(just --evaluate msrv)" --profile minimal
@@ -171,7 +171,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }},cargo-hack
       - run: just test-integrations
@@ -183,7 +183,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }},cargo-hack
       - run: just hack
@@ -208,7 +208,7 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup component add clippy rustfmt
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }},typos@1.52.2
       - run: just lint
@@ -220,7 +220,7 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup toolchain install nightly --profile minimal --component miri
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: just miri
@@ -232,7 +232,7 @@ jobs:
         with:
           persist-credentials: false
       - run: rustup component add llvm-tools-preview
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }},cargo-llvm-cov
       - run: set -o pipefail && just cov | tee coverage.txt
@@ -251,7 +251,7 @@ jobs:
         with:
           persist-credentials: false
           fetch-depth: 0
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: cargo-semver-checks
       - name: the version bump covers every API change since the previous tag
@@ -278,7 +278,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }},cargo-mutants
       - run: just mutants --jobs 4 --sharding round-robin --shard "$SHARD/8"
@@ -357,7 +357,7 @@ jobs:
           persist-credentials: false
       - run: curl -sSfL https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh | sh -s -- -y --default-toolchain none
       - run: echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: just lean
@@ -368,7 +368,7 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           persist-credentials: false
-      - uses: taiki-e/install-action@4a76afe23f9e08d2d9550fb56e556444e8611d21
+      - uses: taiki-e/install-action@75a7c0f87bd666af3cdb75c5b9e9d03ab6044e6f
         with:
           tool: just@${{ env.JUST_VERSION }}
       - run: just aeneas-src
